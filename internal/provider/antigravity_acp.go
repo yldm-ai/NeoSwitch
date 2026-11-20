@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,8 @@ type AntigravityACP struct {
 	stdout      *bufio.Scanner
 	nextID      int64
 	initialized bool
+	// imagePrompts records whether the running agy advertised promptCapabilities.image in its initialize result.
+	imagePrompts bool
 }
 
 func (a *AntigravityACP) Model() string { return a.model }
@@ -145,9 +148,9 @@ func (a *AntigravityACP) Stream(ctx context.Context, req translate.Request) iter
 }
 
 func (a *AntigravityACP) CountTokens(ctx context.Context, req translate.Request) (int, error) {
-	// ACP does not expose a token-count method. This estimate keeps Claude Code's
-	// count_tokens endpoint usable without claiming provider billing precision.
-	return len([]rune(acpPrompt(req))) / 4, nil
+	// ACP does not expose a token-count method. This estimate keeps Claude Code's count_tokens endpoint usable without claiming provider billing precision; images are not counted.
+	text, _ := acpPrompt(req, false)
+	return len([]rune(text)) / 4, nil
 }
 
 func (a *AntigravityACP) prompt(ctx context.Context, req translate.Request) (string, error) {
@@ -157,14 +160,22 @@ func (a *AntigravityACP) prompt(ctx context.Context, req translate.Request) (str
 		return "", err
 	}
 	if !a.initialized {
+		var initResult struct {
+			AgentCapabilities struct {
+				PromptCapabilities struct {
+					Image bool `json:"image"`
+				} `json:"promptCapabilities"`
+			} `json:"agentCapabilities"`
+		}
 		if err := a.callLocked(ctx, "initialize", map[string]any{
 			"protocolVersion":    1,
 			"clientCapabilities": map[string]any{},
 			"clientInfo":         map[string]string{"name": "neoswitch", "version": "1"},
-		}, nil); err != nil {
+		}, &initResult); err != nil {
 			return "", err
 		}
 		a.initialized = true
+		a.imagePrompts = initResult.AgentCapabilities.PromptCapabilities.Image
 	}
 	var session struct {
 		SessionID string `json:"sessionId"`
@@ -191,9 +202,11 @@ func (a *AntigravityACP) prompt(ctx context.Context, req translate.Request) (str
 		StopReason string `json:"stopReason"`
 	}
 	var response strings.Builder
+	text, images := acpPrompt(req, a.imagePrompts)
+	blocks := append([]map[string]string{{"type": "text", "text": text}}, images...)
 	err := a.callLocked(ctx, "session/prompt", map[string]any{
 		"sessionId": session.SessionID,
-		"prompt":    []map[string]string{{"type": "text", "text": acpPrompt(req)}},
+		"prompt":    blocks,
 	}, &promptResult, func(method string, params json.RawMessage) {
 		if method != "session/update" {
 			return
@@ -210,7 +223,10 @@ func (a *AntigravityACP) prompt(ctx context.Context, req translate.Request) (str
 			response.WriteString(update.Update.Content.Text)
 		}
 	})
-	_ = a.callLocked(context.Background(), "session/close", map[string]any{"sessionId": session.SessionID}, nil)
+	// A prompt that failed at the transport level resets the process, and its sessions go with it.
+	if a.cmd != nil {
+		_ = a.callLocked(ctx, "session/close", map[string]any{"sessionId": session.SessionID}, nil)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -249,7 +265,23 @@ func (a *AntigravityACP) startLocked() error {
 }
 
 func (a *AntigravityACP) callLocked(ctx context.Context, method string, params any, result any, notify ...func(string, json.RawMessage)) error {
-	_ = ctx
+	if a.cmd == nil {
+		return errors.New("Antigravity ACP is not running")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	// The reads below block on agy's stdout, and every request shares this process under a.mu. Killing agy is the only way to unblock them when the caller gives up, so a hung agy cannot hold the lock past the request deadline. The next request starts a fresh process.
+	process := a.cmd.Process
+	stopKill := context.AfterFunc(ctx, func() { _ = process.Kill() })
+	defer stopKill()
+	transportErr := func(err error) error {
+		a.resetLocked()
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return fmt.Errorf("Antigravity ACP %s: %w", method, ctxErr)
+		}
+		return err
+	}
 	id := a.nextID
 	a.nextID++
 	payload, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
@@ -257,8 +289,7 @@ func (a *AntigravityACP) callLocked(ctx context.Context, method string, params a
 		return err
 	}
 	if _, err := a.stdin.Write(append(payload, '\n')); err != nil {
-		a.resetLocked()
-		return fmt.Errorf("write Antigravity ACP request: %w", err)
+		return transportErr(fmt.Errorf("write Antigravity ACP request: %w", err))
 	}
 	for a.stdout.Scan() {
 		line := a.stdout.Bytes()
@@ -299,11 +330,9 @@ func (a *AntigravityACP) callLocked(ctx context.Context, method string, params a
 		return nil
 	}
 	if err := a.stdout.Err(); err != nil {
-		a.resetLocked()
-		return fmt.Errorf("read Antigravity ACP response: %w", err)
+		return transportErr(fmt.Errorf("read Antigravity ACP response: %w", err))
 	}
-	a.resetLocked()
-	return errors.New("Antigravity ACP exited unexpectedly")
+	return transportErr(errors.New("Antigravity ACP exited unexpectedly"))
 }
 
 func (a *AntigravityACP) resetLocked() {
@@ -315,29 +344,31 @@ func (a *AntigravityACP) resetLocked() {
 	a.stdin = nil
 	a.stdout = nil
 	a.initialized = false
+	a.imagePrompts = false
 }
 
-func acpPrompt(req translate.Request) string {
-	var out strings.Builder
-	out.WriteString("Act as the language model for Claude Code. Return exactly one JSON object and no markdown. For a normal answer use {\"text\":\"...\"}. To invoke one of the supplied Claude Code tools use {\"tool_use\":{\"name\":\"tool name\",\"input\":{...}}}. Do not use ACP tools, edit files, or run commands yourself.\n\n")
+// acpPrompt renders the request as the text of one ACP prompt. Images become ACP image blocks sent after that text when the agent accepts them (acceptImages); the text marks where each one belongs. Attachments ACP cannot carry are marked as omitted so the model knows they existed.
+func acpPrompt(req translate.Request, acceptImages bool) (string, []map[string]string) {
+	p := &promptBuilder{acceptImages: acceptImages}
+	p.out.WriteString("Act as the language model for Claude Code. Return exactly one JSON object and no markdown. For a normal answer use {\"text\":\"...\"}. To invoke one of the supplied Claude Code tools use {\"tool_use\":{\"name\":\"tool name\",\"input\":{...}}}. Do not use ACP tools, edit files, or run commands yourself.\n\n")
 	if req.Config != nil && req.Config.SystemInstruction != nil {
-		out.WriteString("System instructions:\n")
-		writeParts(&out, req.Config.SystemInstruction.Parts)
-		out.WriteString("\n")
+		p.out.WriteString("System instructions:\n")
+		p.writeParts(req.Config.SystemInstruction.Parts)
+		p.out.WriteString("\n")
 	}
 	for _, content := range req.Contents {
-		out.WriteString(strings.ToUpper(string(content.Role)))
-		out.WriteString(":\n")
-		writeParts(&out, content.Parts)
-		out.WriteString("\n\n")
+		p.out.WriteString(strings.ToUpper(string(content.Role)))
+		p.out.WriteString(":\n")
+		p.writeParts(content.Parts)
+		p.out.WriteString("\n\n")
 	}
 	if req.Config != nil && len(req.Config.Tools) > 0 {
 		declarations, _ := json.Marshal(req.Config.Tools)
-		out.WriteString("Claude Code tool definitions for context only:\n")
-		out.Write(declarations)
-		out.WriteString("\n")
+		p.out.WriteString("Claude Code tool definitions for context only:\n")
+		p.out.Write(declarations)
+		p.out.WriteString("\n")
 	}
-	return out.String()
+	return p.out.String(), p.images
 }
 
 func acpResponseParts(raw string) ([]*genai.Part, error) {
@@ -378,22 +409,45 @@ func acpResponseParts(raw string) ([]*genai.Part, error) {
 	return []*genai.Part{{Text: response.Text}}, nil
 }
 
-func writeParts(out *strings.Builder, parts []*genai.Part) {
+type promptBuilder struct {
+	out          strings.Builder
+	acceptImages bool
+	images       []map[string]string
+}
+
+func (p *promptBuilder) writeParts(parts []*genai.Part) {
 	for _, part := range parts {
 		if part == nil {
 			continue
 		}
 		if part.Text != "" {
-			out.WriteString(part.Text)
-			out.WriteString("\n")
+			p.out.WriteString(part.Text)
+			p.out.WriteString("\n")
+		}
+		if part.InlineData != nil {
+			p.attach(part.InlineData.MIMEType, part.InlineData.Data)
 		}
 		if part.FunctionCall != nil {
 			args, _ := json.Marshal(part.FunctionCall.Args)
-			fmt.Fprintf(out, "[tool call %s %s]\n", part.FunctionCall.Name, args)
+			fmt.Fprintf(&p.out, "[tool call %s %s]\n", part.FunctionCall.Name, args)
 		}
 		if part.FunctionResponse != nil {
 			response, _ := json.Marshal(part.FunctionResponse.Response)
-			fmt.Fprintf(out, "[tool result %s %s]\n", part.FunctionResponse.Name, response)
+			fmt.Fprintf(&p.out, "[tool result %s %s]\n", part.FunctionResponse.Name, response)
+			for _, media := range part.FunctionResponse.Parts {
+				if media != nil && media.InlineData != nil {
+					p.attach(media.InlineData.MIMEType, media.InlineData.Data)
+				}
+			}
 		}
 	}
+}
+
+func (p *promptBuilder) attach(mimeType string, data []byte) {
+	if !p.acceptImages || !strings.HasPrefix(mimeType, "image/") {
+		fmt.Fprintf(&p.out, "[%s attachment omitted: the Antigravity ACP route cannot send it]\n", mimeType)
+		return
+	}
+	p.images = append(p.images, map[string]string{"type": "image", "mimeType": mimeType, "data": base64.StdEncoding.EncodeToString(data)})
+	fmt.Fprintf(&p.out, "[image %d (%s) attached]\n", len(p.images), mimeType)
 }
