@@ -115,6 +115,7 @@ func antigravityCLIPath() string {
 // mode. agy owns the browser OAuth flow and stores its resulting profile in the
 // platform keyring without opening its interactive TUI.
 func antigravityLogin(path string) error {
+	fmt.Fprintln(os.Stderr, antigravityTermsWarning)
 	os.Setenv("ANTIGRAVITY_CLI_PATH", path)
 	backend, err := provider.NewAntigravityACPFromEnv(context.Background())
 	if err != nil {
@@ -212,11 +213,8 @@ func serveWithListener(backend server.Backend, model, listen, token string) erro
 	return err
 }
 
+// doctor checks the whole path a request takes: the Claude CLI, the configured credentials and whether they can actually use the model.
 func doctor() error {
-	_, model, backendName, err := configuredBackend(context.Background())
-	if err != nil {
-		return err
-	}
 	claudePath := os.Getenv("CLAUDE_CLI_PATH")
 	if claudePath == "" {
 		claudePath = "claude"
@@ -224,9 +222,29 @@ func doctor() error {
 	if _, err := exec.LookPath(claudePath); err != nil {
 		return fmt.Errorf("Claude CLI %q was not found: %w", claudePath, err)
 	}
-	fmt.Printf("ok: %s credentials configured\nok: model %s\nok: Claude CLI %s\n", backendName, model, claudePath)
+	fmt.Printf("ok: Claude CLI %s\n", claudePath)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	backend, model, backendName, err := configuredBackend(ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("ok: %s credentials configured\n", backendName)
+	switch backend := backend.(type) {
+	case *provider.Gemini:
+		if err := backend.Check(ctx); err != nil {
+			return err
+		}
+		fmt.Printf("ok: %s can use %s\n", backendName, model)
+	case *provider.AntigravityACP:
+		fmt.Fprintln(os.Stderr, antigravityTermsWarning)
+		return antigravity([]string{"probe"})
+	}
 	return nil
 }
+
+// antigravityTermsWarning is shown wherever NeoSwitch starts or checks the Antigravity OAuth route.
+const antigravityTermsWarning = "warning: the Google Antigravity Terms of Service forbid accessing Antigravity through third-party tools, and Google may suspend Antigravity or Gemini CLI accounts that do. Routing Claude Code through Antigravity OAuth falls under that rule; use a Gemini API key or Vertex AI instead."
 
 func models() error {
 	model := os.Getenv("GEMINI_MODEL")
@@ -256,7 +274,7 @@ Usage:
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [project]                     route them back to Anthropic
   neoswitch status [project]                  show routing and daemon state
-  neoswitch doctor                            check local prerequisites
+  neoswitch doctor                            check that the credentials can use the model
   neoswitch models                            print the configured Gemini model
   neoswitch version                           print the NeoSwitch version
 
