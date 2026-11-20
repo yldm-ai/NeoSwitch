@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -116,15 +117,20 @@ func antigravityCLIPath() string {
 }
 
 // antigravityLogin delegates authentication to the official CLI's ACP server, which owns the browser OAuth flow and stores the resulting profile in the platform keyring. Signing in is also the user's choice of backend, so it is saved: a Gemini key exported for other tools must not take over afterwards.
+//
+// A missing agy is reported before the Terms warning, which only matters once the sign-in can actually start; the warning is still shown before every sign-in.
 func antigravityLogin(path string) error {
-	fmt.Fprintln(os.Stderr, antigravityTermsWarning)
 	os.Setenv("ANTIGRAVITY_CLI_PATH", path)
 	backend, err := provider.NewAntigravityACPFromEnv(context.Background())
+	if errors.Is(err, provider.ErrAntigravityCLIMissing) {
+		return fmt.Errorf("%w: install the Antigravity CLI from Google, then run /neoswitch:login again", err)
+	}
 	if err != nil {
 		return err
 	}
+	fmt.Fprintln(os.Stderr, antigravityTermsWarning)
 	if err := backend.Login(context.Background()); err != nil {
-		return fmt.Errorf("Antigravity OAuth login failed: %w", err)
+		return err
 	}
 	fmt.Println("ok: Antigravity OAuth login completed through agy ACP")
 	dir, err := daemon.Dir()
