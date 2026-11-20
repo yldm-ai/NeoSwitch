@@ -62,7 +62,7 @@ The plugin routes chosen projects to Gemini while plain `claude` keeps working e
 /plugin install neoswitch@neoswitch
 ```
 
-In the plugin's configuration (`/plugin`, then neoswitch), enable **Use Antigravity OAuth via ACP** to route NeoSwitch through the official `agy acp` server and the signed-in Gemini 4 Neon account. Otherwise set the Gemini API key. Claude Code keeps plugin secrets in the macOS Keychain. With the OAuth option enabled, no Gemini API key is required.
+The shortest setup is `/neoswitch:login` in Claude Code. It signs in with the official `agy acp` flow and enables Neon routing for the current project. Start a new Claude Code session after it finishes. A Gemini API key remains available as an alternative. The **Use Antigravity OAuth via ACP** plugin option is only needed when you want to force ACP while another Gemini credential is present.
 
 | Command | Effect |
 |---|---|
@@ -76,7 +76,7 @@ After `/neoswitch:on` or `/neoswitch:off`, start a new session in the project; t
 
 Run `/neoswitch:login` in Claude Code to start the official `agy acp --login` OAuth flow. It opens the browser when needed, stores the login in the platform keyring, and returns to Claude Code without opening the `agy` interactive UI. `/neoswitch:antigravity-login` remains an alias.
 
-For the OAuth-backed Neon route, enable **Use Antigravity OAuth via ACP** in the plugin configuration, run `/neoswitch:login`, then run `/neoswitch:on` and start a new Claude Code session. NeoSwitch launches `agy acp` as the upstream agent and selects `gemini-4-neon` through ACP's session configuration.
+`/neoswitch:login` launches `agy acp` as the upstream agent and selects `gemini-4-neon` through ACP's session configuration.
 
 How it works:
 

@@ -147,6 +147,11 @@ func attach(args []string) error {
 		_ = os.Setenv("NEOSWITCH_ANTIGRAVITY_ACP", "true")
 	} else if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GOOGLE_API_KEY") == "" && os.Getenv(pluginKeyEnv) != "" {
 		_ = os.Setenv("GEMINI_API_KEY", os.Getenv(pluginKeyEnv))
+	} else if noGeminiCredentialConfigured() && antigravityCLIAvailable() {
+		// A successful /neoswitch:login leaves the OAuth profile in agy's keyring.
+		// Select the official ACP bridge automatically so the user does not need
+		// to repeat the provider choice in the plugin configuration.
+		_ = os.Setenv("NEOSWITCH_ANTIGRAVITY_ACP", "true")
 	}
 	if _, _, _, err := configuredBackend(context.Background()); err != nil {
 		if pluginAntigravityEnabled() {
@@ -163,6 +168,24 @@ func attach(args []string) error {
 func pluginAntigravityEnabled() bool {
 	value := strings.ToLower(strings.TrimSpace(os.Getenv(pluginAntigravityEnv)))
 	return value == "1" || value == "true" || value == "yes"
+}
+
+func noGeminiCredentialConfigured() bool {
+	if strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")) != "" || strings.TrimSpace(os.Getenv(pluginKeyEnv)) != "" {
+		return false
+	}
+	if value := strings.ToLower(strings.TrimSpace(os.Getenv("GOOGLE_GENAI_USE_ENTERPRISE"))); value == "1" || value == "true" {
+		return false
+	}
+	if value := strings.ToLower(strings.TrimSpace(os.Getenv("GOOGLE_GENAI_USE_VERTEXAI"))); value == "1" || value == "true" {
+		return false
+	}
+	return true
+}
+
+func antigravityCLIAvailable() bool {
+	_, err := exec.LookPath(antigravityCLIPath())
+	return err == nil
 }
 
 func hookMessage(message string) error {
