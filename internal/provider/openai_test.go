@@ -472,3 +472,35 @@ func TestOpenAIStreamingMaxTokens(t *testing.T) {
 		t.Fatalf("got %d %s", recorder.Code, out)
 	}
 }
+
+func TestOpenAIListModelsSortsIDs(t *testing.T) {
+	backend, fake := newOpenAITest(t, func(w http.ResponseWriter, path string, _ map[string]any) {
+		if path != "/v1/models" {
+			t.Errorf("path = %s", path)
+		}
+		writeJSONReply(w, http.StatusOK, `{"object":"list","data":[{"id":"gpt-test","object":"model","created":1,"owned_by":"openai"},{"id":"gpt-a","object":"model","created":1,"owned_by":"openai"},{"id":"text-embedding-x","object":"model","created":1,"owned_by":"openai"}]}`)
+	})
+	ids, err := backend.ListModels(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "gpt-a,gpt-test,text-embedding-x"; strings.Join(ids, ",") != want {
+		t.Fatalf("models = %v, want %s", ids, want)
+	}
+	if got := strings.Join(fake.paths, ","); got != "GET /v1/models" {
+		t.Fatalf("requests = %s", got)
+	}
+}
+
+func TestOpenAIListModelsNamesTheFailure(t *testing.T) {
+	backend, _ := newOpenAITest(t, func(w http.ResponseWriter, _ string, _ map[string]any) {
+		writeJSONReply(w, http.StatusUnauthorized, `{"error":{"message":"Incorrect API key provided: `+openAITestKey+`","type":"invalid_request_error","code":"invalid_api_key"}}`)
+	})
+	_, err := backend.ListModels(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "list models") {
+		t.Fatalf("err = %v", err)
+	}
+	if strings.Contains(err.Error(), openAITestKey) {
+		t.Fatalf("error leaks the API key: %v", err)
+	}
+}

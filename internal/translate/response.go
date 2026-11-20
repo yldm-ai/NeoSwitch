@@ -33,7 +33,7 @@ func FromGemini(resp *genai.GenerateContentResponse, model string) (anthropic.Re
 			out.StopReason = "refusal"
 			return out, nil
 		}
-		return anthropic.Response{}, &UpstreamError{Reason: "Gemini returned no candidates"}
+		return anthropic.Response{}, &UpstreamError{Reason: "upstream returned no candidates"}
 	}
 	candidate := resp.Candidates[0]
 	if candidate.Content != nil {
@@ -76,7 +76,7 @@ func Blocks(parts []*genai.Part) ([]anthropic.ContentBlock, error) {
 		case part.Text != "":
 			blocks = append(blocks, anthropic.ContentBlock{Type: "text", Text: part.Text})
 		case part.InlineData != nil, part.FileData != nil, part.ExecutableCode != nil, part.CodeExecutionResult != nil:
-			return nil, &UpstreamError{Reason: fmt.Sprintf("Gemini returned part %d with a type Claude Code cannot receive", i)}
+			return nil, &UpstreamError{Reason: fmt.Sprintf("upstream returned part %d with a type Claude Code cannot receive", i)}
 		}
 	}
 	return blocks, nil

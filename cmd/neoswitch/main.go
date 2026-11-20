@@ -257,6 +257,8 @@ func models() error {
 	case *provider.AntigravityACP:
 		fmt.Fprintln(os.Stderr, antigravityTermsWarning)
 		ids, err = backend.ListModels(ctx)
+	case *provider.OpenAI:
+		ids, err = backend.ListModels(ctx)
 	default:
 		return fmt.Errorf("listing models is not supported for this backend")
 	}

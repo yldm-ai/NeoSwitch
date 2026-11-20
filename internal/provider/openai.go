@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -168,6 +169,20 @@ func (o *OpenAI) Check(ctx context.Context) error {
 		return o.checkError(ctx, "generate with "+o.Model, err)
 	}
 	return nil
+}
+
+// ListModels returns the IDs of every model the key can see, sorted. The OpenAI models API does not say what a model supports, so embedding, audio and image models are listed too.
+func (o *OpenAI) ListModels(ctx context.Context) ([]string, error) {
+	var ids []string
+	pager := o.client.Models.ListAutoPaging(ctx)
+	for pager.Next() {
+		ids = append(ids, pager.Current().ID)
+	}
+	if err := pager.Err(); err != nil {
+		return nil, o.checkError(ctx, "list models", err)
+	}
+	slices.Sort(ids)
+	return ids, nil
 }
 
 // params builds the Responses API request. Requests are sent with store=false so OpenAI does not retain the conversation; NeoSwitch is stateless and replays the history on every turn. stop_sequences and top_k have no Responses API equivalent and are not sent. The request's effort is not sent as reasoning.effort because OPENAI_MODEL may name a model without reasoning support, which rejects the parameter.
