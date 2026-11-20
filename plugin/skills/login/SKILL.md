@@ -1,5 +1,5 @@
 ---
-description: Sign in to the official Antigravity CLI with Google OAuth
+description: Sign in with your Google account through Google's Antigravity sign-in and switch this project to Gemini 4 Neon. Google may suspend accounts used this way
 disable-model-invocation: true
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/plugin/neoswitch.sh *)
 ---
