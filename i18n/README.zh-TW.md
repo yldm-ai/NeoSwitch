@@ -38,7 +38,7 @@ OAuth 憑證始終留在 `agy` 內部。NeoSwitch 不會讀取、複製或匯出
 
 - Claude Code。
 - 使用 Antigravity OAuth 時：官方 Antigravity CLI，並確認 `agy` 指令位於 PATH 中。
-- Go。外掛第一次使用時會編譯內建的 NeoSwitch 執行檔。
+- Go（選用）。有 Go 時，外掛第一次使用時會從原始碼編譯內建的 NeoSwitch 執行檔。沒有 Go 時，它會下載儲存庫 `VERSION` 檔案指定的 release 中對應 macOS 或 Linux（amd64 或 arm64）的執行檔，並在執行前驗證其 SHA-256 checksum。兩次 release 之間，這個執行檔可能比外掛原始碼舊。
 
 ### 安裝外掛
 
@@ -190,7 +190,7 @@ GEMINI_API_KEY='你的 API Key' neoswitch serve
 | `no authorization code was entered` | 更新到最新外掛。目前流程使用 ACP `authenticate`，不讀取 shell stdin。 |
 | 新工作階段出現 `ECONNREFUSED` | 執行 `/neoswitch:status`。如果路由已啟用，檢查 daemon 訊息並重新啟動工作階段。在使用 Anthropic 的工作階段中執行 `/neoswitch:off`，修正憑證後再重新啟用。 |
 | 工作階段提示沒有設定後端 | 執行 `/neoswitch:login`，或在啟動 Claude Code 前 export `GEMINI_API_KEY` 或 Vertex AI 設定。 |
-| 外掛編譯失敗 | 安裝 Go，然後重新啟動 Claude Code。 |
+| 外掛編譯或下載失敗 | 安裝 Go，然後重新啟動 Claude Code；有 Go 時外掛從原始碼編譯，不會下載任何東西。沒有 Go 時，確認能存取 GitHub Releases。checksum 不符表示下載已被拒絕，沒有執行任何東西。 |
 
 ## 相容性邊界
 
@@ -201,7 +201,6 @@ Anthropic 並未在文件中說明如何將 Claude Code 路由到非 Claude 模�
 ## 發展藍圖
 
 - 支援更多模型供應商，首先是 OpenAI。已經提供 Anthropic-compatible endpoint 的供應商可以直接設定 `ANTHROPIC_BASE_URL` 使用，不需要 NeoSwitch。
-- 為外掛提供預先建置的執行檔，不再需要 Go。
 
 ## 開發
 
@@ -210,5 +209,7 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+發布時更新 `VERSION` 並推送對應的 tag（`v` 加上其內容，例如 `v0.1.0`）；tag 與之不符時 release workflow 會拒絕。
 
 MIT License
