@@ -16,7 +16,7 @@ import (
 type Request struct {
 	Contents []*genai.Content
 	Config   *genai.GenerateContentConfig
-	// ThinkingLevel is the request's effort mapped onto Gemini's thinking levels, empty when the request names none or an effort NeoSwitch does not know. It is kept out of Config so each backend decides whether to apply it: the Antigravity ACP route selects agy's thought level from it, while the Gemini API route does not send it yet because per-model support for each level is unverified.
+	// ThinkingLevel is the request's effort mapped onto Gemini's thinking levels, empty when the request names none or an effort NeoSwitch does not know. It is kept out of Config so each backend decides whether to apply it: the Antigravity ACP route selects agy's thought level from it, and the Gemini API route sends it as thinkingConfig.thinkingLevel, dropping it for the rest of the backend's life if the model rejects it, because per-model support for each level has not been verified against the live API.
 	ThinkingLevel genai.ThinkingLevel
 }
 

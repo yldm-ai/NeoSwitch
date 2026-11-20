@@ -131,7 +131,7 @@ Claude Code continue d'exécuter la session, les autorisations, l'exécution des
 | Utilisation d'outils sur plusieurs tours et `/resume` | Pris en charge ; les thought signatures sont transportées dans les ID d'outils | Pris en charge |
 | Images | Pris en charge | Pris en charge lorsque `agy` accepte les images en entrée |
 | PDF | Pris en charge | Non pris en charge ; le modèle est informé qu'un fichier a été omis |
-| `/effort` | Pas encore appliqué | Associé au niveau de réflexion de `agy` |
+| `/effort` | Envoyé comme niveau de réflexion de Gemini ; non vérifié avec l'API réelle, et abandonné si le modèle le refuse | Associé au niveau de réflexion de `agy` |
 | Consommation de jetons et `count_tokens` | Remontée ; `count_tokens` est estimé sur la Developer API | Remontée, y compris environ 14k jetons d'instructions `agy` ajoutés à chaque prompt |
 | Accès à Gemini 4 Neon | Dépend de votre clé ou de votre projet ; vérifiez avec `neoswitch doctor` | Vérifié avec un `agy` connecté |
 

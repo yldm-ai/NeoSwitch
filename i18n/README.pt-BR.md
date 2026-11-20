@@ -131,7 +131,7 @@ O Claude Code continua executando a sessão, as permissões, a execução de fer
 | Uso de ferramentas em vários turnos e `/resume` | Suportado; as thought signatures são levadas nos IDs das ferramentas | Suportado |
 | Imagens | Suportado | Suportado quando o `agy` oferece entrada de imagem |
 | PDFs | Suportado | Não suportado; o modelo é informado de que um arquivo foi omitido |
-| `/effort` | Ainda não aplicado | Mapeado para o nível de pensamento do `agy` |
+| `/effort` | Enviado como nível de pensamento do Gemini; não verificado na API real, e descartado se o modelo o rejeitar | Mapeado para o nível de pensamento do `agy` |
 | Uso de tokens e `count_tokens` | Informado; `count_tokens` é estimado na Developer API | Informado, incluindo cerca de 14k tokens de instruções do `agy` adicionados a cada prompt |
 | Acesso ao Gemini 4 Neon | Depende da sua chave ou projeto; verifique com `neoswitch doctor` | Verificado com um `agy` conectado |
 

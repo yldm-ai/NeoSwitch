@@ -131,7 +131,7 @@ go run ./cmd/neoswitch claude
 | 多輪工具呼叫與 `/resume` | 支援；thought signature 保存在工具 ID 中 | 支援 |
 | 圖片 | 支援 | `agy` 提供圖片輸入時支援 |
 | PDF | 支援 | 不支援；會告知模型有檔案被省略 |
-| `/effort` | 尚未套用 | 對應到 `agy` 的思考層級 |
+| `/effort` | 作為 Gemini 的思考層級送出；未在實際 API 上驗證，模型拒絕時會捨棄 | 對應到 `agy` 的思考層級 |
 | token 用量與 `count_tokens` | 會回報；在 Developer API 上 `count_tokens` 為估計值 | 會回報，包含每個提示詞附加的約 14k token 的 `agy` 指示 |
 | Gemini 4 Neon 存取 | 取決於你的 key 或專案；用 `neoswitch doctor` 檢查 | 已在登入的 `agy` 上驗證 |
 
