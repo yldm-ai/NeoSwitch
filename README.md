@@ -10,7 +10,7 @@
 
 NeoSwitch lets you use Gemini with Claude Code without changing the workflow you already know. Claude Code keeps its CLI, commands, permissions, tools, skills, MCP servers and hooks; NeoSwitch runs a small local proxy that translates its requests for the model behind it.
 
-Today NeoSwitch routes Claude Code to Gemini 4 Neon. Other providers are planned and not yet supported.
+Today NeoSwitch routes Claude Code to Gemini 4 Neon. OpenAI is available as an experimental backend: it is opt-in and has only been tested against a scripted upstream.
 
 ## Why NeoSwitch
 
@@ -109,6 +109,18 @@ The Google Cloud SDK's Application Default Credentials must already be available
 
 `neoswitch doctor` looks the model up and runs a one-line generation, then reports whether the credentials work or why they do not: rejected credentials, missing permission, region restriction, unknown model, quota, or an unavailable service.
 
+### OpenAI (experimental)
+
+The OpenAI backend sends requests to the OpenAI Responses API through the official `openai-go` SDK. It is opt-in: automatic selection never picks it, so set `NEOSWITCH_BACKEND=openai` or run `neoswitch backend openai`. `OPENAI_MODEL` is required; NeoSwitch does not choose a model for you. `OPENAI_BASE_URL` is optional and must include `/v1`. It has only been tested against a scripted upstream, not a live OpenAI account. What is and is not mapped is listed in [docs/protocol-contract.md](docs/protocol-contract.md#openai-backend-experimental).
+
+```bash
+export NEOSWITCH_BACKEND=openai
+export OPENAI_API_KEY='your-key'
+export OPENAI_MODEL='model-name'
+neoswitch doctor
+go run ./cmd/neoswitch claude
+```
+
 ## Plugin commands
 
 | Command | Effect |
@@ -147,7 +159,7 @@ The SessionStart hook starts one local daemon and registers the Claude Code proc
 
 With the OAuth route, the daemon starts the official `agy acp` subprocess. NeoSwitch sends the translated request through an ACP session and translates the returned answer or tool-call JSON back to the local Anthropic-compatible endpoint. One `agy` process serves all sessions, and requests run concurrently in separate ACP sessions. `agy`'s own file, shell and web tools are refused on every request, so tools run only in Claude Code, under Claude Code's permission rules.
 
-`/neoswitch:login` saves Antigravity OAuth as the backend, so a Gemini key exported for other tools does not take over. Without a saved choice, NeoSwitch uses Gemini credentials from the environment when present and Antigravity OAuth otherwise. `NEOSWITCH_BACKEND=antigravity|gemini|auto` overrides both, and `/neoswitch:status` shows the backend in use and why.
+`/neoswitch:login` saves Antigravity OAuth as the backend, so a Gemini key exported for other tools does not take over. Without a saved choice, NeoSwitch uses Gemini credentials from the environment when present and Antigravity OAuth otherwise. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` overrides both, and `/neoswitch:status` shows the backend in use and why.
 
 ## Standalone CLI
 
@@ -235,7 +247,7 @@ Anthropic does not document routing Claude Code to non-Claude models, so Claude 
 
 ## Roadmap
 
-- More model providers, starting with OpenAI. Providers that already offer an Anthropic-compatible endpoint can be used by setting `ANTHROPIC_BASE_URL` directly and do not need NeoSwitch.
+- More model providers. OpenAI is available as an experimental backend and still needs verification against the live API. Providers that already offer an Anthropic-compatible endpoint can be used by setting `ANTHROPIC_BASE_URL` directly and do not need NeoSwitch.
 
 ## Development
 

@@ -103,6 +103,9 @@ func status(args []string) error {
 	if model == "" {
 		model = provider.DefaultModel
 	}
+	if kind, _, err := resolveBackend(); err == nil && kind == backendOpenAI {
+		model = os.Getenv("OPENAI_MODEL")
+	}
 	fmt.Printf("project:  %s\n", project)
 	if !enabled {
 		fmt.Println("routing:  Anthropic (NeoSwitch off)")

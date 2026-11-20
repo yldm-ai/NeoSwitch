@@ -10,7 +10,7 @@
 
 NeoSwitch を使うと、使い慣れたワークフローを変えずに Claude Code で Gemini を利用できます。Claude Code の CLI、コマンド、権限、ツール、スキル、MCP サーバー、フックはそのままで、NeoSwitch はローカルで小さなプロキシを動かし、Claude Code のリクエストを背後のモデル向けに変換します。
 
-現在、NeoSwitch は Claude Code を Gemini 4 Neon にルーティングします。他のプロバイダーは計画中で、まだ対応していません。
+現在、NeoSwitch は Claude Code を Gemini 4 Neon にルーティングします。OpenAI は実験的なバックエンドとして利用できます。明示的に選んだ場合のみ使われ、テストはスクリプト化した上流サーバーに対してのみ行っています。
 
 ## NeoSwitch を使う理由
 
@@ -109,6 +109,18 @@ go run ./cmd/neoswitch claude
 
 `neoswitch doctor` はモデルを照会して 1 行の生成を実行し、認証情報が使えるかどうか、使えない場合はその理由を報告します。理由は、認証情報の拒否、権限不足、リージョン制限、不明なモデル、クォータ、サービス利用不可のいずれかです。
 
+### OpenAI（実験的）
+
+OpenAI バックエンドは公式の `openai-go` SDK を通じて OpenAI Responses API にリクエストを送ります。自動選択では決して選ばれないため、`NEOSWITCH_BACKEND=openai` を設定するか `neoswitch backend openai` を実行してください。`OPENAI_MODEL` は必須で、NeoSwitch がモデルを選ぶことはありません。`OPENAI_BASE_URL` は任意で、`/v1` を含める必要があります。テストはスクリプト化した上流サーバーに対してのみ行っており、実際の OpenAI アカウントでは検証していません。対応している項目と対応していない項目は [docs/protocol-contract.md](../docs/protocol-contract.md#openai-backend-experimental) にあります。
+
+```bash
+export NEOSWITCH_BACKEND=openai
+export OPENAI_API_KEY='your-key'
+export OPENAI_MODEL='model-name'
+neoswitch doctor
+go run ./cmd/neoswitch claude
+```
+
 ## プラグインコマンド
 
 | コマンド | 効果 |
@@ -147,7 +159,7 @@ SessionStart フックはローカルデーモンを 1 つ起動し、最初の�
 
 OAuth ルートでは、デーモンが公式の `agy acp` サブプロセスを起動します。NeoSwitch は変換したリクエストを ACP セッション経由で送信し、返ってきた回答やツール呼び出し JSON をローカルの Anthropic 互換エンドポイントへ変換して返します。1 つの `agy` プロセスがすべてのセッションを処理し、リクエストは個別の ACP セッションで並行して実行されます。`agy` 自身のファイル、シェル、Web ツールはすべてのリクエストで拒否されるため、ツールは Claude Code の中でのみ、Claude Code の権限ルールに従って実行されます。
 
-`/neoswitch:login` は Antigravity OAuth をバックエンドとして保存するため、他のツール用に export した Gemini キーに切り替わることはありません。保存された選択がない場合、環境に Gemini 認証情報があれば Gemini API を、なければ Antigravity OAuth を使います。`NEOSWITCH_BACKEND=antigravity|gemini|auto` で両方を上書きでき、`/neoswitch:status` は使用中のバックエンドとその理由を表示します。
+`/neoswitch:login` は Antigravity OAuth をバックエンドとして保存するため、他のツール用に export した Gemini キーに切り替わることはありません。保存された選択がない場合、環境に Gemini 認証情報があれば Gemini API を、なければ Antigravity OAuth を使います。`NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` で両方を上書きでき、`/neoswitch:status` は使用中のバックエンドとその理由を表示します。
 
 ## スタンドアロン CLI
 
@@ -235,7 +247,7 @@ Anthropic は Claude Code を Claude 以外のモデルへルーティングす�
 
 ## ロードマップ
 
-- OpenAI を皮切りに、より多くのモデルプロバイダーに対応します。すでに Anthropic 互換エンドポイントを提供しているプロバイダーは、`ANTHROPIC_BASE_URL` を直接設定すれば使え、NeoSwitch は必要ありません。
+- より多くのモデルプロバイダーに対応します。OpenAI は実験的なバックエンドとして利用でき、実際の API での検証が残っています。すでに Anthropic 互換エンドポイントを提供しているプロバイダーは、`ANTHROPIC_BASE_URL` を直接設定すれば使え、NeoSwitch は必要ありません。
 
 ## 開発
 

@@ -10,7 +10,7 @@
 
 NeoSwitch vous permet d'utiliser Gemini avec Claude Code sans changer le flux de travail que vous connaissez déjà. Claude Code conserve sa CLI, ses commandes, ses autorisations, ses outils, ses skills, ses serveurs MCP et ses hooks ; NeoSwitch exécute un petit proxy local qui traduit ses requêtes pour le modèle qui se trouve derrière.
 
-Aujourd'hui, NeoSwitch achemine Claude Code vers Gemini 4 Neon. D'autres fournisseurs sont prévus mais ne sont pas encore pris en charge.
+Aujourd'hui, NeoSwitch achemine Claude Code vers Gemini 4 Neon. OpenAI est disponible comme backend expérimental : il doit être activé explicitement et n'a été testé que contre un upstream scripté.
 
 ## Pourquoi NeoSwitch
 
@@ -109,6 +109,18 @@ Les Application Default Credentials du Google Cloud SDK doivent déjà être dis
 
 `neoswitch doctor` recherche le modèle et lance une génération d'une ligne, puis indique si les identifiants fonctionnent ou pourquoi ils ne fonctionnent pas : identifiants refusés, autorisation manquante, restriction de région, modèle inconnu, quota ou service indisponible.
 
+### OpenAI (expérimental)
+
+Le backend OpenAI envoie les requêtes à l'API Responses d'OpenAI via le SDK officiel `openai-go`. Il doit être activé explicitement : la sélection automatique ne le choisit jamais, donc définissez `NEOSWITCH_BACKEND=openai` ou exécutez `neoswitch backend openai`. `OPENAI_MODEL` est obligatoire ; NeoSwitch ne choisit pas de modèle à votre place. `OPENAI_BASE_URL` est facultatif et doit inclure `/v1`. Il n'a été testé que contre un upstream scripté, pas avec un vrai compte OpenAI. Ce qui est traduit et ce qui ne l'est pas est détaillé dans [docs/protocol-contract.md](../docs/protocol-contract.md#openai-backend-experimental).
+
+```bash
+export NEOSWITCH_BACKEND=openai
+export OPENAI_API_KEY='your-key'
+export OPENAI_MODEL='model-name'
+neoswitch doctor
+go run ./cmd/neoswitch claude
+```
+
 ## Commandes du plugin
 
 | Commande | Effet |
@@ -147,7 +159,7 @@ Le hook SessionStart démarre un daemon local et enregistre le processus Claude 
 
 Avec la route OAuth, le daemon lance le sous-processus officiel `agy acp`. NeoSwitch envoie la requête traduite via une session ACP et reconvertit la réponse ou le JSON de tool-call renvoyé vers le endpoint local compatible Anthropic. Un seul processus `agy` sert toutes les sessions, et les requêtes s'exécutent en parallèle dans des sessions ACP distinctes. Les outils de fichiers, de shell et web propres à `agy` sont refusés à chaque requête : les outils ne s'exécutent donc que dans Claude Code, selon les règles d'autorisation de Claude Code.
 
-`/neoswitch:login` enregistre Antigravity OAuth comme backend, si bien qu'une clé Gemini exportée pour d'autres outils ne le remplace pas. Sans choix enregistré, NeoSwitch utilise les identifiants Gemini présents dans l'environnement, sinon Antigravity OAuth. `NEOSWITCH_BACKEND=antigravity|gemini|auto` prime sur les deux, et `/neoswitch:status` indique le backend utilisé et pourquoi.
+`/neoswitch:login` enregistre Antigravity OAuth comme backend, si bien qu'une clé Gemini exportée pour d'autres outils ne le remplace pas. Sans choix enregistré, NeoSwitch utilise les identifiants Gemini présents dans l'environnement, sinon Antigravity OAuth. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` prime sur les deux, et `/neoswitch:status` indique le backend utilisé et pourquoi.
 
 ## CLI autonome
 
@@ -235,7 +247,7 @@ Anthropic ne documente pas le routage de Claude Code vers des modèles autres qu
 
 ## Feuille de route
 
-- Davantage de fournisseurs de modèles, à commencer par OpenAI. Les fournisseurs qui proposent déjà un endpoint compatible Anthropic peuvent être utilisés en définissant directement `ANTHROPIC_BASE_URL` et n'ont pas besoin de NeoSwitch.
+- Davantage de fournisseurs de modèles. OpenAI est disponible comme backend expérimental et doit encore être vérifié contre l'API réelle. Les fournisseurs qui proposent déjà un endpoint compatible Anthropic peuvent être utilisés en définissant directement `ANTHROPIC_BASE_URL` et n'ont pas besoin de NeoSwitch.
 
 ## Développement
 

@@ -132,7 +132,7 @@ func authorized(r *http.Request, token string) bool {
 func upstreamStatus(err error) (int, string, string) {
 	var apiErr genai.APIError
 	if errors.As(err, &apiErr) {
-		message := "Gemini returned HTTP " + fmt.Sprint(apiErr.Code) + ": " + apiErr.Message
+		message := "upstream returned HTTP " + fmt.Sprint(apiErr.Code) + ": " + apiErr.Message
 		switch {
 		case apiErr.Code == http.StatusBadRequest:
 			lower := strings.ToLower(apiErr.Message)
@@ -198,7 +198,7 @@ func streamMessage(ctx context.Context, w http.ResponseWriter, backend Backend, 
 	defer stop()
 	first, err, ok := next()
 	if !ok {
-		writeUpstreamError(w, &translate.UpstreamError{Reason: "Gemini returned an empty stream"})
+		writeUpstreamError(w, &translate.UpstreamError{Reason: "upstream returned an empty stream"})
 		return
 	}
 	if err != nil {

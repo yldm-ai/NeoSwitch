@@ -16,6 +16,8 @@ import (
 const (
 	backendAntigravity = "antigravity"
 	backendGemini      = "gemini"
+	// backendOpenAI is the experimental OpenAI Responses API backend. It is opt-in only: automatic selection never picks it.
+	backendOpenAI = "openai"
 
 	// backendEnv selects the backend for one process over the stored choice. The SessionStart hook sets it for the daemon it spawns, so the daemon serves the backend the hook checked.
 	backendEnv = "NEOSWITCH_BACKEND"
@@ -28,14 +30,14 @@ const (
 
 var errNoBackend = errors.New("no backend is configured: run /neoswitch:login to sign in with Antigravity OAuth (needs the official agy CLI), or export GEMINI_API_KEY before starting Claude Code")
 
-// resolveBackend decides which upstream to use and why. An explicit choice wins: NEOSWITCH_BACKEND, then the choice saved by /neoswitch:login or `neoswitch backend`. Without one, Gemini credentials in the environment select the Gemini API, and otherwise an installed agy selects Antigravity OAuth.
+// resolveBackend decides which upstream to use and why. An explicit choice wins: NEOSWITCH_BACKEND, then the choice saved by /neoswitch:login or `neoswitch backend`. Without one, Gemini credentials in the environment select the Gemini API, and otherwise an installed agy selects Antigravity OAuth. OpenAI is only used when chosen explicitly, even if OPENAI_API_KEY is set.
 func resolveBackend() (kind, reason string, err error) {
 	switch value := strings.ToLower(strings.TrimSpace(os.Getenv(backendEnv))); value {
-	case backendAntigravity, backendGemini:
+	case backendAntigravity, backendGemini, backendOpenAI:
 		return value, "set by " + backendEnv, nil
 	case "", "auto":
 	default:
-		return "", "", fmt.Errorf("%s=%q is not a backend; use antigravity, gemini or auto", backendEnv, value)
+		return "", "", fmt.Errorf("%s=%q is not a backend; use antigravity, gemini, openai or auto", backendEnv, value)
 	}
 	if truthy(os.Getenv(legacyACPEnv)) {
 		return backendAntigravity, "set by " + legacyACPEnv, nil
@@ -76,6 +78,13 @@ func configuredBackend(ctx context.Context) (server.Backend, string, string, err
 		}
 		return backend, backend.Model(), backendLabel(kind, ""), nil
 	}
+	if kind == backendOpenAI {
+		backend, err := provider.NewOpenAIFromEnv()
+		if err != nil {
+			return nil, "", "", err
+		}
+		return backend, backend.Model, backendLabel(kind, ""), nil
+	}
 	if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GOOGLE_API_KEY") == "" && os.Getenv(pluginKeyEnv) != "" {
 		_ = os.Setenv("GEMINI_API_KEY", os.Getenv(pluginKeyEnv))
 	}
@@ -90,8 +99,11 @@ func configuredBackend(ctx context.Context) (server.Backend, string, string, err
 }
 
 func backendLabel(kind, geminiName string) string {
-	if kind == backendAntigravity {
+	switch kind {
+	case backendAntigravity:
 		return "Antigravity OAuth (agy ACP)"
+	case backendOpenAI:
+		return "OpenAI Responses API (experimental)"
 	}
 	return geminiName
 }
@@ -99,16 +111,16 @@ func backendLabel(kind, geminiName string) string {
 // backendCommand shows or changes the saved backend choice.
 func backendCommand(args []string) error {
 	if len(args) > 1 {
-		return fmt.Errorf("usage: neoswitch backend [auto|antigravity|gemini]")
+		return fmt.Errorf("usage: neoswitch backend [auto|antigravity|gemini|openai]")
 	}
 	if len(args) == 1 {
 		choice := strings.ToLower(strings.TrimSpace(args[0]))
 		switch choice {
 		case "auto":
 			choice = ""
-		case backendAntigravity, backendGemini:
+		case backendAntigravity, backendGemini, backendOpenAI:
 		default:
-			return fmt.Errorf("usage: neoswitch backend [auto|antigravity|gemini]")
+			return fmt.Errorf("usage: neoswitch backend [auto|antigravity|gemini|openai]")
 		}
 		dir, err := daemon.Dir()
 		if err != nil {
@@ -139,7 +151,10 @@ func printDaemonSwitchNote(kind string) {
 	if err != nil || !ok {
 		return
 	}
-	if info, running := daemon.Status(state); running && info.Backend != "" && (kind == backendAntigravity) != (info.Backend == backendLabel(backendAntigravity, "")) {
+	info, running := daemon.Status(state)
+	// Gemini labels vary (Developer API or Vertex AI), so the switch is detected through the fixed labels of the other backends.
+	differs := func(other string) bool { return (kind == other) != (info.Backend == backendLabel(other, "")) }
+	if running && info.Backend != "" && (differs(backendAntigravity) || differs(backendOpenAI)) {
 		fmt.Printf("The running NeoSwitch proxy still uses %s for its %d open session(s); new sessions switch once those exit.\n", info.Backend, info.Sessions)
 	}
 }

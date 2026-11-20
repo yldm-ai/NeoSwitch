@@ -227,6 +227,11 @@ func doctor() error {
 			return err
 		}
 		fmt.Printf("ok: %s can use %s\n", backendName, model)
+	case *provider.OpenAI:
+		if err := backend.Check(ctx); err != nil {
+			return err
+		}
+		fmt.Printf("ok: %s can use %s\n", backendName, model)
 	case *provider.AntigravityACP:
 		fmt.Fprintln(os.Stderr, antigravityTermsWarning)
 		return antigravity([]string{"probe"})
@@ -251,6 +256,8 @@ func models() error {
 		ids, err = backend.ListModels(ctx)
 	case *provider.AntigravityACP:
 		fmt.Fprintln(os.Stderr, antigravityTermsWarning)
+		ids, err = backend.ListModels(ctx)
+	case *provider.OpenAI:
 		ids, err = backend.ListModels(ctx)
 	default:
 		return fmt.Errorf("listing models is not supported for this backend")
@@ -297,18 +304,22 @@ Usage:
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [project]                     route them back to Anthropic
   neoswitch status [project]                  show routing and daemon state
-  neoswitch backend [auto|antigravity|gemini] show or choose the upstream (login chooses antigravity)
+  neoswitch backend [auto|antigravity|gemini|openai]
+                                              show or choose the upstream (openai is opt-in and experimental)
   neoswitch doctor                            check that the credentials can use the model
   neoswitch models                            list the models the credentials can use (* = configured)
   neoswitch version                           print the NeoSwitch version
 
 Environment:
-  NEOSWITCH_BACKEND    antigravity, gemini or auto; overrides the saved choice
+  NEOSWITCH_BACKEND    antigravity, gemini, openai or auto; overrides the saved choice
   GEMINI_API_KEY       Gemini Developer API key
   GOOGLE_GENAI_USE_VERTEXAI=true with GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION
                        use Vertex AI with Application Default Credentials instead
   GEMINI_MODEL         backend model (default: gemini-4-neon)
   GEMINI_BASE_URL      Gemini API base URL
+  OPENAI_API_KEY       OpenAI API key (experimental openai backend)
+  OPENAI_MODEL         OpenAI model, required for the openai backend
+  OPENAI_BASE_URL      OpenAI API base URL including /v1 (default: https://api.openai.com/v1)
   CLAUDE_CLI_PATH      Claude executable (default: claude)
   ANTIGRAVITY_CLI_PATH  Antigravity executable (default: agy)
   NEOSWITCH_LISTEN     serve listen address (default: 127.0.0.1:8080)
