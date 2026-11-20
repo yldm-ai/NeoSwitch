@@ -14,7 +14,7 @@ To start or switch the account session, run:
 neoswitch antigravity login
 ```
 
-This delegates the interactive browser OAuth flow to the official `agy` CLI and keeps its credentials in the platform keyring. The command does not read or print the resulting token. In an SSH session, `agy` prints a URL and an authorization code for completing the same flow in a local browser. `neoswitch antigravity oauth` is accepted as an alias.
+This delegates the headless browser OAuth flow to the official `agy` CLI and keeps its credentials in the platform keyring. The command does not read or print the resulting token or open the interactive `agy` TUI. In an SSH session, `agy` prints a URL and an authorization code for completing the same flow in a local browser. `neoswitch antigravity oauth` is accepted as an alias.
 
 The probe launches the official CLI in headless JSON mode with a fixed, non-sensitive prompt. It captures the result in memory, checks for an exact success response, and prints only whether the session is usable. It never prints `stdout`, `stderr`, an account email, a token, or usage details.
 
