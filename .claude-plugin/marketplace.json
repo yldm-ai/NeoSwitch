@@ -5,7 +5,9 @@
     {
       "name": "neoswitch",
       "source": "./",
-      "description": "Run Claude Code against Gemini through a local Anthropic-to-Gemini proxy, per project"
+      "description": "Run Claude Code against Gemini through a local Anthropic-to-Gemini proxy, per project",
+      "repository": "https://github.com/yldm-ai/NeoSwitch",
+      "license": "MIT"
     }
   ]
 }
