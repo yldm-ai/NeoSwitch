@@ -121,6 +121,30 @@ func TestToGeminiReplaysThoughtSignatureAndToolResults(t *testing.T) {
 	}
 }
 
+// Claude Code sends parallel tool results in the order the tools finished, not the order they were called. Gemini returns calls without IDs on the Developer API, so it can only pair responses with same-name calls by position: they must follow the call order.
+func TestToGeminiOrdersParallelToolResultsLikeTheCalls(t *testing.T) {
+	first, second := newToolID([]byte("sig"), ""), newToolID(nil, "")
+	body := `{"model":"m","max_tokens":10,"messages":[
+		{"role":"user","content":"read both"},
+		{"role":"assistant","content":[
+			{"type":"tool_use","id":"` + first + `","name":"Read","input":{"file_path":"a.txt"}},
+			{"type":"tool_use","id":"` + second + `","name":"Read","input":{"file_path":"b.txt"}}
+		]},
+		{"role":"user","content":[
+			{"type":"tool_result","tool_use_id":"` + second + `","content":"beta"},
+			{"type":"text","text":"<system-reminder>r</system-reminder>"},
+			{"type":"tool_result","tool_use_id":"` + first + `","content":"alpha"}
+		]}]}`
+	got, err := ToGemini(mustDecode(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := got.Contents[2].Parts
+	if len(parts) != 3 || parts[0].FunctionResponse.Response["output"] != "alpha" || parts[1].Text == "" || parts[2].FunctionResponse.Response["output"] != "beta" {
+		t.Fatalf("results must follow the call order and other parts keep their place: %+v %+v %+v", parts[0], parts[1], parts[2])
+	}
+}
+
 // Claude Code 2.1.x sends its environment block as a role "system" message after the first user turn.
 func TestToGeminiAppendsMidConversationSystemMessages(t *testing.T) {
 	got, err := ToGemini(mustDecode(t, `{"system":"base","messages":[

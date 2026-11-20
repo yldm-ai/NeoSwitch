@@ -2,7 +2,7 @@
 
 [English](../README.md) | **简体中文** | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md)
 
-[![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/releases) [![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
 
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neon-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neon-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md)
 
@@ -38,7 +38,7 @@ OAuth 凭证始终留在 `agy` 内部。NeoSwitch 不读取、复制或导出 to
 
 - Claude Code。
 - 使用 Antigravity OAuth 时：官方 Antigravity CLI，并确保命令 `agy` 在 PATH 中。
-- Go。插件首次使用时会编译内置的 NeoSwitch 二进制。
+- Go（可选）。有 Go 时，插件首次使用时会从源码编译内置的 NeoSwitch 二进制。没有 Go 时，它会下载仓库 `VERSION` 文件指定的 release 中对应 macOS 或 Linux（amd64 或 arm64）的二进制，并在运行前校验其 SHA-256 checksum。两次 release 之间，这个二进制可能比插件源码旧。
 
 ### 安装插件
 
@@ -134,7 +134,7 @@ go run ./cmd/neoswitch claude
 
 ## 兼容性
 
-会话、权限、工具执行、MCP 服务器、skills、hooks、`CLAUDE.md` 和 `/resume` 仍由 Claude Code 负责；NeoSwitch 只替换它们背后的模型。这些功能的效果取决于模型遵循 Claude Code 工具协议的程度。这一点在日常编码中经过实际使用，但没有自动化的端到端测试覆盖。
+会话、权限、工具执行、MCP 服务器、skills、hooks、`CLAUDE.md` 和 `/resume` 仍由 Claude Code 负责；NeoSwitch 只替换它们背后的模型。这些功能的效果取决于模型遵循 Claude Code 工具协议的程度。这一点在日常编码中经过实际使用。每次改动都会运行自动化的端到端测试：通过 NeoSwitch 让真实的 Claude Code CLI 对接一个按脚本应答的 Gemini 服务器，检查工具调用及其结果、文件编辑、Bash、并行调用、权限拒绝、hooks、skills、`/resume`、子代理和 MCP 工具都能完整地经过 Gemini API 路径；它不衡量真实模型用得好不好。
 
 | 能力 | Gemini API / Vertex AI | Antigravity OAuth (ACP) |
 |---|---|---|
@@ -143,7 +143,7 @@ go run ./cmd/neoswitch claude
 | 多轮工具调用和 `/resume` | 支持；thought signature 保存在工具 ID 中 | 支持 |
 | 图片 | 支持 | `agy` 提供图片输入时支持 |
 | PDF | 支持 | 不支持；会告知模型有文件被省略 |
-| `/effort` | 尚未生效 | 映射到 `agy` 的思考级别 |
+| `/effort` | 作为 Gemini 的思考级别发送；未在实际 API 上验证，模型拒绝时会丢弃 | 映射到 `agy` 的思考级别 |
 | token 用量和 `count_tokens` | 会上报；在 Developer API 上 `count_tokens` 为估算值 | 会上报，包括每个提示词附加的约 14k token 的 `agy` 指令 |
 | Gemini 4 Neon 访问 | 取决于你的 key 或项目；用 `neoswitch doctor` 检查 | 已在登录的 `agy` 上验证 |
 
@@ -153,7 +153,7 @@ go run ./cmd/neoswitch claude
 
 ## 插件工作方式
 
-`/neoswitch:on` 只会在项目的 `.claude/settings.local.json` 中写入 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`。这个 token 用于授权本机回环代理，不是 Antigravity 凭证。
+`/neoswitch:on` 只会在项目的 `.claude/settings.local.json` 中写入三个键：代理用的 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，以及 `CLAUDE_CODE_USE_GATEWAY=0`。这是因为网关启动器会打开 gateway 模式，在该模式下 Claude Code 会改用环境变量里的 base URL，悄悄绕过代理。这个 token 用于授权本机回环代理，不是 Antigravity 凭证。
 
 SessionStart hook 会启动一个本机 daemon，并在 Claude Code 发出第一个模型请求前登记该 Claude Code 进程。所有登记的 Claude Code 进程退出后，daemon 也会退出。
 
@@ -176,7 +176,7 @@ go install ./cmd/neoswitch
 neoswitch doctor              # 检查 Claude CLI，以及凭证能否使用该模型
 neoswitch antigravity login   # 通过官方 agy 客户端完成 ACP OAuth 登录
 neoswitch antigravity probe   # 检查已保存的 agy 会话，不打印凭证
-neoswitch models              # 打印当前配置的模型
+neoswitch models              # 列出凭证可用的模型，并标记当前配置的模型
 neoswitch on [project]        # 为项目启用路由
 neoswitch off [project]       # 为项目关闭路由
 neoswitch status [project]    # 查看路由和 daemon 状态
@@ -192,6 +192,41 @@ GEMINI_API_KEY='你的 API Key' neoswitch serve
 
 在客户端中同时设置 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`。`neoswitch claude` 会使用临时端口和 token 自动配置这两个变量。
 
+## 升级与卸载
+
+### 升级
+
+插件用 [安装插件](#安装插件) 中的命令更新。独立 CLI 可以从 [Releases](https://github.com/yldm-ai/neon-switch/releases) 页面下载更新的二进制，或用 Go 安装最新版本：
+
+```bash
+go install github.com/yldm-ai/neon-switch/cmd/neoswitch@latest
+```
+
+仓库已从 `yldm-ai/NeoSwitch` 迁移到 `yldm-ai/neon-switch`。如果你是用旧名称添加的 marketplace，请从新地址重新添加：
+
+```bash
+claude plugin marketplace add yldm-ai/neon-switch
+```
+
+### 卸载
+
+1. 卸载前，在每个开启了路由的项目中运行 `/neoswitch:off`（或 `neoswitch off <project>`）。卸载插件不会修改项目文件：跳过这一步的话，该项目 `.claude/settings.local.json` 的 `env` 对象会保留 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` 和 `CLAUDE_CODE_USE_GATEWAY`，之后该项目的新会话会去连接一个不再启动的代理。如果插件已经卸载，请手动删除这三项。
+2. 关闭使用 NeoSwitch 的 Claude Code 会话，然后在终端中移除插件及其 marketplace：
+
+```bash
+claude plugin uninstall neoswitch@neoswitch
+claude plugin marketplace remove neoswitch
+```
+
+3. 删除 NeoSwitch 在项目之外保存的文件：
+
+| 内容 | 位置 |
+|---|---|
+| 首次使用时构建的插件二进制 | `$XDG_CACHE_HOME/neoswitch/`；未设置 `XDG_CACHE_HOME` 时为 `~/.cache/neoswitch/` |
+| 状态目录：`proxy.json`（代理地址、token、保存的后端）和 `daemon.log` | 设置了 `NEOSWITCH_STATE_DIR` 时为该目录；否则 macOS 上为 `~/Library/Application Support/neoswitch/`，Linux 上为 `$XDG_CONFIG_HOME/neoswitch/` 或 `~/.config/neoswitch/` |
+
+Antigravity 登录信息由 `agy` 保存，不由 NeoSwitch 保存，卸载后仍然保留。要移除用 `go install` 安装的独立 CLI，请从 `$(go env GOBIN)` 删除 `neoswitch`；未设置 `GOBIN` 时从 `$(go env GOPATH)/bin` 删除。
+
 ## 故障排查
 
 | 现象 | 处理方式 |
@@ -202,7 +237,7 @@ GEMINI_API_KEY='你的 API Key' neoswitch serve
 | `no authorization code was entered` | 更新到最新插件。当前流程使用 ACP `authenticate`，不读取 shell stdin。 |
 | 新会话出现 `ECONNREFUSED` | 运行 `/neoswitch:status`。如果路由已启用，检查 daemon 提示并重启会话。在使用 Anthropic 的会话中运行 `/neoswitch:off`，修复凭证后再重新启用。 |
 | 会话提示没有配置后端 | 运行 `/neoswitch:login`，或在启动 Claude Code 前 export `GEMINI_API_KEY` 或 Vertex AI 设置。 |
-| 插件编译失败 | 安装 Go，然后重启 Claude Code。 |
+| 插件编译或下载失败 | 安装 Go，然后重启 Claude Code；有 Go 时插件从源码编译，不会下载任何东西。没有 Go 时，确认能访问 GitHub Releases。checksum 不匹配表示下载已被拒绝，没有运行任何东西。 |
 
 ## 兼容边界
 
@@ -213,7 +248,6 @@ Anthropic 没有文档说明如何把 Claude Code 路由到非 Claude 模型，�
 ## 路线图
 
 - 支持更多模型提供商。OpenAI 已作为实验性后端提供，仍需在真实 API 上验证。已经提供 Anthropic-compatible endpoint 的提供商可以直接设置 `ANTHROPIC_BASE_URL` 使用，不需要 NeoSwitch。
-- 为插件提供预编译二进制，不再需要 Go。
 
 ## 开发
 
@@ -222,5 +256,9 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+发布时更新 `VERSION` 并推送对应的 tag（`v` 加上其内容，例如 `v0.1.0`）；tag 与之不符时 release workflow 会拒绝。
+
+贡献流程见 [CONTRIBUTING.md](../CONTRIBUTING.md)，私下报告漏洞见 [SECURITY.md](../SECURITY.md)，行为准则见 [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)。
 
 MIT License

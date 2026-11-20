@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -241,13 +242,45 @@ func doctor() error {
 // antigravityTermsWarning is shown wherever NeoSwitch starts or checks the Antigravity OAuth route.
 const antigravityTermsWarning = "warning: the Google Antigravity Terms of Service forbid accessing Antigravity through third-party tools, and Google may suspend Antigravity or Gemini CLI accounts that do. Routing Claude Code through Antigravity OAuth falls under that rule; use a Gemini API key or Vertex AI instead."
 
+// models lists the models the configured credentials can use, marking the configured one.
 func models() error {
-	model := os.Getenv("GEMINI_MODEL")
-	if model == "" {
-		model = provider.DefaultModel
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	backend, model, _, err := configuredBackend(ctx)
+	if err != nil {
+		return err
 	}
-	fmt.Println(model)
+	var ids []string
+	switch backend := backend.(type) {
+	case *provider.Gemini:
+		ids, err = backend.ListModels(ctx)
+	case *provider.AntigravityACP:
+		fmt.Fprintln(os.Stderr, antigravityTermsWarning)
+		ids, err = backend.ListModels(ctx)
+	default:
+		return fmt.Errorf("listing models is not supported for this backend")
+	}
+	if err != nil {
+		return err
+	}
+	printModels(os.Stdout, os.Stderr, ids, model)
 	return nil
+}
+
+// printModels writes one model per line, the configured one prefixed with "* ", and warns on errOut when the configured model is not among them.
+func printModels(out, errOut io.Writer, ids []string, configured string) {
+	found := false
+	for _, id := range ids {
+		marker := "  "
+		if id == configured {
+			marker = "* "
+			found = true
+		}
+		fmt.Fprintln(out, marker+id)
+	}
+	if !found {
+		fmt.Fprintf(errOut, "warning: the configured model %s is not in this list; set GEMINI_MODEL to one of these\n", configured)
+	}
 }
 
 func randomToken() (string, error) {
@@ -272,7 +305,7 @@ Usage:
   neoswitch backend [auto|antigravity|gemini|openai]
                                               show or choose the upstream (openai is opt-in and experimental)
   neoswitch doctor                            check that the credentials can use the model
-  neoswitch models                            print the configured Gemini model
+  neoswitch models                            list the models the credentials can use (* = configured)
   neoswitch version                           print the NeoSwitch version
 
 Environment:

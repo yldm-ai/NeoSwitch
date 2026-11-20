@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"google.golang.org/genai"
@@ -16,7 +17,7 @@ import (
 type Request struct {
 	Contents []*genai.Content
 	Config   *genai.GenerateContentConfig
-	// ThinkingLevel is the request's effort mapped onto Gemini's thinking levels, empty when the request names none or an effort NeoSwitch does not know. It is kept out of Config so each backend decides whether to apply it: the Antigravity ACP route selects agy's thought level from it, while the Gemini API route does not send it yet because per-model support for each level is unverified.
+	// ThinkingLevel is the request's effort mapped onto Gemini's thinking levels, empty when the request names none or an effort NeoSwitch does not know. It is kept out of Config so each backend decides whether to apply it: the Antigravity ACP route selects agy's thought level from it, and the Gemini API route sends it as thinkingConfig.thinkingLevel, dropping it for the rest of the backend's life if the model rejects it, because per-model support for each level has not been verified against the live API.
 	ThinkingLevel genai.ThinkingLevel
 }
 
@@ -32,6 +33,8 @@ var thinkingLevels = map[string]genai.ThinkingLevel{
 type toolCall struct {
 	name   string
 	callID string
+	// order is the position of the call in the conversation, used to put parallel results back in call order.
+	order int
 }
 
 // ToGemini translates an Anthropic Messages request. It does not require max_tokens so that /v1/messages/count_tokens can reuse it; the /v1/messages handler enforces that field itself.
@@ -88,13 +91,18 @@ func ToGemini(in anthropic.MessagesRequest) (Request, error) {
 			return Request{}, fmt.Errorf("messages[%d]: %w", i, err)
 		}
 		content := &genai.Content{Role: geminiRole(message.Role)}
+		var results []toolResultSlot
 		for j, block := range blocks {
 			parts, err := blockToParts(block, message.Role, calls)
 			if err != nil {
 				return Request{}, fmt.Errorf("messages[%d].content[%d]: %w", i, j, err)
 			}
+			if block.Type == "tool_result" {
+				results = append(results, toolResultSlot{index: len(content.Parts), order: calls[block.ToolUseID].order})
+			}
 			content.Parts = append(content.Parts, parts...)
 		}
+		orderToolResults(content.Parts, results)
 		// A message can legitimately translate to nothing (an assistant turn holding only Claude thinking blocks, or an empty text block). Gemini rejects contents without parts, so such turns are dropped rather than sent.
 		if len(content.Parts) > 0 {
 			contents = append(contents, content)
@@ -194,6 +202,28 @@ func toolConfig(choice *anthropic.ToolChoice) (*genai.ToolConfig, error) {
 	return &genai.ToolConfig{FunctionCallingConfig: config}, nil
 }
 
+// toolResultSlot is the position of a translated tool_result part in its content and the order of the call it answers.
+type toolResultSlot struct {
+	index int
+	order int
+}
+
+// orderToolResults puts function responses into the order of the calls they answer, leaving other parts where they are. Claude Code sends parallel tool results in the order the tools finished; the Gemini Developer API returns calls without IDs, so Gemini pairs responses with same-name calls by position and would otherwise hand the model one file's content as another's.
+func orderToolResults(parts []*genai.Part, slots []toolResultSlot) {
+	if len(slots) < 2 {
+		return
+	}
+	sorted := slices.Clone(slots)
+	slices.SortStableFunc(sorted, func(a, b toolResultSlot) int { return a.order - b.order })
+	responses := make([]*genai.Part, len(sorted))
+	for i, slot := range sorted {
+		responses[i] = parts[slot.index]
+	}
+	for i, slot := range slots {
+		parts[slot.index] = responses[i]
+	}
+}
+
 func blockToParts(block anthropic.ContentBlock, role string, calls map[string]toolCall) ([]*genai.Part, error) {
 	switch block.Type {
 	case "text":
@@ -225,7 +255,7 @@ func blockToParts(block anthropic.ContentBlock, role string, calls map[string]to
 			}
 		}
 		meta := parseToolID(block.ID)
-		calls[block.ID] = toolCall{name: block.Name, callID: meta.CallID}
+		calls[block.ID] = toolCall{name: block.Name, callID: meta.CallID, order: len(calls)}
 		return []*genai.Part{{
 			FunctionCall:     &genai.FunctionCall{ID: meta.CallID, Name: block.Name, Args: args},
 			ThoughtSignature: meta.Signature,

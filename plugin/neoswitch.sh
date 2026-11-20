@@ -1,16 +1,66 @@
 #!/bin/sh
-# Runs the NeoSwitch CLI bundled with this plugin. The plugin cache holds the Go source, so the binary is built on first use (and rebuilt when the source is newer) into the user's cache directory.
+# Runs the NeoSwitch CLI bundled with this plugin. When Go is available, the binary is built from the plugin's own Go source on first use (and rebuilt when the source is newer) into the user's cache directory, which always matches the installed plugin exactly.
+# Without Go, the script downloads the release binary named by the repository's VERSION file for this OS and architecture, verifies it against the release's checksums.txt and caches it per version. Between releases the plugin source on main can be newer than that binary, so a downloaded binary may lack changes that a Go build would include.
 set -eu
-root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
 cache="${XDG_CACHE_HOME:-$HOME/.cache}/neoswitch"
 bin="$cache/neoswitch-$(printf '%s' "$root" | cksum | cut -d' ' -f1)"
-if [ ! -x "$bin" ] || [ -n "$(find "$root/cmd" "$root/internal" "$root/go.mod" "$root/go.sum" -newer "$bin" \( -name '*.go' -o -name 'go.*' \) -print 2>/dev/null | head -n 1)" ]; then
-	if ! command -v go >/dev/null 2>&1; then
-		echo "NeoSwitch builds itself with Go on first use; install Go from https://go.dev/dl and try again." >&2
-		exit 1
-	fi
+if [ -x "$bin" ] && [ -z "$(find "$root/cmd" "$root/internal" "$root/go.mod" "$root/go.sum" -newer "$bin" \( -name '*.go' -o -name 'go.*' \) -print 2>/dev/null | head -n 1)" ]; then
+	exec "$bin" "$@"
+fi
+if command -v go >/dev/null 2>&1; then
 	mkdir -p "$cache"
 	(cd "$root" && go build -trimpath -o "$bin.tmp" ./cmd/neoswitch) >&2
 	mv "$bin.tmp" "$bin"
+	exec "$bin" "$@"
 fi
-exec "$bin" "$@"
+
+version=v$(tr -d ' \t\r\n' <"$root/VERSION")
+case $(uname -s) in
+Darwin) os=darwin ;;
+Linux) os=linux ;;
+*) os= ;;
+esac
+case $(uname -m) in
+x86_64 | amd64) arch=amd64 ;;
+arm64 | aarch64) arch=arm64 ;;
+*) arch= ;;
+esac
+if [ -z "$os" ] || [ -z "$arch" ]; then
+	echo "NeoSwitch has no prebuilt binary for $(uname -s) $(uname -m); install Go from https://go.dev/dl so the plugin can build it, then try again." >&2
+	exit 1
+fi
+release="$cache/neoswitch-$version-${os}_$arch"
+if [ ! -x "$release" ]; then
+	if command -v sha256sum >/dev/null 2>&1; then
+		sha256() { sha256sum "$1" | cut -d' ' -f1; }
+	elif command -v shasum >/dev/null 2>&1; then
+		sha256() { shasum -a 256 "$1" | cut -d' ' -f1; }
+	else
+		echo "NeoSwitch cannot verify the prebuilt binary because neither sha256sum nor shasum is installed; install Go from https://go.dev/dl so the plugin can build it, then try again." >&2
+		exit 1
+	fi
+	asset="neoswitch_${version}_${os}_$arch"
+	base="https://github.com/yldm-ai/neon-switch/releases/download/$version"
+	mkdir -p "$cache"
+	tmp=$(mktemp -d "$cache/.download.XXXXXX")
+	trap 'rm -rf "$tmp"' EXIT
+	trap 'exit 1' INT TERM
+	echo "NeoSwitch: Go not found, downloading $asset ..." >&2
+	if ! curl -fsSL --connect-timeout 15 --max-time 300 -o "$tmp/checksums.txt" "$base/checksums.txt" || ! curl -fsSL --connect-timeout 15 --max-time 300 -o "$tmp/$asset" "$base/$asset"; then
+		echo "NeoSwitch could not download $asset from $base; check the network, or install Go from https://go.dev/dl so the plugin can build it." >&2
+		exit 1
+	fi
+	want=$(awk -v f="$asset" '$2 == f || $2 == "*" f { print $1; exit }' "$tmp/checksums.txt")
+	got=$(sha256 "$tmp/$asset")
+	if [ -z "$want" ] || [ "$want" != "$got" ]; then
+		echo "NeoSwitch refused the downloaded $asset: its SHA-256 ($got) does not match checksums.txt (${want:-no entry}). Nothing was run." >&2
+		exit 1
+	fi
+	chmod +x "$tmp/$asset"
+	mv "$tmp/$asset" "$release"
+	rm -rf "$tmp"
+	trap - EXIT INT TERM
+	echo "NeoSwitch: verified $asset." >&2
+fi
+exec "$release" "$@"
