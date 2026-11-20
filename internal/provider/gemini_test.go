@@ -12,8 +12,8 @@ import (
 
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/NeoSwitch/internal/anthropic"
-	"github.com/yldm-ai/NeoSwitch/internal/translate"
+	"github.com/yldm-ai/neon-switch/internal/anthropic"
+	"github.com/yldm-ai/neon-switch/internal/translate"
 )
 
 // isolate clears every variable genai reads so a developer's real credentials can never reach the test server.

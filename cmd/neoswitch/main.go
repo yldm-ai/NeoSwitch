@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yldm-ai/NeoSwitch/internal/provider"
-	"github.com/yldm-ai/NeoSwitch/internal/server"
+	"github.com/yldm-ai/neon-switch/internal/provider"
+	"github.com/yldm-ai/neon-switch/internal/server"
 )
 
 // version is set by the release build with -ldflags "-X main.version=<tag>".

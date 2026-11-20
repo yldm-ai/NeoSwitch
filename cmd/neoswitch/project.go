@@ -12,9 +12,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/yldm-ai/NeoSwitch/internal/daemon"
-	"github.com/yldm-ai/NeoSwitch/internal/provider"
-	"github.com/yldm-ai/NeoSwitch/internal/server"
+	"github.com/yldm-ai/neon-switch/internal/daemon"
+	"github.com/yldm-ai/neon-switch/internal/provider"
+	"github.com/yldm-ai/neon-switch/internal/server"
 )
 
 // pluginKeyEnv is how Claude Code hands the Gemini key saved in the plugin's sensitive userConfig (kept in the macOS Keychain) to hook processes.

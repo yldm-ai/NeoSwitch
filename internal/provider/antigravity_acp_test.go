@@ -14,7 +14,7 @@ import (
 	acp "github.com/coder/acp-go-sdk"
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/NeoSwitch/internal/translate"
+	"github.com/yldm-ai/neon-switch/internal/translate"
 )
 
 // fakeACPEnv makes the test binary act as a scripted `agy acp` server when it is started as the ACP subprocess, so the client is exercised over real pipes without the Antigravity CLI.

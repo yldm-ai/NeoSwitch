@@ -19,7 +19,7 @@
         "ai-coding",
         "model-routing"
       ],
-      "repository": "https://github.com/yldm-ai/NeoSwitch",
+      "repository": "https://github.com/yldm-ai/neon-switch",
       "license": "MIT"
     }
   ]
