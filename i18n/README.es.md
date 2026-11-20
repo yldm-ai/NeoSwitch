@@ -38,7 +38,7 @@ Las credenciales OAuth siempre permanecen dentro de `agy`. NeoSwitch no lee, cop
 
 - Claude Code.
 - Para Antigravity OAuth: la CLI oficial de Antigravity, disponible como `agy` en tu PATH.
-- Go. El plugin compila el binario de NeoSwitch incluido la primera vez que se usa.
+- Go (opcional). Con Go, el plugin compila el binario de NeoSwitch incluido a partir de su código fuente la primera vez que se usa. Sin Go, descarga el binario de la release indicada por el archivo `VERSION` del repositorio para macOS o Linux (amd64 o arm64) y verifica su checksum SHA-256 antes de ejecutarlo. Entre releases, ese binario puede ser más antiguo que el código fuente del plugin.
 
 ### Instalar el plugin
 
@@ -131,7 +131,7 @@ Claude Code sigue ejecutando la sesión, los permisos, la ejecución de herramie
 | Uso de herramientas en varios turnos y `/resume` | Soportado; las thought signatures viajan en los ID de las herramientas | Soportado |
 | Imágenes | Soportado | Soportado cuando `agy` ofrece entrada de imágenes |
 | PDF | Soportado | No soportado; se indica al modelo que se omitió un archivo |
-| `/effort` | Aún no se aplica | Se asigna al nivel de razonamiento de `agy` |
+| `/effort` | Se envía como nivel de razonamiento de Gemini; no verificado con la API real, y se descarta si el modelo lo rechaza | Se asigna al nivel de razonamiento de `agy` |
 | Uso de tokens y `count_tokens` | Se informa; en la Developer API `count_tokens` es una estimación | Se informa, incluidos unos 14k tokens de instrucciones de `agy` añadidos a cada prompt |
 | Acceso a Gemini 4 Neon | Depende de tu clave o proyecto; compruébalo con `neoswitch doctor` | Verificado con un `agy` con sesión iniciada |
 
@@ -190,7 +190,7 @@ Define tanto `ANTHROPIC_BASE_URL` como `ANTHROPIC_AUTH_TOKEN` en el cliente. `ne
 | `no authorization code was entered` | Actualiza a la última versión del plugin. El flujo actual usa ACP `authenticate` y no lee la stdin de la shell. |
 | `ECONNREFUSED` en una nueva sesión | Ejecuta `/neoswitch:status`. Si la ruta está activada, revisa el mensaje del daemon y reinicia la sesión. Ejecuta `/neoswitch:off` desde una sesión que use Anthropic y vuelve a activarlo después de corregir la credencial. |
 | La sesión indica que no hay ningún backend configurado | Ejecuta `/neoswitch:login`, o exporta `GEMINI_API_KEY` o la configuración de Vertex AI antes de iniciar Claude Code. |
-| Falla la compilación del plugin | Instala Go y reinicia Claude Code. |
+| Falla la compilación o la descarga del plugin | Instala Go y reinicia Claude Code; con Go el plugin compila desde el código fuente y no descarga nada. Sin Go, comprueba que GitHub Releases sea accesible. Un checksum que no coincide significa que la descarga se rechazó y no se ejecutó nada. |
 
 ## Límites de compatibilidad
 
@@ -201,7 +201,6 @@ Anthropic no documenta el enrutamiento de Claude Code hacia modelos que no son C
 ## Hoja de ruta
 
 - Más proveedores de modelos, empezando por OpenAI. Los proveedores que ya ofrecen un endpoint compatible con Anthropic se pueden usar definiendo `ANTHROPIC_BASE_URL` directamente y no necesitan NeoSwitch.
-- Binarios precompilados para el plugin, para que ya no necesite Go.
 
 ## Desarrollo
 
@@ -210,5 +209,7 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+Para publicar una release, actualiza `VERSION` y sube el tag correspondiente (`v` seguido de su contenido, como `v0.1.0`); el workflow de release rechaza un tag que no coincida.
 
 MIT License
