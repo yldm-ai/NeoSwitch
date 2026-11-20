@@ -1,6 +1,6 @@
 name: pages
 
-# Publishes the static landing page in site/ to GitHub Pages whenever it changes on main.
+# Renders the landing page in every language with site/build and publishes it to GitHub Pages whenever site/ changes on main.
 on:
   push:
     branches: [main]
@@ -26,9 +26,13 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go run ./site/build -src site -out _site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: _site
       - id: deployment
         uses: actions/deploy-pages@v4
