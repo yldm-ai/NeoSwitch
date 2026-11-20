@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"net/http"
@@ -103,4 +104,56 @@ func (g *Gemini) CountTokens(ctx context.Context, req translate.Request) (int, e
 		return 0, err
 	}
 	return int(resp.TotalTokens), nil
+}
+
+// Check verifies that the configured credentials can use the model. models.get separates a missing model from a missing permission, and a short generation catches region, quota and billing limits that only apply when generating.
+func (g *Gemini) Check(ctx context.Context) error {
+	if _, err := g.client.Models.Get(ctx, g.Model, nil); err != nil {
+		return checkError(ctx, "look up model "+g.Model, err)
+	}
+	if _, err := g.client.Models.GenerateContent(ctx, g.Model, genai.Text("Reply with OK."), &genai.GenerateContentConfig{MaxOutputTokens: 256}); err != nil {
+		return checkError(ctx, "generate with "+g.Model, err)
+	}
+	return nil
+}
+
+func checkError(ctx context.Context, step string, err error) error {
+	var apiErr genai.APIError
+	if errors.As(err, &apiErr) {
+		return fmt.Errorf("%s: %s (HTTP %d %s: %s)", step, diagnose(apiErr), apiErr.Code, apiErr.Status, apiErr.Message)
+	}
+	if ctx.Err() != nil {
+		return fmt.Errorf("%s: Gemini did not answer in time", step)
+	}
+	return fmt.Errorf("%s: could not reach Gemini: %w", step, err)
+}
+
+// diagnose names the cause of a failed check in terms the user can act on.
+func diagnose(e genai.APIError) string {
+	message := strings.ToLower(e.Message)
+	switch {
+	case e.Code == http.StatusUnauthorized || e.Status == "UNAUTHENTICATED" || strings.Contains(message, "api key not valid") || hasReason(e, "API_KEY_INVALID"):
+		return "authentication failed: the API key or credentials were rejected"
+	case strings.Contains(message, "location is not supported") || strings.Contains(message, "not available in your country") || strings.Contains(message, "region"):
+		return "region restricted: the model is not available where this request comes from"
+	case e.Code == http.StatusForbidden || e.Status == "PERMISSION_DENIED":
+		return "permission denied: this account or project has no access to the model"
+	case e.Code == http.StatusNotFound || e.Status == "NOT_FOUND":
+		return "model not found: check GEMINI_MODEL and whether this API offers the model"
+	case e.Code == http.StatusTooManyRequests || e.Status == "RESOURCE_EXHAUSTED":
+		return "quota or rate limit reached"
+	case e.Code >= http.StatusInternalServerError:
+		return "Gemini service unavailable"
+	default:
+		return "request rejected"
+	}
+}
+
+func hasReason(e genai.APIError, reason string) bool {
+	for _, detail := range e.Details {
+		if detail["reason"] == reason {
+			return true
+		}
+	}
+	return false
 }

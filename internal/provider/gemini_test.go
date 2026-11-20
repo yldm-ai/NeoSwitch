@@ -175,3 +175,85 @@ func TestMissingCredentials(t *testing.T) {
 		t.Fatalf("err = %v", err)
 	}
 }
+
+func TestCheckLooksUpAndGenerates(t *testing.T) {
+	var paths []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		paths = append(paths, r.Method+" "+r.URL.Path)
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet {
+			_, _ = w.Write([]byte(`{"name":"models/gemini-4-neon"}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"candidates":[{"content":{"role":"model","parts":[{"text":"OK"}]},"finishReason":"STOP"}]}`))
+	}))
+	defer upstream.Close()
+	isolate(t, upstream.URL)
+	backend, err := NewGeminiFromEnv(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.Check(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"GET /v1beta/models/gemini-4-neon", "POST /v1beta/models/gemini-4-neon:generateContent"}
+	if strings.Join(paths, ",") != strings.Join(want, ",") {
+		t.Fatalf("paths = %v, want %v", paths, want)
+	}
+}
+
+func TestCheckNamesTheFailure(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		failOn    string
+		status    int
+		body      string
+		wantStep  string
+		wantCause string
+	}{
+		{"invalid key", http.MethodGet, 400, `{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}`, "look up model", "authentication failed"},
+		{"missing model", http.MethodGet, 404, `{"error":{"code":404,"message":"models/gemini-4-neon is not found","status":"NOT_FOUND"}}`, "look up model", "model not found"},
+		{"no access", http.MethodGet, 403, `{"error":{"code":403,"message":"Permission denied on resource project","status":"PERMISSION_DENIED"}}`, "look up model", "permission denied"},
+		{"region", http.MethodPost, 400, `{"error":{"code":400,"message":"User location is not supported for the API use.","status":"FAILED_PRECONDITION"}}`, "generate with", "region restricted"},
+		{"quota", http.MethodPost, 429, `{"error":{"code":429,"message":"quota exceeded","status":"RESOURCE_EXHAUSTED"}}`, "generate with", "quota or rate limit"},
+		{"outage", http.MethodPost, 503, `{"error":{"code":503,"message":"overloaded","status":"UNAVAILABLE"}}`, "generate with", "service unavailable"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if r.Method == tc.failOn {
+					w.WriteHeader(tc.status)
+					_, _ = w.Write([]byte(tc.body))
+					return
+				}
+				_, _ = w.Write([]byte(`{"name":"models/gemini-4-neon"}`))
+			}))
+			defer upstream.Close()
+			isolate(t, upstream.URL)
+			backend, err := NewGeminiFromEnv(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			err = backend.Check(context.Background())
+			if err == nil || !strings.Contains(err.Error(), tc.wantStep) || !strings.Contains(err.Error(), tc.wantCause) {
+				t.Fatalf("err = %v, want step %q and cause %q", err, tc.wantStep, tc.wantCause)
+			}
+			if strings.Contains(err.Error(), "test-key") {
+				t.Fatalf("error leaks the API key: %v", err)
+			}
+		})
+	}
+}
+
+func TestCheckReportsUnreachableUpstream(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	upstream.Close()
+	isolate(t, upstream.URL)
+	backend, err := NewGeminiFromEnv(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.Check(context.Background()); err == nil || !strings.Contains(err.Error(), "could not reach Gemini") {
+		t.Fatalf("err = %v", err)
+	}
+}
