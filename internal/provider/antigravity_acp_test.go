@@ -77,7 +77,10 @@ func runFakeACP(mode string) {
 	askPermission := func(p prompt) {
 		permission["perm-"+p.sid] = p
 		send(map[string]any{"id": "perm-" + p.sid, "method": "session/request_permission", "params": map[string]any{
-			"sessionId": p.sid, "toolCall": map[string]any{"toolCallId": "t1"}, "options": []any{},
+			"sessionId": p.sid, "toolCall": map[string]any{"toolCallId": "t1"}, "options": []any{
+				map[string]string{"optionId": "allow", "name": "Allow", "kind": "allow_once"},
+				map[string]string{"optionId": "reject", "name": "Reject", "kind": "reject_once"},
+			},
 		}})
 	}
 	answer := func(p prompt) {
@@ -98,6 +101,12 @@ func runFakeACP(mode string) {
 			Error  *struct {
 				Code int `json:"code"`
 			} `json:"error"`
+			Result struct {
+				Outcome struct {
+					Outcome  string `json:"outcome"`
+					OptionID string `json:"optionId"`
+				} `json:"outcome"`
+			} `json:"result"`
 		}
 		if json.Unmarshal(in.Bytes(), &msg) != nil {
 			continue
@@ -115,7 +124,7 @@ func runFakeACP(mode string) {
 		_ = json.Unmarshal(msg.Params, &params)
 		switch msg.Method {
 		case "":
-			// A response from the client: only the permission requests expect one, and it must be a rejection.
+			// A response from the client: only the permission requests expect one, and it must select the reject option.
 			var id string
 			_ = json.Unmarshal(msg.ID, &id)
 			p, ok := permission[id]
@@ -123,7 +132,7 @@ func runFakeACP(mode string) {
 				continue
 			}
 			delete(permission, id)
-			if msg.Error == nil || msg.Error.Code != -32601 {
+			if msg.Error != nil || msg.Result.Outcome.Outcome != "selected" || msg.Result.Outcome.OptionID != "reject" {
 				send(map[string]any{"id": p.id, "error": map[string]any{"code": -1, "message": "client did not reject request_permission"}})
 				continue
 			}
@@ -611,6 +620,40 @@ func TestEnvelopeDecoder(t *testing.T) {
 			hasTool := len(rest) > 0 && rest[len(rest)-1].FunctionCall != nil
 			if hasTool != tc.tool {
 				t.Fatalf("tool call delivered: %v, want %v (%#v)", hasTool, tc.tool, rest)
+			}
+		})
+	}
+}
+
+func TestACPRejectsAgentToolPermissions(t *testing.T) {
+	allow := acp.PermissionOption{OptionId: "allow", Kind: acp.PermissionOptionKindAllowOnce, Name: "Allow"}
+	allowAlways := acp.PermissionOption{OptionId: "allow-always", Kind: acp.PermissionOptionKindAllowAlways, Name: "Always allow"}
+	rejectOnce := acp.PermissionOption{OptionId: "reject", Kind: acp.PermissionOptionKindRejectOnce, Name: "Reject"}
+	rejectAlways := acp.PermissionOption{OptionId: "reject-always", Kind: acp.PermissionOptionKindRejectAlways, Name: "Always reject"}
+	for _, tc := range []struct {
+		name    string
+		options []acp.PermissionOption
+		want    acp.PermissionOptionId
+	}{
+		{"prefers one-time rejection", []acp.PermissionOption{allow, allowAlways, rejectAlways, rejectOnce}, "reject"},
+		{"falls back to permanent rejection", []acp.PermissionOption{allow, rejectAlways}, "reject-always"},
+		{"cancels without a reject option", []acp.PermissionOption{allow, allowAlways}, ""},
+		{"cancels without options", nil, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			c := &acpConn{}
+			resp, err := c.RequestPermission(context.Background(), acp.RequestPermissionRequest{SessionId: "s", Options: tc.options})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if resp.Outcome.Cancelled == nil || resp.Outcome.Selected != nil {
+					t.Fatalf("outcome = %+v, want cancelled", resp.Outcome)
+				}
+				return
+			}
+			if resp.Outcome.Selected == nil || resp.Outcome.Selected.OptionId != tc.want {
+				t.Fatalf("outcome = %+v, want selected %q", resp.Outcome, tc.want)
 			}
 		})
 	}

@@ -391,7 +391,8 @@ type acpConn struct {
 var _ acp.Client = (*acpConn)(nil)
 
 func startACP(path, agent, cwd string) (*acpConn, error) {
-	cmd := exec.Command(path, "acp", "--agent", agent, "--dangerously-skip-permissions")
+	// No --dangerously-skip-permissions: agy's own tools must ask through RequestPermission, which always refuses. Tools run only in Claude Code, under its permission rules.
+	cmd := exec.Command(path, "acp", "--agent", agent)
 	cmd.Dir = cwd
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -451,10 +452,22 @@ func (c *acpConn) SessionUpdate(_ context.Context, n acp.SessionNotification) er
 	return nil
 }
 
-// The prompt tells agy not to use its own tools, and agy runs with --dangerously-skip-permissions, so it has no reason to call back into the client. Any such call is refused rather than left waiting.
+// agy is a full coding agent with its own file, shell and web tools, and agy versions without the requested agent fall back to the default one. The prompt tells it not to use them, but that is only an instruction, so every tool permission request is rejected: Claude Code is the only place tools may run. The other client methods are refused rather than left waiting.
 
-func (c *acpConn) RequestPermission(context.Context, acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
-	return acp.RequestPermissionResponse{}, acp.NewMethodNotFound(acp.ClientMethodSessionRequestPermission)
+func (c *acpConn) RequestPermission(_ context.Context, req acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
+	return acp.RequestPermissionResponse{Outcome: rejectPermission(req.Options)}, nil
+}
+
+// rejectPermission picks the agent's own reject option, preferring a one-time rejection, and falls back to cancelling the request when the agent offers none.
+func rejectPermission(options []acp.PermissionOption) acp.RequestPermissionOutcome {
+	for _, kind := range []acp.PermissionOptionKind{acp.PermissionOptionKindRejectOnce, acp.PermissionOptionKindRejectAlways} {
+		for _, o := range options {
+			if o.Kind == kind {
+				return acp.NewRequestPermissionOutcomeSelected(o.OptionId)
+			}
+		}
+	}
+	return acp.NewRequestPermissionOutcomeCancelled()
 }
 
 func (c *acpConn) ReadTextFile(context.Context, acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
