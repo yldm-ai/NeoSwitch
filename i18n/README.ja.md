@@ -24,7 +24,7 @@ NeoSwitch を使うと、使い慣れたワークフローを変えずに Claude
 | 方法 | サインイン方法 | 備考 |
 |---|---|---|
 | Antigravity OAuth | 公式 `agy` CLI 経由の Google アカウント | プラグインのデフォルトのフロー。先に下の警告を読んでください。 |
-| Gemini Developer API | `GEMINI_API_KEY` | Gemini 4 Neon を使えるかはキーによります。`neoswitch doctor` で確認してください。 |
+| Gemini Developer API | `/neoswitch:key`、CLI では `GEMINI_API_KEY` | Gemini 4 Neon を使えるかはキーによります。`neoswitch doctor` で確認してください。 |
 | Vertex AI | Google Cloud Application Default Credentials | 使えるかはプロジェクトとリージョンによります。`neoswitch doctor` で確認してください。 |
 
 > [!WARNING]
@@ -76,9 +76,9 @@ Neon を使いたいプロジェクトで次を実行します。
 3. 現在のプロジェクトで NeoSwitch のルーティングを有効にします。
 4. ACP セッションで `gemini-4-neon` を選択します。
 
-代わりに Gemini API キーを使う場合は、Claude Code を起動する前に `GEMINI_API_KEY` を export し、`/neoswitch:on` を実行します。プラグインに入力する設定はありません。以前 `/neoswitch:login` でサインインした場合は `NEOSWITCH_BACKEND=gemini` も export してください。そうしないとログイン時に保存された選択が優先されます。
+代わりに Gemini API キーを使う場合は（上記のアカウントのリスクを避けられます）、`/neoswitch:key` を実行します。ブラウザーでページが開くので、そこにキーを貼り付けます。キーはこのコンピューターにだけ保存され、チャットを経由しません。保存するとバックエンドが Gemini API に切り替わり（以前 `/neoswitch:login` でサインインしていても同じです）、このプロジェクトが有効になります。キーがまだない場合は [Google AI Studio](https://aistudio.google.com/apikey) で作成してください。
 
-そのプロジェクトの Claude Code を閉じて開き直してください。ルートは次のコマンドで確認できます。
+そのプロジェクトの Claude Code を閉じて開き直してください。ほかのウィンドウでも Claude Code を開いている場合は、先にすべて閉じてください。どれか一つでも開いている間、NeoSwitch は以前の設定を使い続けます。ルートは次のコマンドで確認できます。
 
 ```text
 /neoswitch:status
@@ -86,11 +86,13 @@ Neon を使いたいプロジェクトで次を実行します。
 
 うまくいくと、新しいセッションの最初に `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.` のようなメッセージが表示され、`/neoswitch:status` は `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` と答えます。Claude Code のセッションヘッダーには、`claude-opus-5-5` のようにリクエストしたラベルが表示されることがありますが、実際に応答するモデルは NeoSwitch のメッセージと `/neoswitch:status` に表示されるものです。
 
-`/neoswitch:on` と `/neoswitch:off` は、サインインし直さずにプロジェクトを切り替えます。Gemini API キーも Antigravity のサインインも設定されていない間は、`/neoswitch:on` はメッセージを表示して止まり、何も変更しません。
+`/neoswitch:on` と `/neoswitch:off` は、サインインし直さずにプロジェクトを切り替えます。Gemini API キー（`/neoswitch:key`）も Antigravity のサインイン（`/neoswitch:login`）も設定されていない間は、`/neoswitch:on` はメッセージを表示して止まり、何も変更しません。
 
 ## その他の認証方法
 
 ### Gemini API キー
+
+Claude Code では `/neoswitch:key` を実行します。単体の CLI ではキーを export してください。以前 `/neoswitch:login` でサインインした場合は `neoswitch backend gemini` も実行してください。そうしないと保存された選択が優先されます。
 
 ```bash
 export GEMINI_API_KEY='your-key'
@@ -129,9 +131,11 @@ go run ./cmd/neoswitch claude
 | コマンド | 効果 |
 |---|---|
 | `/neoswitch:login` | Antigravity OAuth で認証し、このプロジェクトの Neon ルートを有効にして ACP を使う |
+| `/neoswitch:key` | このコンピューター上のページで Gemini API キーを貼り付け、Gemini API に切り替えて、このプロジェクトの Neon ルートを有効にする |
 | `/neoswitch:on` | このプロジェクトの新しい Claude Code セッションでルーティングを有効にする |
 | `/neoswitch:status` | このプロジェクトとセッションが Gemini 4 Neon を使っているか、次に何をすればよいかを表示する |
 | `/neoswitch:off` | このプロジェクトの新しいセッションでルーティングを無効にする |
+| `/neoswitch:off all` | NeoSwitch が有効にしたすべてのプロジェクトでルーティングを無効にする。アンインストール前に実行する |
 
 ルーティングを変更したら、新しい Claude Code セッションを開始してください。現在のセッションは既存の接続を維持します。
 
@@ -162,7 +166,7 @@ SessionStart フックはローカルデーモンを 1 つ起動し、最初の�
 
 OAuth ルートでは、デーモンが公式の `agy acp` サブプロセスを起動します。NeoSwitch は変換したリクエストを ACP セッション経由で送信し、返ってきた回答やツール呼び出し JSON をローカルの Anthropic 互換エンドポイントへ変換して返します。1 つの `agy` プロセスがすべてのセッションを処理し、リクエストは個別の ACP セッションで並行して実行されます。`agy` 自身のファイル、シェル、Web ツールはすべてのリクエストで拒否されるため、ツールは Claude Code の中でのみ、Claude Code の権限ルールに従って実行されます。
 
-`/neoswitch:login` は Antigravity OAuth をバックエンドとして保存するため、他のツール用に export した Gemini キーに切り替わることはありません。保存された選択がない場合、環境に Gemini 認証情報があれば Gemini API を、なければ Antigravity OAuth を使います。`NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` で両方を上書きでき、`/neoswitch:status` は使用中のバックエンドとその理由を表示します。
+`/neoswitch:login` は Antigravity OAuth をバックエンドとして保存するため、他のツール用に export した Gemini キーに切り替わることはありません。保存された選択がない場合、環境に Gemini 認証情報があれば Gemini API を、なければ Antigravity OAuth を使います。`NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` で両方を上書きでき、`/neoswitch:status` は使用中のバックエンドとその理由を表示します。`/neoswitch:key` は Gemini API をバックエンドとして保存するため、以前の `/neoswitch:login` の選択に代わります。
 
 ## スタンドアロン CLI
 
@@ -181,7 +185,9 @@ neoswitch antigravity login   # 公式 agy クライアントで ACP OAuth ロ�
 neoswitch antigravity probe   # 保存済みの agy セッションを確認（認証情報は表示しない）
 neoswitch models              # 認証情報で使えるモデルを一覧表示し、設定中のモデルに印を付ける
 neoswitch on [project]        # プロジェクトのルーティングを有効化
+neoswitch key [project]       # ローカルのブラウザーページで Gemini API キーを貼り付け、プロジェクトを有効化
 neoswitch off [project]       # プロジェクトのルーティングを無効化
+neoswitch off all             # NeoSwitch が有効にしたすべてのプロジェクトでルーティングを無効化
 neoswitch status [-v] [project] # プロジェクトが NeoSwitch を使っているかと次の手順を表示（-v で詳細）
 neoswitch version             # NeoSwitch のバージョンを表示
 ```
@@ -213,7 +219,7 @@ claude plugin marketplace add yldm-ai/neo-switch
 
 ### アンインストール
 
-1. アンインストールの前に、ルーティングを有効にしたすべてのプロジェクトで `/neoswitch:off`（または `neoswitch off <project>`）を実行します。プラグインをアンインストールしてもプロジェクトのファイルは変更されません。この手順を省くと、そのプロジェクトの `.claude/settings.local.json` の `env` オブジェクトに `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`CLAUDE_CODE_USE_GATEWAY` が残り、新しいセッションはもう起動しないプロキシに接続しようとします。プラグインをすでに削除した場合は、この 3 項目を手動で削除してください。
+1. アンインストールの前に `/neoswitch:off all`（または `neoswitch off all`）を実行します。NeoSwitch が有効にしたすべてのプロジェクトでルーティングを無効にし、その一覧を表示します。`off all` がなかった頃のバージョンで有効にしたプロジェクトはこの一覧に入らないため、それぞれのプロジェクトで `/neoswitch:off` を実行してください。プラグインをアンインストールしてもプロジェクトのファイルは変更されません。有効のまま残ったプロジェクトでは `.claude/settings.local.json` の `env` オブジェクトに `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`CLAUDE_CODE_USE_GATEWAY` が残り、新しいセッションはもう起動しないプロキシに接続しようとします。プラグインをすでに削除した場合は、この 3 項目を手動で削除してください。
 2. NeoSwitch を使っている Claude Code セッションを閉じてから、シェルでプラグインとマーケットプレイスを削除します。
 
 ```bash
@@ -226,7 +232,7 @@ claude plugin marketplace remove neoswitch
 | 内容 | 場所 |
 |---|---|
 | 初回使用時にビルドされるプラグインのバイナリ | `$XDG_CACHE_HOME/neoswitch/`。`XDG_CACHE_HOME` が未設定なら `~/.cache/neoswitch/` |
-| 状態ディレクトリ：`proxy.json`（プロキシのアドレス、トークン、保存されたバックエンド）と `daemon.log` | `NEOSWITCH_STATE_DIR` が設定されていればそのディレクトリ。それ以外は macOS で `~/Library/Application Support/neoswitch/`、Linux で `$XDG_CONFIG_HOME/neoswitch/` または `~/.config/neoswitch/` |
+| 状態ディレクトリ：`proxy.json`（プロキシのアドレス、トークン、保存されたバックエンド）、`gemini-api-key`（`/neoswitch:key` で保存したキー）、`projects.json`（`/neoswitch:off all` が元に戻すプロジェクト）と `daemon.log` | `NEOSWITCH_STATE_DIR` が設定されていればそのディレクトリ。それ以外は macOS で `~/Library/Application Support/neoswitch/`、Linux で `$XDG_CONFIG_HOME/neoswitch/` または `~/.config/neoswitch/` |
 
 Antigravity のサインイン情報は NeoSwitch ではなく `agy` が保存しており、アンインストール後も残ります。`go install` でインストールしたスタンドアロン CLI を削除するには、`$(go env GOBIN)`、`GOBIN` が未設定なら `$(go env GOPATH)/bin` から `neoswitch` を削除します。
 
@@ -239,7 +245,7 @@ Antigravity のサインイン情報は NeoSwitch ではなく `agy` が保存�
 | `agy: command not found` | 公式 Antigravity CLI をインストールするか、`ANTIGRAVITY_CLI_PATH` を設定します。 |
 | `no authorization code was entered` | 最新のプラグインに更新してください。現在のフローは ACP `authenticate` を使い、シェルの stdin を読みません。 |
 | 新しいセッションで `ECONNREFUSED` | `/neoswitch:status` を実行します。ルートが有効ならデーモンのメッセージを確認してセッションを再起動します。Anthropic を使うセッションから `/neoswitch:off` を実行し、認証情報を修正してから再度有効にしてください。 |
-| バックエンドが設定されていないと表示される | `/neoswitch:login` を実行するか、Claude Code の起動前に `GEMINI_API_KEY` または Vertex AI の設定を export します。 |
+| バックエンドが設定されていないと表示される | Gemini API キーを使うなら `/neoswitch:key`、Google アカウントでサインインするなら `/neoswitch:login` を実行します。単体の CLI では、Claude Code の起動前に `GEMINI_API_KEY` または Vertex AI の設定を export します。 |
 | プラグインのビルドまたはダウンロードに失敗する | Go をインストールして Claude Code を再起動します。Go があればプラグインはソースからビルドし、何もダウンロードしません。Go がない場合は GitHub Releases にアクセスできるか確認します。チェックサムの不一致は、ダウンロードが拒否され何も実行されなかったことを意味します。 |
 
 ## 互換性の範囲

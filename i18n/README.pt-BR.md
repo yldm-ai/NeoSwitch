@@ -24,7 +24,7 @@ Hoje o NeoSwitch roteia o Claude Code para o Gemini 4 Neon. A OpenAI está dispo
 | Caminho | Como faz login | Observações |
 |---|---|---|
 | Antigravity OAuth | Conta Google pela CLI oficial `agy` | Fluxo padrão do plugin. Leia o aviso abaixo primeiro. |
-| Gemini Developer API | `GEMINI_API_KEY` | O acesso ao Gemini 4 Neon depende da sua chave. Verifique com `neoswitch doctor`. |
+| Gemini Developer API | `/neoswitch:key`, ou `GEMINI_API_KEY` para a CLI | O acesso ao Gemini 4 Neon depende da sua chave. Verifique com `neoswitch doctor`. |
 | Vertex AI | Application Default Credentials do Google Cloud | O acesso depende do seu projeto e da sua região. Verifique com `neoswitch doctor`. |
 
 > [!WARNING]
@@ -76,9 +76,9 @@ O comando executa as seguintes etapas:
 3. Ativa o roteamento do NeoSwitch para o projeto atual.
 4. Seleciona `gemini-4-neon` para a sessão ACP.
 
-Para usar uma chave de API do Gemini em vez disso, exporte `GEMINI_API_KEY` antes de iniciar o Claude Code e execute `/neoswitch:on`; o plugin não tem configurações para preencher. Se você já entrou com `/neoswitch:login`, exporte também `NEOSWITCH_BACKEND=gemini`, pois caso contrário prevalece a escolha salva no login.
+Para usar uma chave de API do Gemini em vez disso, o que evita o risco à conta descrito acima, execute `/neoswitch:key`. Uma página abre no navegador para você colar a chave; a chave fica neste computador e não passa pelo chat. Ao salvá-la, o backend passa a ser a API do Gemini, mesmo depois de um `/neoswitch:login` anterior, e este projeto é ativado. Ainda não tem chave? Crie uma no [Google AI Studio](https://aistudio.google.com/apikey).
 
-Feche e reabra o Claude Code nesse projeto. Verifique a rota com:
+Feche e reabra o Claude Code nesse projeto. Se o Claude Code também estiver aberto em outras janelas, feche todas primeiro: enquanto alguma estiver aberta, o NeoSwitch mantém a configuração anterior. Verifique a rota com:
 
 ```text
 /neoswitch:status
@@ -86,11 +86,13 @@ Feche e reabra o Claude Code nesse projeto. Verifique a rota com:
 
 Quando funciona, a nova sessão começa com um aviso como `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.`, e `/neoswitch:status` responde `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` O Claude Code ainda pode exibir o rótulo solicitado, como `claude-opus-5-5`, no cabeçalho da sessão; o modelo que responde de fato é o que o aviso do NeoSwitch e `/neoswitch:status` mostram.
 
-`/neoswitch:on` e `/neoswitch:off` alternam o projeto sem fazer login de novo. `/neoswitch:on` para com uma mensagem, sem alterar nada, enquanto não houver uma chave da API do Gemini nem o login do Antigravity.
+`/neoswitch:on` e `/neoswitch:off` alternam o projeto sem fazer login de novo. `/neoswitch:on` para com uma mensagem, sem alterar nada, enquanto não houver uma chave da API do Gemini (`/neoswitch:key`) nem o login do Antigravity (`/neoswitch:login`).
 
 ## Outros caminhos de credenciais
 
 ### Chave de API do Gemini
+
+No Claude Code, execute `/neoswitch:key`. Na CLI independente, exporte a chave em vez disso; se você já entrou com `/neoswitch:login`, execute também `neoswitch backend gemini`, pois caso contrário prevalece a escolha salva.
 
 ```bash
 export GEMINI_API_KEY='your-key'
@@ -129,9 +131,11 @@ go run ./cmd/neoswitch claude
 | Comando | Efeito |
 |---|---|
 | `/neoswitch:login` | Autentica com Antigravity OAuth, ativa a rota do Neon neste projeto e usa ACP |
+| `/neoswitch:key` | Cola uma chave da API do Gemini em uma página neste computador, muda para a API do Gemini e ativa a rota do Neon neste projeto |
 | `/neoswitch:on` | Ativa o roteamento para novas sessões do Claude Code neste projeto |
 | `/neoswitch:status` | Diz se este projeto e esta sessão usam o Gemini 4 Neon e o que fazer em seguida |
 | `/neoswitch:off` | Desativa o roteamento para novas sessões neste projeto |
+| `/neoswitch:off all` | Desativa o roteamento em todos os projetos que o NeoSwitch ativou; execute antes de desinstalar |
 
 Depois de alterar o roteamento, inicie uma nova sessão do Claude Code. A sessão atual mantém a conexão existente.
 
@@ -162,7 +166,7 @@ O hook SessionStart inicia um daemon local e registra o processo do Claude Code 
 
 Na rota OAuth, o daemon inicia o subprocesso oficial `agy acp`. O NeoSwitch envia a requisição traduzida por uma sessão ACP e converte a resposta, ou o JSON de tool-call, de volta para o endpoint local compatível com a Anthropic. Um único processo `agy` atende todas as sessões, e as requisições são executadas em paralelo em sessões ACP separadas. As ferramentas próprias de arquivo, shell e web do `agy` são recusadas em toda requisição, então as ferramentas rodam apenas no Claude Code, sob as regras de permissão do Claude Code.
 
-`/neoswitch:login` salva o Antigravity OAuth como backend, então uma chave do Gemini exportada para outras ferramentas não o substitui. Sem uma escolha salva, o NeoSwitch usa as credenciais do Gemini presentes no ambiente e, se não houver, o Antigravity OAuth. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` substitui ambos, e `/neoswitch:status` mostra o backend em uso e o motivo.
+`/neoswitch:login` salva o Antigravity OAuth como backend, então uma chave do Gemini exportada para outras ferramentas não o substitui. Sem uma escolha salva, o NeoSwitch usa as credenciais do Gemini presentes no ambiente e, se não houver, o Antigravity OAuth. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` substitui ambos, e `/neoswitch:status` mostra o backend em uso e o motivo. `/neoswitch:key` salva a API do Gemini como backend, então substitui um `/neoswitch:login` anterior.
 
 ## CLI independente
 
@@ -181,7 +185,9 @@ neoswitch antigravity login   # login ACP OAuth pelo cliente oficial agy
 neoswitch antigravity probe   # verifica a sessão salva do agy sem exibir credenciais
 neoswitch models              # lista os modelos que as credenciais podem usar e marca o configurado
 neoswitch on [project]        # ativa o roteamento de um projeto
+neoswitch key [project]       # cola uma chave da API do Gemini em uma página local do navegador e ativa o projeto
 neoswitch off [project]       # desativa o roteamento de um projeto
+neoswitch off all             # desativa o roteamento em todos os projetos que o NeoSwitch ativou
 neoswitch status [-v] [project] # diz se um projeto usa o NeoSwitch e o que fazer (-v adiciona detalhes)
 neoswitch version             # exibe a versão do NeoSwitch
 ```
@@ -213,7 +219,7 @@ claude plugin marketplace add yldm-ai/neo-switch
 
 ### Desinstalar
 
-1. Antes de desinstalar, execute `/neoswitch:off` (ou `neoswitch off <project>`) em cada projeto com o roteamento ativado. Desinstalar o plugin não altera os arquivos do projeto: sem esta etapa, o objeto `env` do `.claude/settings.local.json` do projeto mantém `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` e `CLAUDE_CODE_USE_GATEWAY`, e novas sessões tentam se conectar a um proxy que não inicia mais. Se o plugin já foi removido, apague essas três entradas manualmente.
+1. Antes de desinstalar, execute `/neoswitch:off all` (ou `neoswitch off all`). Ele desativa o roteamento em todos os projetos que o NeoSwitch ativou e os lista. Projetos ativados com uma versão do NeoSwitch anterior ao `off all` não estão nessa lista; execute `/neoswitch:off` em cada um deles. Desinstalar o plugin não altera os arquivos do projeto: um projeto que continuar ativado mantém `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` e `CLAUDE_CODE_USE_GATEWAY` no objeto `env` do seu `.claude/settings.local.json`, e novas sessões ali tentam se conectar a um proxy que não inicia mais. Se o plugin já foi removido, apague essas três entradas manualmente.
 2. Feche as sessões do Claude Code que usam o NeoSwitch e então remova o plugin e o marketplace pelo terminal:
 
 ```bash
@@ -226,7 +232,7 @@ claude plugin marketplace remove neoswitch
 | O quê | Local |
 |---|---|
 | Binário do plugin compilado no primeiro uso | `$XDG_CACHE_HOME/neoswitch/`, ou `~/.cache/neoswitch/` quando `XDG_CACHE_HOME` não está definida |
-| Diretório de estado: `proxy.json` (endereço do proxy, token, backend salvo) e `daemon.log` | `NEOSWITCH_STATE_DIR` quando definida; caso contrário, `~/Library/Application Support/neoswitch/` no macOS e `$XDG_CONFIG_HOME/neoswitch/` ou `~/.config/neoswitch/` no Linux |
+| Diretório de estado: `proxy.json` (endereço do proxy, token, backend salvo), `gemini-api-key` (a chave salva por `/neoswitch:key`), `projects.json` (os projetos que `/neoswitch:off all` restaura) e `daemon.log` | `NEOSWITCH_STATE_DIR` quando definida; caso contrário, `~/Library/Application Support/neoswitch/` no macOS e `$XDG_CONFIG_HOME/neoswitch/` ou `~/.config/neoswitch/` no Linux |
 
 O login do Antigravity é guardado pelo `agy`, não pelo NeoSwitch, e continua lá. Para remover uma CLI independente instalada com `go install`, apague `neoswitch` de `$(go env GOBIN)`, ou de `$(go env GOPATH)/bin` quando `GOBIN` não está definida.
 
@@ -239,7 +245,7 @@ O login do Antigravity é guardado pelo `agy`, não pelo NeoSwitch, e continua l
 | `agy: command not found` | Instale a CLI oficial do Antigravity ou defina `ANTIGRAVITY_CLI_PATH`. |
 | `no authorization code was entered` | Atualize para a versão mais recente do plugin. O fluxo atual usa ACP `authenticate` e não lê a stdin do shell. |
 | `ECONNREFUSED` em uma nova sessão | Execute `/neoswitch:status`. Se a rota estiver ativa, verifique a mensagem do daemon e reinicie a sessão. Execute `/neoswitch:off` a partir de uma sessão que use a Anthropic e ative novamente depois de corrigir a credencial. |
-| A sessão informa que nenhum backend está configurado | Execute `/neoswitch:login` ou exporte `GEMINI_API_KEY` ou as configurações do Vertex AI antes de iniciar o Claude Code. |
+| A sessão informa que nenhum backend está configurado | Execute `/neoswitch:key` para usar uma chave da API do Gemini, ou `/neoswitch:login` para entrar com o Google. Na CLI independente, exporte `GEMINI_API_KEY` ou as configurações do Vertex AI antes de iniciar o Claude Code. |
 | A compilação ou o download do plugin falha | Instale o Go e reinicie o Claude Code; com Go o plugin compila a partir do código-fonte e não baixa nada. Sem Go, verifique se o GitHub Releases está acessível. Um checksum divergente significa que o download foi recusado e nada foi executado. |
 
 ## Limites de compatibilidade

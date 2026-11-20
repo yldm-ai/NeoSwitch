@@ -24,7 +24,7 @@ NeoSwitch를 사용하면 익숙한 워크플로를 바꾸지 않고 Claude Code
 | 방식 | 로그인 방법 | 비고 |
 |---|---|---|
 | Antigravity OAuth | 공식 `agy` CLI를 통한 Google 계정 | 플러그인의 기본 흐름입니다. 먼저 아래 경고를 읽으세요. |
-| Gemini Developer API | `GEMINI_API_KEY` | Gemini 4 Neon 접근 가능 여부는 키에 따라 다릅니다. `neoswitch doctor`로 확인하세요. |
+| Gemini Developer API | `/neoswitch:key`, CLI에서는 `GEMINI_API_KEY` | Gemini 4 Neon 접근 가능 여부는 키에 따라 다릅니다. `neoswitch doctor`로 확인하세요. |
 | Vertex AI | Google Cloud Application Default Credentials | 접근 가능 여부는 프로젝트와 리전에 따라 다릅니다. `neoswitch doctor`로 확인하세요. |
 
 > [!WARNING]
@@ -76,9 +76,9 @@ Neon을 사용하려는 프로젝트에서 다음을 실행합니다.
 3. 현재 프로젝트에 NeoSwitch 라우팅을 활성화합니다.
 4. ACP 세션에 `gemini-4-neon`을 선택합니다.
 
-대신 Gemini API 키를 사용하려면 Claude Code를 시작하기 전에 `GEMINI_API_KEY`를 export하고 `/neoswitch:on`을 실행하세요. 플러그인에는 입력할 설정이 없습니다. 이전에 `/neoswitch:login`으로 로그인했다면 `NEOSWITCH_BACKEND=gemini`도 export하세요. 그렇지 않으면 로그인 때 저장된 선택이 우선합니다.
+대신 Gemini API 키를 사용하려면(위의 계정 위험을 피할 수 있습니다) `/neoswitch:key`를 실행하세요. 브라우저에 페이지가 열리면 키를 붙여 넣습니다. 키는 이 컴퓨터에만 저장되고 채팅을 거치지 않습니다. 저장하면 백엔드가 Gemini API로 바뀌고(이전에 `/neoswitch:login`으로 로그인했어도 마찬가지입니다) 이 프로젝트가 활성화됩니다. 키가 아직 없다면 [Google AI Studio](https://aistudio.google.com/apikey)에서 만드세요.
 
-해당 프로젝트에서 Claude Code를 닫았다가 다시 엽니다. 다음 명령으로 라우트를 확인합니다.
+해당 프로젝트에서 Claude Code를 닫았다가 다시 엽니다. 다른 창에서도 Claude Code를 열어 두었다면 먼저 모두 닫으세요. 하나라도 열려 있는 동안 NeoSwitch는 이전 설정을 계속 사용합니다. 다음 명령으로 라우트를 확인합니다.
 
 ```text
 /neoswitch:status
@@ -86,11 +86,13 @@ Neon을 사용하려는 프로젝트에서 다음을 실행합니다.
 
 제대로 동작하면 새 세션이 `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.` 같은 메시지로 시작하고, `/neoswitch:status`는 `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.`라고 답합니다. Claude Code는 세션 헤더에 `claude-opus-5-5`처럼 요청한 모델 이름을 계속 표시할 수 있습니다. 실제로 응답하는 모델은 NeoSwitch 메시지와 `/neoswitch:status`에 표시되는 것입니다.
 
-`/neoswitch:on`과 `/neoswitch:off`는 다시 로그인하지 않고 프로젝트를 전환합니다. Gemini API 키도 Antigravity 로그인도 설정되지 않은 동안 `/neoswitch:on`은 메시지를 보여 주고 아무것도 바꾸지 않은 채 멈춥니다.
+`/neoswitch:on`과 `/neoswitch:off`는 다시 로그인하지 않고 프로젝트를 전환합니다. Gemini API 키(`/neoswitch:key`)도 Antigravity 로그인(`/neoswitch:login`)도 설정되지 않은 동안 `/neoswitch:on`은 메시지를 보여 주고 아무것도 바꾸지 않은 채 멈춥니다.
 
 ## 기타 자격 증명 방식
 
 ### Gemini API 키
+
+Claude Code에서는 `/neoswitch:key`를 실행하세요. 독립 실행형 CLI에서는 대신 키를 export하세요. 이전에 `/neoswitch:login`으로 로그인했다면 `neoswitch backend gemini`도 실행하세요. 그렇지 않으면 저장된 선택이 우선합니다.
 
 ```bash
 export GEMINI_API_KEY='your-key'
@@ -129,9 +131,11 @@ go run ./cmd/neoswitch claude
 | 명령 | 효과 |
 |---|---|
 | `/neoswitch:login` | Antigravity OAuth로 인증하고, 이 프로젝트의 Neon 라우트를 활성화하며, ACP를 사용 |
+| `/neoswitch:key` | 이 컴퓨터의 페이지에 Gemini API 키를 붙여 넣고, Gemini API로 전환하며, 이 프로젝트의 Neon 라우트를 활성화 |
 | `/neoswitch:on` | 이 프로젝트의 새 Claude Code 세션에 라우팅 활성화 |
 | `/neoswitch:status` | 이 프로젝트와 세션이 Gemini 4 Neon을 쓰는지, 다음에 무엇을 하면 되는지 표시 |
 | `/neoswitch:off` | 이 프로젝트의 새 세션에 라우팅 비활성화 |
+| `/neoswitch:off all` | NeoSwitch가 활성화한 모든 프로젝트에서 라우팅 비활성화. 제거하기 전에 실행 |
 
 라우팅을 변경한 뒤에는 새 Claude Code 세션을 시작하세요. 현재 세션은 기존 연결을 유지합니다.
 
@@ -162,7 +166,7 @@ SessionStart 훅은 첫 모델 요청 전에 로컬 데몬 하나를 시작하�
 
 OAuth 라우트에서는 데몬이 공식 `agy acp` 하위 프로세스를 시작합니다. NeoSwitch는 변환된 요청을 ACP 세션으로 보내고, 반환된 응답이나 tool-call JSON을 로컬 Anthropic 호환 엔드포인트 형식으로 다시 변환합니다. 하나의 `agy` 프로세스가 모든 세션을 처리하며, 요청은 각자의 ACP 세션에서 동시에 실행됩니다. `agy` 자체의 파일, 셸, 웹 도구는 모든 요청에서 거부되므로, 도구는 Claude Code 안에서 Claude Code의 권한 규칙에 따라서만 실행됩니다.
 
-`/neoswitch:login`은 Antigravity OAuth를 백엔드로 저장하므로, 다른 도구용으로 export한 Gemini 키가 이를 대체하지 않습니다. 저장된 선택이 없으면 환경에 Gemini 자격 증명이 있을 때 Gemini API를, 없으면 Antigravity OAuth를 사용합니다. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto`로 둘 다 재정의할 수 있으며, `/neoswitch:status`에서 사용 중인 백엔드와 그 이유를 확인할 수 있습니다.
+`/neoswitch:login`은 Antigravity OAuth를 백엔드로 저장하므로, 다른 도구용으로 export한 Gemini 키가 이를 대체하지 않습니다. 저장된 선택이 없으면 환경에 Gemini 자격 증명이 있을 때 Gemini API를, 없으면 Antigravity OAuth를 사용합니다. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto`로 둘 다 재정의할 수 있으며, `/neoswitch:status`에서 사용 중인 백엔드와 그 이유를 확인할 수 있습니다. `/neoswitch:key`는 Gemini API를 백엔드로 저장하므로 이전 `/neoswitch:login`의 선택을 대신합니다.
 
 ## 독립 실행형 CLI
 
@@ -181,7 +185,9 @@ neoswitch antigravity login   # 공식 agy 클라이언트를 통한 ACP OAuth �
 neoswitch antigravity probe   # 자격 증명을 출력하지 않고 저장된 agy 세션 확인
 neoswitch models              # 자격 증명으로 사용할 수 있는 모델을 나열하고 설정된 모델을 표시
 neoswitch on [project]        # 프로젝트 라우팅 활성화
+neoswitch key [project]       # 로컬 브라우저 페이지에 Gemini API 키를 붙여 넣고 프로젝트 활성화
 neoswitch off [project]       # 프로젝트 라우팅 비활성화
+neoswitch off all             # NeoSwitch가 활성화한 모든 프로젝트의 라우팅 비활성화
 neoswitch status [-v] [project] # 프로젝트가 NeoSwitch를 쓰는지와 다음 할 일 표시 (-v는 세부 정보 추가)
 neoswitch version             # NeoSwitch 버전 출력
 ```
@@ -213,7 +219,7 @@ claude plugin marketplace add yldm-ai/neo-switch
 
 ### 제거
 
-1. 제거하기 전에 라우팅을 켠 모든 프로젝트에서 `/neoswitch:off`(또는 `neoswitch off <project>`)를 실행합니다. 플러그인을 제거해도 프로젝트 파일은 수정되지 않습니다. 이 단계를 건너뛰면 해당 프로젝트 `.claude/settings.local.json`의 `env` 객체에 `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_GATEWAY`가 남고, 새 세션은 더 이상 시작되지 않는 프록시에 연결하려고 합니다. 플러그인을 이미 제거했다면 이 세 항목을 직접 삭제하세요.
+1. 제거하기 전에 `/neoswitch:off all`(또는 `neoswitch off all`)을 실행합니다. NeoSwitch가 활성화한 모든 프로젝트에서 라우팅을 끄고 그 목록을 보여 줍니다. `off all`이 생기기 전 버전에서 활성화한 프로젝트는 이 목록에 없으므로, 그런 프로젝트마다 `/neoswitch:off`를 실행하세요. 플러그인을 제거해도 프로젝트 파일은 수정되지 않습니다. 라우팅이 켜진 채 남은 프로젝트는 `.claude/settings.local.json`의 `env` 객체에 `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_GATEWAY`가 남고, 새 세션은 더 이상 시작되지 않는 프록시에 연결하려고 합니다. 플러그인을 이미 제거했다면 이 세 항목을 직접 삭제하세요.
 2. NeoSwitch를 사용하는 Claude Code 세션을 닫은 뒤, 셸에서 플러그인과 마켓플레이스를 제거합니다.
 
 ```bash
@@ -226,7 +232,7 @@ claude plugin marketplace remove neoswitch
 | 항목 | 위치 |
 |---|---|
 | 처음 사용할 때 빌드되는 플러그인 바이너리 | `$XDG_CACHE_HOME/neoswitch/`, `XDG_CACHE_HOME`이 없으면 `~/.cache/neoswitch/` |
-| 상태 디렉터리: `proxy.json`(프록시 주소, 토큰, 저장된 백엔드)과 `daemon.log` | `NEOSWITCH_STATE_DIR`가 설정되어 있으면 그 디렉터리, 아니면 macOS에서는 `~/Library/Application Support/neoswitch/`, Linux에서는 `$XDG_CONFIG_HOME/neoswitch/` 또는 `~/.config/neoswitch/` |
+| 상태 디렉터리: `proxy.json`(프록시 주소, 토큰, 저장된 백엔드), `gemini-api-key`(`/neoswitch:key`로 저장한 키), `projects.json`(`/neoswitch:off all`이 되돌릴 프로젝트)과 `daemon.log` | `NEOSWITCH_STATE_DIR`가 설정되어 있으면 그 디렉터리, 아니면 macOS에서는 `~/Library/Application Support/neoswitch/`, Linux에서는 `$XDG_CONFIG_HOME/neoswitch/` 또는 `~/.config/neoswitch/` |
 
 Antigravity 로그인 정보는 NeoSwitch가 아니라 `agy`가 보관하며 제거 후에도 남아 있습니다. `go install`로 설치한 독립 실행형 CLI를 제거하려면 `$(go env GOBIN)`에서, `GOBIN`이 설정되지 않았다면 `$(go env GOPATH)/bin`에서 `neoswitch`를 삭제합니다.
 
@@ -239,7 +245,7 @@ Antigravity 로그인 정보는 NeoSwitch가 아니라 `agy`가 보관하며 제
 | `agy: command not found` | 공식 Antigravity CLI를 설치하거나 `ANTIGRAVITY_CLI_PATH`를 설정합니다. |
 | `no authorization code was entered` | 최신 플러그인으로 업데이트하세요. 현재 흐름은 ACP `authenticate`를 사용하며 셸 stdin을 읽지 않습니다. |
 | 새 세션에서 `ECONNREFUSED` | `/neoswitch:status`를 실행합니다. 라우트가 활성화되어 있다면 데몬 메시지를 확인하고 세션을 다시 시작합니다. Anthropic을 사용하는 세션에서 `/neoswitch:off`를 실행한 뒤, 자격 증명을 고치고 다시 활성화하세요. |
-| 백엔드가 설정되지 않았다는 메시지가 표시됨 | `/neoswitch:login`을 실행하거나, Claude Code를 시작하기 전에 `GEMINI_API_KEY` 또는 Vertex AI 설정을 export하세요. |
+| 백엔드가 설정되지 않았다는 메시지가 표시됨 | Gemini API 키를 쓰려면 `/neoswitch:key`를, Google 계정으로 로그인하려면 `/neoswitch:login`을 실행하세요. 독립 실행형 CLI에서는 Claude Code를 시작하기 전에 `GEMINI_API_KEY` 또는 Vertex AI 설정을 export하세요. |
 | 플러그인 빌드 또는 다운로드 실패 | Go를 설치하고 Claude Code를 다시 시작합니다. Go가 있으면 플러그인은 소스에서 빌드하며 아무것도 내려받지 않습니다. Go가 없다면 GitHub Releases에 접속할 수 있는지 확인합니다. 체크섬 불일치는 다운로드가 거부되어 아무것도 실행되지 않았다는 뜻입니다. |
 
 ## 호환성 범위

@@ -24,7 +24,7 @@ NeoSwitch позволяет использовать Gemini в Claude Code, н�
 | Способ | Как выполняется вход | Примечания |
 |---|---|---|
 | Antigravity OAuth | Аккаунт Google через официальный CLI `agy` | Сценарий плагина по умолчанию. Сначала прочитайте предупреждение ниже. |
-| Gemini Developer API | `GEMINI_API_KEY` | Доступ к Gemini 4 Neon зависит от вашего ключа. Проверьте его с помощью `neoswitch doctor`. |
+| Gemini Developer API | `/neoswitch:key` или `GEMINI_API_KEY` для CLI | Доступ к Gemini 4 Neon зависит от вашего ключа. Проверьте его с помощью `neoswitch doctor`. |
 | Vertex AI | Application Default Credentials Google Cloud | Доступ зависит от вашего проекта и региона. Проверьте его с помощью `neoswitch doctor`. |
 
 > [!WARNING]
@@ -76,9 +76,9 @@ claude plugin update neoswitch@neoswitch
 3. Включает маршрутизацию NeoSwitch для текущего проекта.
 4. Выбирает `gemini-4-neon` для сессии ACP.
 
-Чтобы вместо этого использовать ключ API Gemini, экспортируйте `GEMINI_API_KEY` перед запуском Claude Code и выполните `/neoswitch:on`; в плагине нет настроек для заполнения. Если вы ранее входили через `/neoswitch:login`, экспортируйте также `NEOSWITCH_BACKEND=gemini`, иначе будет использоваться выбор, сохранённый при входе.
+Чтобы вместо этого использовать ключ API Gemini, который избавляет от описанного выше риска для аккаунта, выполните `/neoswitch:key`. В браузере откроется страница, куда нужно вставить ключ; ключ остаётся на этом компьютере и не проходит через чат. После сохранения бэкендом становится Gemini API, даже после прежнего `/neoswitch:login`, и этот проект включается. Ключа ещё нет? Создайте его в [Google AI Studio](https://aistudio.google.com/apikey).
 
-Закройте и снова откройте Claude Code в этом проекте. Проверьте маршрут командой:
+Закройте и снова откройте Claude Code в этом проекте. Если Claude Code открыт и в других окнах, сначала закройте их все: пока открыто хотя бы одно, NeoSwitch сохраняет прежнюю настройку. Проверьте маршрут командой:
 
 ```text
 /neoswitch:status
@@ -86,11 +86,13 @@ claude plugin update neoswitch@neoswitch
 
 Если всё работает, новая сессия начинается с сообщения вроде `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.`, а `/neoswitch:status` отвечает `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` В заголовке сессии Claude Code может по-прежнему отображать запрошенную метку, например `claude-opus-5-5`; на самом деле отвечает модель, которую называют сообщение NeoSwitch и `/neoswitch:status`.
 
-`/neoswitch:on` и `/neoswitch:off` переключают проект без повторного входа. Пока не настроены ни ключ Gemini API, ни вход через Antigravity, `/neoswitch:on` останавливается с сообщением и ничего не меняет.
+`/neoswitch:on` и `/neoswitch:off` переключают проект без повторного входа. Пока не настроены ни ключ Gemini API (`/neoswitch:key`), ни вход через Antigravity (`/neoswitch:login`), `/neoswitch:on` останавливается с сообщением и ничего не меняет.
 
 ## Другие способы получения учётных данных
 
 ### Ключ API Gemini
+
+В Claude Code выполните `/neoswitch:key`. Для отдельной CLI вместо этого экспортируйте ключ; если вы ранее входили через `/neoswitch:login`, выполните также `neoswitch backend gemini`, иначе будет использоваться сохранённый выбор.
 
 ```bash
 export GEMINI_API_KEY='your-key'
@@ -129,9 +131,11 @@ go run ./cmd/neoswitch claude
 | Команда | Действие |
 |---|---|
 | `/neoswitch:login` | Аутентифицирует через Antigravity OAuth, включает маршрут Neon для этого проекта и использует ACP |
+| `/neoswitch:key` | Вставляет ключ Gemini API на странице на этом компьютере, переключает на Gemini API и включает маршрут Neon для этого проекта |
 | `/neoswitch:on` | Включает маршрутизацию для новых сессий Claude Code в этом проекте |
 | `/neoswitch:status` | Сообщает, используют ли этот проект и эта сессия Gemini 4 Neon, и что делать дальше |
 | `/neoswitch:off` | Отключает маршрутизацию для новых сессий в этом проекте |
+| `/neoswitch:off all` | Отключает маршрутизацию во всех проектах, где её включил NeoSwitch; выполните перед удалением |
 
 После изменения маршрутизации запустите новую сессию Claude Code. Текущая сессия сохраняет существующее подключение.
 
@@ -162,7 +166,7 @@ Claude Code по-прежнему управляет сессией, разре�
 
 При маршруте OAuth демон запускает официальный подпроцесс `agy acp`. NeoSwitch отправляет преобразованный запрос через сессию ACP и преобразует полученный ответ или JSON вызова инструмента обратно в формат локальной Anthropic-совместимой конечной точки. Один процесс `agy` обслуживает все сессии, а запросы выполняются параллельно в отдельных сессиях ACP. Собственные инструменты `agy` для работы с файлами, оболочкой и вебом отклоняются в каждом запросе, поэтому инструменты выполняются только в Claude Code и по его правилам разрешений.
 
-`/neoswitch:login` сохраняет Antigravity OAuth как бэкенд, поэтому ключ Gemini, экспортированный для других инструментов, его не заменяет. Если выбор не сохранён, NeoSwitch использует учётные данные Gemini из окружения, а при их отсутствии — Antigravity OAuth. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` переопределяет оба варианта, а `/neoswitch:status` показывает используемый бэкенд и причину.
+`/neoswitch:login` сохраняет Antigravity OAuth как бэкенд, поэтому ключ Gemini, экспортированный для других инструментов, его не заменяет. Если выбор не сохранён, NeoSwitch использует учётные данные Gemini из окружения, а при их отсутствии — Antigravity OAuth. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` переопределяет оба варианта, а `/neoswitch:status` показывает используемый бэкенд и причину. `/neoswitch:key` сохраняет Gemini API как бэкенд и тем самым заменяет выбор прежнего `/neoswitch:login`.
 
 ## Автономный CLI
 
@@ -181,7 +185,9 @@ neoswitch antigravity login   # вход ACP OAuth через официальн
 neoswitch antigravity probe   # проверить сохранённую сессию agy, не выводя учётные данные
 neoswitch models              # перечислить модели, доступные с этими учётными данными, отметив настроенную
 neoswitch on [project]        # включить маршрутизацию для проекта
+neoswitch key [project]       # вставить ключ Gemini API на локальной странице в браузере и включить проект
 neoswitch off [project]       # отключить маршрутизацию для проекта
+neoswitch off all             # отключить маршрутизацию во всех проектах, где её включил NeoSwitch
 neoswitch status [-v] [project] # показать, использует ли проект NeoSwitch и что делать (-v добавляет подробности)
 neoswitch version             # вывести версию NeoSwitch
 ```
@@ -213,7 +219,7 @@ claude plugin marketplace add yldm-ai/neo-switch
 
 ### Удаление
 
-1. Перед удалением выполните `/neoswitch:off` (или `neoswitch off <project>`) в каждом проекте, где включена маршрутизация. Удаление плагина не меняет файлы проектов: без этого шага объект `env` в файле проекта `.claude/settings.local.json` сохранит `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` и `CLAUDE_CODE_USE_GATEWAY`, и новые сессии будут пытаться подключиться к прокси, который больше не запускается. Если плагин уже удалён, удалите эти три записи вручную.
+1. Перед удалением выполните `/neoswitch:off all` (или `neoswitch off all`). Команда отключает маршрутизацию во всех проектах, где её включил NeoSwitch, и выводит их список. Проекты, включённые версией NeoSwitch, в которой ещё не было `off all`, в этот список не входят; выполните `/neoswitch:off` в каждом из них. Удаление плагина не меняет файлы проектов: в проекте, где маршрутизация осталась включённой, объект `env` в файле `.claude/settings.local.json` сохранит `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` и `CLAUDE_CODE_USE_GATEWAY`, и новые сессии там будут пытаться подключиться к прокси, который больше не запускается. Если плагин уже удалён, удалите эти три записи вручную.
 2. Закройте сессии Claude Code, которые используют NeoSwitch, затем удалите плагин и его маркетплейс из терминала:
 
 ```bash
@@ -226,7 +232,7 @@ claude plugin marketplace remove neoswitch
 | Что | Где |
 |---|---|
 | Бинарный файл плагина, собранный при первом запуске | `$XDG_CACHE_HOME/neoswitch/` или `~/.cache/neoswitch/`, если `XDG_CACHE_HOME` не задана |
-| Каталог состояния: `proxy.json` (адрес прокси, токен, сохранённый бэкенд) и `daemon.log` | `NEOSWITCH_STATE_DIR`, если задана; иначе `~/Library/Application Support/neoswitch/` в macOS и `$XDG_CONFIG_HOME/neoswitch/` или `~/.config/neoswitch/` в Linux |
+| Каталог состояния: `proxy.json` (адрес прокси, токен, сохранённый бэкенд), `gemini-api-key` (ключ, сохранённый `/neoswitch:key`), `projects.json` (проекты, которые восстанавливает `/neoswitch:off all`) и `daemon.log` | `NEOSWITCH_STATE_DIR`, если задана; иначе `~/Library/Application Support/neoswitch/` в macOS и `$XDG_CONFIG_HOME/neoswitch/` или `~/.config/neoswitch/` в Linux |
 
 Вход в Antigravity хранит `agy`, а не NeoSwitch, и он сохраняется. Чтобы удалить автономный CLI, установленный через `go install`, удалите `neoswitch` из `$(go env GOBIN)` или, если `GOBIN` не задана, из `$(go env GOPATH)/bin`.
 
@@ -239,7 +245,7 @@ claude plugin marketplace remove neoswitch
 | `agy: command not found` | Установите официальный Antigravity CLI или задайте `ANTIGRAVITY_CLI_PATH`. |
 | `no authorization code was entered` | Обновите плагин до последней версии. Текущий процесс использует ACP `authenticate` и не читает stdin оболочки. |
 | `ECONNREFUSED` в новой сессии | Выполните `/neoswitch:status`. Если маршрут включён, проверьте сообщение демона и перезапустите сессию. Выполните `/neoswitch:off` из сессии, использующей Anthropic, и снова включите маршрут после исправления учётных данных. |
-| Сессия сообщает, что бэкенд не настроен | Выполните `/neoswitch:login` или экспортируйте `GEMINI_API_KEY` либо настройки Vertex AI перед запуском Claude Code. |
+| Сессия сообщает, что бэкенд не настроен | Выполните `/neoswitch:key`, чтобы использовать ключ Gemini API, или `/neoswitch:login`, чтобы войти через Google. Для отдельной CLI экспортируйте `GEMINI_API_KEY` либо настройки Vertex AI перед запуском Claude Code. |
 | Сборка или загрузка плагина завершается ошибкой | Установите Go и перезапустите Claude Code; с Go плагин собирается из исходного кода и ничего не скачивает. Без Go проверьте, что GitHub Releases доступен. Несовпадение контрольной суммы означает, что загрузка отклонена и ничего не было запущено. |
 
 ## Границы совместимости
