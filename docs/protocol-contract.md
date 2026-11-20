@@ -1,8 +1,8 @@
-# NeoSwitch protocol contract (MVP)
+# NeoSwitch protocol contract
 
 ## Scope
 
-NeoSwitch presents the subset of the Anthropic Messages API that Claude Code needs and translates it to the Gemini `generateContent` REST shape. The proxy is local-only by default and is not a general-purpose multi-provider gateway.
+NeoSwitch presents the subset of the Anthropic Messages API that Claude Code needs and translates it to Gemini `generateContent` / `streamGenerateContent` through the official `google.golang.org/genai` SDK. The proxy is local-only by default and is not a general-purpose multi-provider gateway.
 
 ## Endpoints
 
@@ -10,55 +10,95 @@ NeoSwitch presents the subset of the Anthropic Messages API that Claude Code nee
 |---|---|---|
 | GET | `/healthz` | Returns `200 {"status":"ok"}` when the process is serving. It does not call Gemini. |
 | GET | `/v1/models` | Returns the configured model as an Anthropic-style model entry. |
-| POST | `/v1/messages` | Accepts an Anthropic Messages request and returns JSON or Anthropic SSE. |
+| POST | `/v1/messages` | Accepts an Anthropic Messages request and returns JSON, or Anthropic SSE when `stream` is true. |
+| POST | `/v1/messages/count_tokens` | Returns `{"input_tokens": n}` for the same request shape (no `max_tokens` required). |
 
-## Request invariants
+Query strings such as `?beta=true` are ignored. Every POST endpoint requires the configured token as `Authorization: Bearer`, `x-api-key` or `X-NeoSwitch-Token` when a token is set.
 
-- `model` is accepted for Claude Code compatibility, but the backend model is selected by `GEMINI_MODEL`.
-- `messages` must be non-empty and contain only `user` and `assistant` roles.
-- Content blocks may be `text`, `image`, `tool_use`, or `tool_result`.
-- `tools` are converted to Gemini function declarations.
-- `max_tokens` is required by the Anthropic contract and becomes `maxOutputTokens`.
-- Unknown content blocks are rejected with `400`; they are never silently discarded.
-- Requests are bounded by the server timeout and are never retried after a response has started.
+## Credentials
 
-## Response invariants
+genai resolves credentials from the standard environment: `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) for the Gemini Developer API, or `GOOGLE_GENAI_USE_VERTEXAI=true` with `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and Application Default Credentials for Vertex AI. The Developer API is called on `v1beta` unless `GOOGLE_GENAI_API_VERSION` is set. `GEMINI_BASE_URL` overrides the API host; a trailing `/v1beta` or `/v1` is accepted and stripped.
 
-- Every response has `type: "message"`, `role: "assistant"`, `model`, `content`, `stop_reason`, and `usage`.
-- A Gemini function call becomes an Anthropic `tool_use` block with a stable ID for that response.
-- A response containing one or more tool calls has `stop_reason: "tool_use"`.
-- A normal completed response has `stop_reason: "end_turn"`.
-- Gemini usage metadata is copied when available; missing usage is reported as zero rather than fabricated.
-- Buffered streaming emits the canonical event order:
+## Request translation
+
+- `model` is accepted for Claude Code compatibility; the backend model is selected by `GEMINI_MODEL`.
+- `system` and mid-conversation `role: "system"` messages (Claude Code sends its environment block this way) become Gemini `systemInstruction` text, in order.
+- `user` / `assistant` messages become `user` / `model` contents. Messages that translate to no parts are dropped, because Gemini rejects empty contents.
+- Content blocks:
+
+| Anthropic block | Gemini |
+|---|---|
+| `text` | text part; empty text is dropped |
+| `image` (base64) | `inlineData` |
+| `document` (base64, e.g. PDF) | `inlineData` |
+| `document` (text source) | text part |
+| `tool_use` | `functionCall`, with the thought signature and call ID recovered from the tool ID |
+| `tool_result` | `functionResponse` with `{"output": text}` or `{"error": text}` when `is_error`; images inside become multimodal `functionResponse.parts` |
+| `thinking`, `redacted_thinking` | dropped: Claude's signed reasoning has no Gemini representation |
+| anything else, URL sources | rejected with `400` |
+
+- Tools are sent as one Gemini tool with every function declaration. `input_schema` is passed unmodified as `parametersJsonSchema` (full JSON Schema), not the OpenAPI-subset `parameters` field, which rejects keywords Claude Code schemas use (`$schema`, `additionalProperties`, `allOf`, `exclusiveMinimum`, ...). Server tools (typed `web_search_*`, `code_execution_*`, ...) are rejected.
+- `tool_choice` `auto` / `any` / `none` / `tool` map to function calling modes `AUTO` / `ANY` / `NONE` / `ANY` restricted to the named function.
+- `max_tokens`, `temperature`, `top_p`, `top_k` and `stop_sequences` map to the generation config. `thinking`, `metadata`, `context_management`, `output_config` and `cache_control` are ignored.
+
+## Tool call IDs and thought signatures
+
+Gemini 3+ attaches a `thoughtSignature` to function calls and rejects a later request whose history replays the call without it (finish reason `MISSING_THOUGHT_SIGNATURE`). Claude Code keeps only Anthropic blocks in its history, so NeoSwitch embeds the signature and Gemini's call ID in the `tool_use` ID it mints: `toolu_ns_` followed by base64url JSON. The ID is restricted to `[A-Za-z0-9_-]`, needs no server-side state, and survives proxy restarts and `claude --resume`. Tool IDs not minted by NeoSwitch carry no signature.
+
+## Response translation
+
+- Text parts become `text` blocks; `thought` parts are skipped; each `functionCall` becomes a `tool_use` block. Responses containing a tool call have `stop_reason: "tool_use"`.
+- Finish reasons: `STOP` → `end_turn` / `tool_use`; `MAX_TOKENS` → `max_tokens`; safety, recitation and blocklist reasons → `refusal`. A blocked prompt (no candidates, `promptFeedback.blockReason`) is a `refusal` with empty content. Finish reasons that mean the turn failed (`MALFORMED_FUNCTION_CALL`, `UNEXPECTED_TOOL_CALL`, `MISSING_THOUGHT_SIGNATURE`, `OTHER`, ...) are errors, never a silent `end_turn`.
+- Usage: `input_tokens` = prompt tokens minus cached tokens, `cache_read_input_tokens` = cached tokens, `output_tokens` = candidate plus thinking tokens.
+
+## Streaming
+
+`stream: true` relays Gemini's SSE stream as it arrives. NeoSwitch waits for the first Gemini chunk before writing anything, so failures before generation starts keep a real HTTP status. Event order:
 
 ```text
 message_start
-content_block_start*
-content_block_delta*
-content_block_stop*
+ping
+(content_block_start content_block_delta+ content_block_stop)*
 message_delta
 message_stop
 ```
 
+Consecutive text chunks share one text block. Gemini delivers each function call whole (argument streaming is not requested), so a `tool_use` block is emitted as start, a single complete `input_json_delta`, stop. A failure after streaming started ends the stream with an Anthropic `error` event and no `message_stop`.
+
+## Token counting
+
+On Vertex AI the system instruction and tools are counted natively. The Gemini Developer API countTokens call accepts contents only, so NeoSwitch prepends the system instruction and the serialized tool declarations as contents; the result is an estimate within the framing tokens Gemini adds around them.
+
 ## Failure policy
 
-- Missing credentials fail before an upstream request is made.
-- Gemini 4xx/5xx responses are returned as Anthropic-compatible `502` errors with the provider status preserved in the message.
-- No automatic model fallback is enabled in the MVP.
-- No retry occurs after the first SSE byte is written.
-- Logs contain request metadata and provider status only; prompts, tool arguments, API keys, and responses are not logged.
+| Upstream | NeoSwitch response |
+|---|---|
+| translation error (unsupported block, unknown tool_use_id) | `400 invalid_request_error`, before any upstream call |
+| Gemini 400 | `400 invalid_request_error`; token-limit errors are prefixed `prompt is too long:` so Claude Code offers compaction |
+| Gemini 401 / 403 / 404 / 413 | same status, `authentication_error` / `permission_error` / `not_found_error` / `request_too_large` |
+| Gemini 429 | `429 rate_limit_error` |
+| Gemini 503 | `529 overloaded_error` |
+| other Gemini 5xx | same status, `api_error` |
+| no response within 10 minutes | `504 api_error` |
+| network failure, unusable response | `502 api_error` |
+
+- Missing credentials fail at startup.
+- No automatic retry or model fallback: Claude Code owns retries; genai's retry option is left unset.
+- Logs contain no prompts, tool arguments, credentials or responses.
 
 ## Compatibility matrix
 
-| Scenario | MVP status | Acceptance check |
+| Scenario | Status | Acceptance check |
 |---|---|---|
-| Text, non-streaming | Supported | Response text and usage preserved |
-| Text, `stream: true` | Supported, buffered | Canonical SSE event order |
-| System prompt | Supported | Gemini system instruction populated |
-| Single tool call | Supported | Tool name, arguments, and ID preserved |
-| Parallel tool calls | Translation supported | Each call receives its own ID |
-| Tool result turn | Supported | Function response references prior tool name |
-| Image input | Supported | Base64 inline data and MIME type preserved |
-| Native upstream streaming | Not yet | Separate milestone; must pass tool-call replay tests |
-| Session resume | Launcher-compatible | Resume through `neoswitch claude` |
+| Text, non-streaming and streaming | Supported | `server` tests; deltas merged into one block |
+| System prompt and system messages | Supported | `translate` tests |
+| Claude Code built-in tool schemas | Supported | `testdata/claude-code-tools.json`, captured from Claude Code 2.1.329, passes unmodified |
+| Tool call → tool result → answer | Supported | `provider` wire test replays the signature through genai serialization |
+| Parallel tool calls | Supported | Each call gets its own ID |
+| Images and PDFs, including inside tool results | Supported | `translate` tests |
+| Upstream errors | Supported | Status mapping table test |
+| `count_tokens` | Supported, estimated on the Developer API | `provider` and `server` tests |
+| Session resume | Supported | Stateless tool IDs |
 | Consumer OAuth / Antigravity | Not supported | Explicitly outside stable core |
+
+End-to-end check without a Gemini key: run `neoswitch claude -- -p ...` with `GEMINI_BASE_URL` pointing at a scripted server that returns a function call with a thought signature and returns 400 if the next request does not replay it.

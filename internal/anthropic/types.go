@@ -2,15 +2,18 @@ package anthropic
 
 import "encoding/json"
 
+// MessagesRequest is the subset of the Anthropic Messages request that NeoSwitch translates. Fields Claude Code sends but Gemini has no equivalent for (metadata, thinking, cache_control) are accepted and ignored at the JSON level; content blocks are validated strictly by the translator.
 type MessagesRequest struct {
 	Model       string          `json:"model"`
 	MaxTokens   int             `json:"max_tokens"`
 	Messages    []Message       `json:"messages"`
 	System      json.RawMessage `json:"system,omitempty"`
 	Tools       []Tool          `json:"tools,omitempty"`
+	ToolChoice  *ToolChoice     `json:"tool_choice,omitempty"`
 	Stream      bool            `json:"stream,omitempty"`
 	Temperature *float64        `json:"temperature,omitempty"`
 	TopP        *float64        `json:"top_p,omitempty"`
+	TopK        *int            `json:"top_k,omitempty"`
 	Stop        []string        `json:"stop_sequences,omitempty"`
 }
 
@@ -20,9 +23,16 @@ type Message struct {
 }
 
 type Tool struct {
+	// Type is empty for client tools. Server tools (web_search, code_execution, ...) carry a versioned type and cannot be executed by Gemini.
+	Type        string          `json:"type,omitempty"`
 	Name        string          `json:"name"`
 	Description string          `json:"description,omitempty"`
 	InputSchema json.RawMessage `json:"input_schema"`
+}
+
+type ToolChoice struct {
+	Type string `json:"type"`
+	Name string `json:"name,omitempty"`
 }
 
 type ContentBlock struct {
@@ -35,13 +45,16 @@ type ContentBlock struct {
 	Input     json.RawMessage `json:"input,omitempty"`
 	ToolUseID string          `json:"tool_use_id,omitempty"`
 	Content   json.RawMessage `json:"content,omitempty"`
-	Source    *ImageSource    `json:"source,omitempty"`
+	IsError   bool            `json:"is_error,omitempty"`
+	Source    *Source         `json:"source,omitempty"`
 }
 
-type ImageSource struct {
+// Source is the payload of image and document blocks.
+type Source struct {
 	Type      string `json:"type"`
-	MediaType string `json:"media_type"`
-	Data      string `json:"data"`
+	MediaType string `json:"media_type,omitempty"`
+	Data      string `json:"data,omitempty"`
+	URL       string `json:"url,omitempty"`
 }
 
 type Response struct {
@@ -56,8 +69,13 @@ type Response struct {
 }
 
 type Usage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
+	InputTokens          int `json:"input_tokens"`
+	OutputTokens         int `json:"output_tokens"`
+	CacheReadInputTokens int `json:"cache_read_input_tokens"`
+}
+
+type CountTokensResponse struct {
+	InputTokens int `json:"input_tokens"`
 }
 
 type ErrorResponse struct {

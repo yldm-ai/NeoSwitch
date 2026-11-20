@@ -8,24 +8,28 @@ NeoSwitch 的定位很明确：Claude Code 继续负责 Agent 运行时、工具
 
 ## 当前状态
 
-这是第一个协议合同 MVP，目前支持：
+目前支持：
 
 - `neoswitch serve`：启动本地 Anthropic-compatible Proxy。
 - `neoswitch claude`：通过临时本地 Proxy 启动 Claude Code。
 - `neoswitch antigravity probe`：验证现有 `agy` 登录是否可用，不读取 Antigravity token；它不是 Claude Code 后端。
-- 文本、图片、工具声明、工具结果、非流式响应，以及缓冲式 Anthropic SSE 响应。
-- 默认使用 Gemini `generateContent` 和 `gemini-4-neon`。
-
-当前版本的 `stream: true` 会等待 Gemini 完整响应后，再生成合法的 Anthropic SSE 事件。这会牺牲首 token 延迟，但可以避免把不完整的工具调用发送给 Claude Code。原生上游流式传输会在独立的兼容性测试通过后接入。
+- 文本、图片、PDF、Claude Code 的工具 schema、多轮工具调用（包括 Gemini 的 thought signature）、流式与非流式响应，以及 `count_tokens`。
+- 通过官方 `google.golang.org/genai` SDK 接入 Gemini Developer API 或 Vertex AI，默认模型 `gemini-4-neon`。
 
 ## 快速开始
 
-### 1. 准备官方 Gemini API Key
+### 1. 准备凭证
 
-NeoSwitch 稳定路径使用官方 Gemini API 凭证。请先设置：
+使用 Gemini API Key：
 
 ```bash
 export GEMINI_API_KEY='你的 Gemini API Key'
+```
+
+或者使用 Vertex AI 和 Application Default Credentials：
+
+```bash
+export GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT=my-project GOOGLE_CLOUD_LOCATION=global
 ```
 
 ### 2. 启动 Claude Code
@@ -49,15 +53,54 @@ go run ./cmd/neoswitch claude
 如果你要把 NeoSwitch 接到其他 Anthropic-compatible 客户端：
 
 ```bash
-GEMINI_API_KEY='你的 Gemini API Key' \
-go run ./cmd/neoswitch serve
+export NEOSWITCH_AUTH_TOKEN="$(openssl rand -hex 24)"
+GEMINI_API_KEY='你的 Gemini API Key' go run ./cmd/neoswitch serve
+
+# 在客户端的环境里
+ANTHROPIC_BASE_URL=http://127.0.0.1:8080 ANTHROPIC_AUTH_TOKEN="$NEOSWITCH_AUTH_TOKEN" claude
 ```
 
-Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOSWITCH_LISTEN` 到其他回环地址。`GEMINI_BASE_URL` 可以指向兼容的 Google Gemini endpoint；默认使用 Gemini Developer API。
+两个变量都要设置：如果 Claude Code 只拿到 base URL，会把已登录的 claude.ai 凭证发给 Proxy。`neoswitch claude` 会自动用随机端口和一次性 token 完成这一步。
+
+Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOSWITCH_LISTEN` 到其他回环地址。`GEMINI_BASE_URL` 用于覆盖 Gemini API 的主机地址。
+
+## Claude Code 插件
+
+装上插件后，可以只把选定的项目切到 Gemini，其他项目里照常直接用 `claude`，不需要记额外的启动命令。
+
+```text
+/plugin marketplace add yldm-ai/NeoSwitch
+/plugin install neoswitch@neoswitch
+```
+
+在插件配置里填入 Gemini API Key（`/plugin` → neoswitch），Claude Code 会把它存进 macOS 钥匙串。不填的话，NeoSwitch 会使用启动 Claude Code 时环境里的 `GEMINI_API_KEY` 或 Vertex AI 凭证。
+
+| 命令 | 作用 |
+|---|---|
+| `/neoswitch:on` | 让这个项目之后的新会话走 Gemini |
+| `/neoswitch:status` | 查看路由状态和代理是否在运行 |
+| `/neoswitch:off` | 让这个项目之后的新会话改回 Anthropic |
+
+执行 `/neoswitch:on` 或 `/neoswitch:off` 之后，要在项目里开一个新会话才生效，正在运行的会话保持原来的连接。
+
+工作方式：
+
+- `/neoswitch:on` 在项目的 `.claude/settings.local.json` 里加入 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，指向一个所有已启用项目共用的本机代理。文件里的其他设置原样保留，`/neoswitch:off` 只删除这两项。
+- SessionStart hook 会在会话发出第一个请求之前启动代理，并把这个 Claude Code 进程登记给代理。所有登记过的会话都退出后，代理自己退出，关掉 Claude Code 后不会留下后台进程。
+- 插件第一次使用时会用 Go 编译自带的源码，所以需要安装 Go。支持 macOS 和 Linux。
+
+注意事项：
+
+- 启用后 `.claude/settings.local.json` 里会存有代理 token，这个文件不要提交到版本库；如果 git 没有忽略它，`/neoswitch:on` 会给出提示。
+- 已启用的项目里无法使用 Remote Control：只要 `ANTHROPIC_BASE_URL` 不指向 Anthropic，Claude Code 就会禁用它。
+- Anthropic 的文档写明不支持把 Claude Code 路由到非 Claude 模型，所以 Claude Code 升级后，NeoSwitch 依赖的行为可能发生变化。
 
 ## 常用命令
 
 ```bash
+neoswitch on [项目目录]           # 让项目的新会话走 Gemini（插件的 /neoswitch:on 调用的就是它）
+neoswitch off [项目目录]          # 改回 Anthropic
+neoswitch status [项目目录]       # 查看路由和代理状态
 neoswitch doctor                 # 检查 Gemini 凭证和 Claude CLI
 neoswitch models                 # 查看当前配置的模型
 neoswitch antigravity probe      # 检查 agy 登录，不输出 token
@@ -71,7 +114,7 @@ go run ./cmd/neoswitch
 
 ## 稳定性边界
 
-NeoSwitch 的稳定核心只使用官方 Gemini API Key 或 Vertex/ADC 凭证。以下方式不属于稳定核心：
+NeoSwitch 的稳定核心只使用官方 Gemini API Key 或 Vertex AI（ADC）凭证。以下方式不属于稳定核心：
 
 - 读取或导出 Antigravity OAuth/token profile。
 - 抓取 Antigravity 内部接口。
