@@ -17,10 +17,6 @@ import (
 	"github.com/yldm-ai/NeoSwitch/internal/server"
 )
 
-// pluginKeyEnv is how Claude Code hands the Gemini key saved in the plugin's sensitive userConfig (kept in the macOS Keychain) to hook processes.
-const pluginKeyEnv = "CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY"
-const pluginAntigravityEnv = "CLAUDE_PLUGIN_OPTION_ANTIGRAVITY_OAUTH"
-
 func projectDir(args []string) (string, error) {
 	dir := os.Getenv("CLAUDE_PROJECT_DIR")
 	if len(args) > 0 {
@@ -113,8 +109,13 @@ func status(args []string) error {
 		return nil
 	}
 	fmt.Printf("routing:  NeoSwitch %s -> %s\n", state.BaseURL(), model)
-	if sessions, running := daemon.Status(state); running {
-		fmt.Printf("daemon:   running, %d Claude Code session(s) attached\n", sessions)
+	if kind, reason, err := resolveBackend(); err != nil {
+		fmt.Printf("backend:  none: %v\n", err)
+	} else {
+		fmt.Printf("backend:  %s (%s)\n", kind, reason)
+	}
+	if info, running := daemon.Status(state); running {
+		fmt.Printf("daemon:   running on %s, %d Claude Code session(s) attached\n", info.Backend, info.Sessions)
 	} else {
 		fmt.Println("daemon:   not running; it starts with the next Claude Code session in this project")
 	}
@@ -155,24 +156,26 @@ func attach(args []string) error {
 		}
 		notice = "NeoSwitch: Claude Code was started in gateway mode (" + daemon.EnvUseGateway + "), which can send this session's requests to the gateway instead of Gemini. This project's .claude/settings.local.json now turns gateway mode off; start a new session to use NeoSwitch."
 	}
-	if pluginAntigravityEnabled() {
-		_ = os.Setenv("NEOSWITCH_ANTIGRAVITY_ACP", "true")
-	} else if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GOOGLE_API_KEY") == "" && os.Getenv(pluginKeyEnv) != "" {
-		_ = os.Setenv("GEMINI_API_KEY", os.Getenv(pluginKeyEnv))
-	} else if noGeminiCredentialConfigured() && antigravityCLIAvailable() {
-		// A successful /neoswitch:login leaves the OAuth profile in agy's keyring.
-		// Select the official ACP bridge automatically so the user does not need
-		// to repeat the provider choice in the plugin configuration.
-		_ = os.Setenv("NEOSWITCH_ANTIGRAVITY_ACP", "true")
+	kind, _, err := resolveBackend()
+	if err != nil {
+		return hookMessage("NeoSwitch: " + err.Error())
 	}
-	if _, _, _, err := configuredBackend(context.Background()); err != nil {
-		if pluginAntigravityEnabled() {
-			return hookMessage("NeoSwitch: " + err.Error() + ". Run /neoswitch:login first to authenticate Antigravity OAuth.")
-		}
-		return hookMessage("NeoSwitch: " + err.Error() + ". Set the Gemini API key in the plugin's settings (/plugin) or export it before starting Claude Code.")
+	// configuredBackend also moves a Gemini key saved by an earlier plugin version into GEMINI_API_KEY. Pinning the kind makes the daemon spawned below, whose environment drops Claude Code's variables, serve the backend checked here.
+	_, _, label, err := configuredBackend(context.Background())
+	if err != nil {
+		return hookMessage("NeoSwitch: " + err.Error())
 	}
+	_ = os.Setenv(backendEnv, kind)
 	if err := daemon.Attach(state, *pid, func() error { return spawnDaemon(dir) }); err != nil {
 		return hookMessage("NeoSwitch: " + err.Error() + "; see " + filepath.Join(dir, "daemon.log"))
+	}
+	if info, running := daemon.Status(state); running && info.Backend != "" && info.Backend != label {
+		running := "NeoSwitch: the shared proxy still uses " + info.Backend + " because other Claude Code sessions are using it; this session gets " + label + " once they have all exited."
+		if notice != "" {
+			notice += " " + running
+		} else {
+			notice = running
+		}
 	}
 	if notice != "" {
 		return hookMessage(notice)
@@ -187,29 +190,6 @@ func gatewayModeOn() bool {
 		return false
 	}
 	return true
-}
-
-func pluginAntigravityEnabled() bool {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv(pluginAntigravityEnv)))
-	return value == "1" || value == "true" || value == "yes"
-}
-
-func noGeminiCredentialConfigured() bool {
-	if strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")) != "" || strings.TrimSpace(os.Getenv(pluginKeyEnv)) != "" {
-		return false
-	}
-	if value := strings.ToLower(strings.TrimSpace(os.Getenv("GOOGLE_GENAI_USE_ENTERPRISE"))); value == "1" || value == "true" {
-		return false
-	}
-	if value := strings.ToLower(strings.TrimSpace(os.Getenv("GOOGLE_GENAI_USE_VERTEXAI"))); value == "1" || value == "true" {
-		return false
-	}
-	return true
-}
-
-func antigravityCLIAvailable() bool {
-	_, err := exec.LookPath(antigravityCLIPath())
-	return err == nil
 }
 
 func hookMessage(message string) error {
@@ -267,7 +247,7 @@ func runDaemon() error {
 	defer stop()
 	fmt.Fprintf(os.Stderr, "NeoSwitch daemon on %s (%s, model %s)\n", state.BaseURL(), backendName, model)
 	handler := server.NewHandler(server.Config{Backend: backend, Model: model, Token: state.Token})
-	err = daemon.Run(ctx, state, handler, daemon.Options{})
+	err = daemon.Run(ctx, state, handler, daemon.Options{Backend: backendName})
 	fmt.Fprintln(os.Stderr, "NeoSwitch daemon stopped: no Claude Code session attached")
 	return err
 }
