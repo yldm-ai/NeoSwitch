@@ -24,7 +24,9 @@ prune() {
 if command -v go >/dev/null 2>&1; then
 	mkdir -p "$cache"
 	echo "$preparing" >&2
-	(cd "$root" && go build -trimpath -o "$bin.tmp" ./cmd/neoswitch) >&2
+	# The version names the plugin's source: the release it follows plus the plugin directory, which Claude Code names after the installed version or commit.
+	plugin_dir=$(printf '%s' "$(basename "$root")" | tr -c 'A-Za-z0-9._-' '_')
+	(cd "$root" && go build -trimpath -ldflags "-X main.version=$version+source.$plugin_dir" -o "$bin.tmp" ./cmd/neoswitch) >&2
 	mv "$bin.tmp" "$bin"
 	prune "$bin"
 	exec "$bin" "$@"
