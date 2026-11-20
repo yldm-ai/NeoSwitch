@@ -58,12 +58,12 @@ func main() {
 }
 
 func antigravity(args []string) error {
-	if len(args) != 1 || args[0] != "probe" {
-		return fmt.Errorf("usage: neoswitch antigravity probe")
+	if len(args) != 1 || (args[0] != "probe" && args[0] != "login" && args[0] != "oauth") {
+		return fmt.Errorf("usage: neoswitch antigravity {login|probe}")
 	}
-	path := os.Getenv("ANTIGRAVITY_CLI_PATH")
-	if path == "" {
-		path = "agy"
+	path := antigravityCLIPath()
+	if args[0] == "login" || args[0] == "oauth" {
+		return antigravityLogin(path)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -95,6 +95,30 @@ func antigravity(args []string) error {
 		return fmt.Errorf("Antigravity session probe was not successful; run %q interactively to inspect authentication", path)
 	}
 	fmt.Println("ok: Antigravity CLI session is usable")
+	return nil
+}
+
+func antigravityCLIPath() string {
+	if path := strings.TrimSpace(os.Getenv("ANTIGRAVITY_CLI_PATH")); path != "" {
+		return path
+	}
+	return "agy"
+}
+
+// antigravityLogin delegates authentication to the official CLI. agy owns the
+// browser OAuth flow and stores its resulting profile in the platform keyring.
+func antigravityLogin(path string) error {
+	command := exec.Command(path)
+	command.Stdin = os.Stdin
+	command.Stdout = os.Stdout
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		if execErr, ok := err.(*exec.ExitError); ok {
+			return fmt.Errorf("Antigravity OAuth login failed (exit code %d)", execErr.ExitCode())
+		}
+		return fmt.Errorf("start Antigravity CLI %q for OAuth login: %w", path, err)
+	}
+	fmt.Println("ok: Antigravity OAuth login completed")
 	return nil
 }
 
@@ -203,6 +227,7 @@ func usage() {
 Usage:
   neoswitch claude [-- claude arguments...]   start Claude Code through a local proxy
   neoswitch serve                             run the Anthropic-compatible proxy
+  neoswitch antigravity login                 sign in with the official agy browser OAuth flow
   neoswitch antigravity probe                 verify the official agy session without reading its token
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [project]                     route them back to Anthropic
