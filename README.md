@@ -131,7 +131,7 @@ Claude Code still runs the session, permissions, tool execution, MCP servers, sk
 | Multi-turn tool use and `/resume` | Supported; thought signatures are carried in the tool IDs | Supported |
 | Images | Supported | Supported when `agy` offers image input |
 | PDFs | Supported | Not supported; the model is told a file was omitted |
-| `/effort` | Not applied yet | Mapped to `agy`'s thought level |
+| `/effort` | Sent as Gemini's thinking level; not verified against the live API, and dropped if the model rejects it | Mapped to `agy`'s thought level |
 | Token usage and `count_tokens` | Reported; `count_tokens` is estimated on the Developer API | Reported, including about 14k tokens of `agy` instructions added to every prompt |
 | Gemini 4 Neon access | Depends on your key or project; check with `neoswitch doctor` | Verified with a signed-in `agy` |
 

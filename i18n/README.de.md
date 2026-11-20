@@ -131,7 +131,7 @@ Claude Code führt weiterhin Sitzung, Berechtigungen, Tool-Ausführung, MCP-Serv
 | Mehrstufige Tool-Nutzung und `/resume` | Unterstützt; Thought Signatures werden in den Tool-IDs mitgeführt | Unterstützt |
 | Bilder | Unterstützt | Unterstützt, wenn `agy` Bildeingabe anbietet |
 | PDFs | Unterstützt | Nicht unterstützt; dem Modell wird mitgeteilt, dass eine Datei ausgelassen wurde |
-| `/effort` | Noch nicht angewendet | Auf die Thought-Stufe von `agy` abgebildet |
+| `/effort` | Als Thinking-Stufe von Gemini gesendet; nicht gegen die Live-API geprüft, und verworfen, wenn das Modell sie ablehnt | Auf die Thought-Stufe von `agy` abgebildet |
 | Token-Verbrauch und `count_tokens` | Gemeldet; `count_tokens` wird bei der Developer API geschätzt | Gemeldet, einschließlich etwa 14k Tokens an `agy`-Anweisungen, die jedem Prompt hinzugefügt werden |
 | Zugriff auf Gemini 4 Neon | Hängt von Ihrem Schlüssel oder Projekt ab; prüfen mit `neoswitch doctor` | Mit angemeldetem `agy` verifiziert |
 

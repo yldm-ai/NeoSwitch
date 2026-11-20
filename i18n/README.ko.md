@@ -131,7 +131,7 @@ go run ./cmd/neoswitch claude
 | 멀티턴 도구 사용과 `/resume` | 지원. thought signature는 도구 ID에 담아 전달 | 지원 |
 | 이미지 | 지원 | `agy`가 이미지 입력을 제공할 때 지원 |
 | PDF | 지원 | 미지원. 파일이 생략되었다는 사실을 모델에 알림 |
-| `/effort` | 아직 적용되지 않음 | `agy`의 사고 수준에 매핑 |
+| `/effort` | Gemini의 사고 수준으로 전송; 실제 API에서 검증되지 않았으며, 모델이 거부하면 제외 | `agy`의 사고 수준에 매핑 |
 | 토큰 사용량과 `count_tokens` | 보고됨. Developer API에서는 `count_tokens`가 추정값 | 보고됨. 모든 프롬프트에 추가되는 약 14k 토큰의 `agy` 지시문 포함 |
 | Gemini 4 Neon 접근 | 키나 프로젝트에 따라 다름. `neoswitch doctor`로 확인 | 로그인된 `agy`로 검증됨 |
 

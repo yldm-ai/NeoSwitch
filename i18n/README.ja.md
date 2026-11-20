@@ -131,7 +131,7 @@ go run ./cmd/neoswitch claude
 | 複数ターンのツール使用と `/resume` | 対応。thought signature はツール ID に保持される | 対応 |
 | 画像 | 対応 | `agy` が画像入力を提供する場合に対応 |
 | PDF | 対応 | 非対応。ファイルが省略されたことがモデルに伝えられる |
-| `/effort` | まだ反映されない | `agy` の思考レベルに対応付け |
+| `/effort` | Gemini の思考レベルとして送信。実際の API では未検証で、モデルが拒否した場合は外す | `agy` の思考レベルに対応付け |
 | トークン使用量と `count_tokens` | 報告される。Developer API では `count_tokens` は推定値 | 報告される。すべてのプロンプトに追加される約 14k トークンの `agy` の指示を含む |
 | Gemini 4 Neon へのアクセス | キーまたはプロジェクトによる。`neoswitch doctor` で確認 | サインイン済みの `agy` で検証済み |
 
