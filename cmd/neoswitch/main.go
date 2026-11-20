@@ -268,7 +268,7 @@ Usage:
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [project]                     route them back to Anthropic
   neoswitch status [project]                  show routing and daemon state
-  neoswitch doctor                            check local prerequisites
+  neoswitch doctor                            check that the credentials can use the model
   neoswitch models                            print the configured Gemini model
 
 Environment:
