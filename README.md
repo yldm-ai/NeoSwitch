@@ -74,7 +74,7 @@ The shortest setup is `/neoswitch:login` in Claude Code. It signs in with the of
 
 After `/neoswitch:on` or `/neoswitch:off`, start a new session in the project; the running session keeps its connection.
 
-Run `/neoswitch:login` in Claude Code to start the official `agy acp --login` OAuth flow. It opens the browser when needed, stores the login in the platform keyring, and returns to Claude Code without opening the `agy` interactive UI. `/neoswitch:antigravity-login` remains an alias.
+Run `/neoswitch:login` in Claude Code to start ACP's protocol-driven OAuth flow. `agy` opens the browser when needed, handles the callback itself, stores the login in the platform keyring, and returns to Claude Code without requiring pasted input or opening the `agy` interactive UI. `/neoswitch:antigravity-login` remains an alias.
 
 `/neoswitch:login` launches `agy acp` as the upstream agent and selects `gemini-4-neon` through ACP's session configuration.
 

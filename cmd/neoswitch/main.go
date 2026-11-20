@@ -109,37 +109,16 @@ func antigravityCLIPath() string {
 // mode. agy owns the browser OAuth flow and stores its resulting profile in the
 // platform keyring without opening its interactive TUI.
 func antigravityLogin(path string) error {
-	command := exec.Command(path, "acp", "--login")
-	command.Stdin = os.Stdin
-	if input, closeInput := antigravityLoginInput(); input != nil {
-		command.Stdin = input
-		defer closeInput()
+	os.Setenv("ANTIGRAVITY_CLI_PATH", path)
+	backend, err := provider.NewAntigravityACPFromEnv(context.Background())
+	if err != nil {
+		return err
 	}
-	command.Stdout = os.Stdout
-	command.Stderr = os.Stderr
-	if err := command.Run(); err != nil {
-		if execErr, ok := err.(*exec.ExitError); ok {
-			return fmt.Errorf("Antigravity OAuth login failed (exit code %d)", execErr.ExitCode())
-		}
-		return fmt.Errorf("start Antigravity CLI %q for OAuth login: %w", path, err)
+	if err := backend.Login(context.Background()); err != nil {
+		return fmt.Errorf("Antigravity OAuth login failed: %w", err)
 	}
 	fmt.Println("ok: Antigravity OAuth login completed through agy ACP")
 	return nil
-}
-
-// Claude Code runs skill shell substitutions without passing an interactive
-// stdin stream. Reattach agy's login prompt to the controlling terminal when
-// one exists so its URL/code flow remains usable from the Claude terminal.
-func antigravityLoginInput() (*os.File, func()) {
-	info, err := os.Stdin.Stat()
-	if err == nil && info.Mode()&os.ModeCharDevice != 0 {
-		return nil, func() {}
-	}
-	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
-	if err != nil {
-		return nil, func() {}
-	}
-	return tty, func() { _ = tty.Close() }
 }
 
 func configuredBackend(ctx context.Context) (server.Backend, string, string, error) {

@@ -39,6 +39,40 @@ type AntigravityACP struct {
 
 func (a *AntigravityACP) Model() string { return a.model }
 
+// Login performs ACP's protocol-driven OAuth flow. The agy ACP server owns the
+// browser callback and keyring state, so this method never reads a token or
+// waits for an authorization code on stdin.
+func (a *AntigravityACP) Login(ctx context.Context) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.startLocked(); err != nil {
+		return err
+	}
+	defer a.resetLocked()
+	var initResult struct {
+		AuthMethods []struct {
+			ID string `json:"id"`
+		} `json:"authMethods"`
+	}
+	if err := a.callLocked(ctx, "initialize", map[string]any{
+		"protocolVersion": 1,
+		"clientCapabilities": map[string]any{
+			"auth": map[string]bool{"terminal": false},
+		},
+		"clientInfo": map[string]string{"name": "neoswitch", "version": "1"},
+	}, &initResult); err != nil {
+		return err
+	}
+	methodID := "oauth-personal"
+	if len(initResult.AuthMethods) > 0 {
+		methodID = initResult.AuthMethods[0].ID
+	}
+	if methodID == "" {
+		return errors.New("Antigravity ACP did not advertise an authentication method")
+	}
+	return a.callLocked(ctx, "authenticate", map[string]any{"methodId": methodID}, nil)
+}
+
 func NewAntigravityACPFromEnv(ctx context.Context) (*AntigravityACP, error) {
 	path := strings.TrimSpace(os.Getenv("ANTIGRAVITY_CLI_PATH"))
 	if path == "" {
