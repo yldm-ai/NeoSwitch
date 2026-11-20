@@ -71,7 +71,7 @@ Neon을 사용하려는 프로젝트에서 다음을 실행합니다.
 3. 현재 프로젝트에 NeoSwitch 라우팅을 활성화합니다.
 4. ACP 세션에 `gemini-4-neon`을 선택합니다.
 
-대신 Gemini API 키를 사용하려면 `/plugin` → `neoswitch` → **Gemini API key**에서 키를 설정하고(Claude Code가 보안 플러그인 설정에 저장합니다) `/neoswitch:on`을 실행하세요.
+대신 Gemini API 키를 사용하려면 Claude Code를 시작하기 전에 `GEMINI_API_KEY`를 export하고 `/neoswitch:on`을 실행하세요. 플러그인에는 입력할 설정이 없습니다. 이전에 `/neoswitch:login`으로 로그인했다면 `NEOSWITCH_BACKEND=gemini`도 export하세요. 그렇지 않으면 로그인 때 저장된 선택이 우선합니다.
 
 해당 프로젝트에서 Claude Code를 닫았다가 다시 엽니다. 다음 명령으로 라우트를 확인합니다.
 
@@ -145,7 +145,7 @@ SessionStart 훅은 첫 모델 요청 전에 로컬 데몬 하나를 시작하�
 
 OAuth 라우트에서는 데몬이 공식 `agy acp` 하위 프로세스를 시작합니다. NeoSwitch는 변환된 요청을 ACP 세션으로 보내고, 반환된 응답이나 tool-call JSON을 로컬 Anthropic 호환 엔드포인트 형식으로 다시 변환합니다. 하나의 `agy` 프로세스가 모든 세션을 처리하며, 요청은 각자의 ACP 세션에서 동시에 실행됩니다. `agy` 자체의 파일, 셸, 웹 도구는 모든 요청에서 거부되므로, 도구는 Claude Code 안에서 Claude Code의 권한 규칙에 따라서만 실행됩니다.
 
-다른 Gemini 자격 증명도 함께 있을 때는 플러그인 설정의 **Use Antigravity OAuth via ACP**를 켜서 ACP 라우트를 강제할 수 있습니다. Gemini 자격 증명이 설정되어 있지 않으면 일반 `/neoswitch:login`이 자동으로 ACP를 사용합니다.
+`/neoswitch:login`은 Antigravity OAuth를 백엔드로 저장하므로, 다른 도구용으로 export한 Gemini 키가 이를 대체하지 않습니다. 저장된 선택이 없으면 환경에 Gemini 자격 증명이 있을 때 Gemini API를, 없으면 Antigravity OAuth를 사용합니다. `NEOSWITCH_BACKEND=antigravity|gemini|auto`로 둘 다 재정의할 수 있으며, `/neoswitch:status`에서 사용 중인 백엔드와 그 이유를 확인할 수 있습니다.
 
 ## 독립 실행형 CLI
 
@@ -187,7 +187,7 @@ GEMINI_API_KEY='your-key' neoswitch serve
 | `agy: command not found` | 공식 Antigravity CLI를 설치하거나 `ANTIGRAVITY_CLI_PATH`를 설정합니다. |
 | `no authorization code was entered` | 최신 플러그인으로 업데이트하세요. 현재 흐름은 ACP `authenticate`를 사용하며 셸 stdin을 읽지 않습니다. |
 | 새 세션에서 `ECONNREFUSED` | `/neoswitch:status`를 실행합니다. 라우트가 활성화되어 있다면 데몬 메시지를 확인하고 세션을 다시 시작합니다. Anthropic을 사용하는 세션에서 `/neoswitch:off`를 실행한 뒤, 자격 증명을 고치고 다시 활성화하세요. |
-| Gemini 자격 증명 없이 세션이 시작됨 | `/neoswitch:login`을 실행하거나 Gemini API 키 또는 Vertex AI ADC를 설정합니다. |
+| 백엔드가 설정되지 않았다는 메시지가 표시됨 | `/neoswitch:login`을 실행하거나, Claude Code를 시작하기 전에 `GEMINI_API_KEY` 또는 Vertex AI 설정을 export하세요. |
 | 플러그인 빌드 실패 | Go를 설치하고 Claude Code를 다시 시작합니다. |
 
 ## 호환성 범위

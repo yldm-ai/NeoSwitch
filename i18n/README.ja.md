@@ -71,7 +71,7 @@ Neon を使いたいプロジェクトで次を実行します。
 3. 現在のプロジェクトで NeoSwitch のルーティングを有効にします。
 4. ACP セッションで `gemini-4-neon` を選択します。
 
-代わりに Gemini API キーを使う場合は、`/plugin` → `neoswitch` → **Gemini API key** で設定し（Claude Code はセキュアなプラグイン設定に保存します）、`/neoswitch:on` を実行します。
+代わりに Gemini API キーを使う場合は、Claude Code を起動する前に `GEMINI_API_KEY` を export し、`/neoswitch:on` を実行します。プラグインに入力する設定はありません。以前 `/neoswitch:login` でサインインした場合は `NEOSWITCH_BACKEND=gemini` も export してください。そうしないとログイン時に保存された選択が優先されます。
 
 そのプロジェクトの Claude Code を閉じて開き直してください。ルートは次のコマンドで確認できます。
 
@@ -145,7 +145,7 @@ SessionStart フックはローカルデーモンを 1 つ起動し、最初の�
 
 OAuth ルートでは、デーモンが公式の `agy acp` サブプロセスを起動します。NeoSwitch は変換したリクエストを ACP セッション経由で送信し、返ってきた回答やツール呼び出し JSON をローカルの Anthropic 互換エンドポイントへ変換して返します。1 つの `agy` プロセスがすべてのセッションを処理し、リクエストは個別の ACP セッションで並行して実行されます。`agy` 自身のファイル、シェル、Web ツールはすべてのリクエストで拒否されるため、ツールは Claude Code の中でのみ、Claude Code の権限ルールに従って実行されます。
 
-別の Gemini 認証情報も存在する場合、オプションのプラグイン設定 **Use Antigravity OAuth via ACP** で ACP ルートを強制できます。Gemini 認証情報が設定されていなければ、通常の `/neoswitch:login` は自動的に ACP を使います。
+`/neoswitch:login` は Antigravity OAuth をバックエンドとして保存するため、他のツール用に export した Gemini キーに切り替わることはありません。保存された選択がない場合、環境に Gemini 認証情報があれば Gemini API を、なければ Antigravity OAuth を使います。`NEOSWITCH_BACKEND=antigravity|gemini|auto` で両方を上書きでき、`/neoswitch:status` は使用中のバックエンドとその理由を表示します。
 
 ## スタンドアロン CLI
 
@@ -187,7 +187,7 @@ GEMINI_API_KEY='your-key' neoswitch serve
 | `agy: command not found` | 公式 Antigravity CLI をインストールするか、`ANTIGRAVITY_CLI_PATH` を設定します。 |
 | `no authorization code was entered` | 最新のプラグインに更新してください。現在のフローは ACP `authenticate` を使い、シェルの stdin を読みません。 |
 | 新しいセッションで `ECONNREFUSED` | `/neoswitch:status` を実行します。ルートが有効ならデーモンのメッセージを確認してセッションを再起動します。Anthropic を使うセッションから `/neoswitch:off` を実行し、認証情報を修正してから再度有効にしてください。 |
-| Gemini の認証情報がない状態でセッションが始まる | `/neoswitch:login` を実行するか、Gemini API キーまたは Vertex AI ADC を設定します。 |
+| バックエンドが設定されていないと表示される | `/neoswitch:login` を実行するか、Claude Code の起動前に `GEMINI_API_KEY` または Vertex AI の設定を export します。 |
 | プラグインのビルドに失敗する | Go をインストールして Claude Code を再起動します。 |
 
 ## 互換性の範囲

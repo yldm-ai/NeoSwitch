@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/yldm-ai/NeoSwitch/internal/daemon"
 	"github.com/yldm-ai/NeoSwitch/internal/provider"
 	"github.com/yldm-ai/NeoSwitch/internal/server"
 )
@@ -43,6 +44,8 @@ func main() {
 		err = off(os.Args[2:])
 	case "status":
 		err = status(os.Args[2:])
+	case "backend":
+		err = backendCommand(os.Args[2:])
 	case "attach":
 		err = attach(os.Args[2:])
 	case "daemon":
@@ -111,9 +114,7 @@ func antigravityCLIPath() string {
 	return "agy"
 }
 
-// antigravityLogin delegates authentication to the official CLI's headless
-// mode. agy owns the browser OAuth flow and stores its resulting profile in the
-// platform keyring without opening its interactive TUI.
+// antigravityLogin delegates authentication to the official CLI's ACP server, which owns the browser OAuth flow and stores the resulting profile in the platform keyring. Signing in is also the user's choice of backend, so it is saved: a Gemini key exported for other tools must not take over afterwards.
 func antigravityLogin(path string) error {
 	fmt.Fprintln(os.Stderr, antigravityTermsWarning)
 	os.Setenv("ANTIGRAVITY_CLI_PATH", path)
@@ -125,27 +126,16 @@ func antigravityLogin(path string) error {
 		return fmt.Errorf("Antigravity OAuth login failed: %w", err)
 	}
 	fmt.Println("ok: Antigravity OAuth login completed through agy ACP")
-	return nil
-}
-
-func configuredBackend(ctx context.Context) (server.Backend, string, string, error) {
-	if usesAntigravityACP() {
-		backend, err := provider.NewAntigravityACPFromEnv(ctx)
-		if err != nil {
-			return nil, "", "", err
-		}
-		return backend, backend.Model(), "Antigravity ACP", nil
-	}
-	backend, err := provider.NewGeminiFromEnv(ctx)
+	dir, err := daemon.Dir()
 	if err != nil {
-		return nil, "", "", err
+		return err
 	}
-	return backend, backend.Model, backend.BackendName(), nil
-}
-
-func usesAntigravityACP() bool {
-	value := strings.ToLower(strings.TrimSpace(os.Getenv("NEOSWITCH_ANTIGRAVITY_ACP")))
-	return value == "1" || value == "true" || value == "yes"
+	if _, err := daemon.SaveBackend(dir, backendAntigravity); err != nil {
+		return fmt.Errorf("save the Antigravity OAuth choice: %w", err)
+	}
+	fmt.Println("ok: NeoSwitch uses Antigravity OAuth for routed projects")
+	printDaemonSwitchNote(backendAntigravity)
+	return nil
 }
 
 func serve() error {
@@ -274,11 +264,13 @@ Usage:
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [project]                     route them back to Anthropic
   neoswitch status [project]                  show routing and daemon state
+  neoswitch backend [auto|antigravity|gemini] show or choose the upstream (login chooses antigravity)
   neoswitch doctor                            check that the credentials can use the model
   neoswitch models                            print the configured Gemini model
   neoswitch version                           print the NeoSwitch version
 
 Environment:
+  NEOSWITCH_BACKEND    antigravity, gemini or auto; overrides the saved choice
   GEMINI_API_KEY       Gemini Developer API key
   GOOGLE_GENAI_USE_VERTEXAI=true with GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION
                        use Vertex AI with Application Default Credentials instead

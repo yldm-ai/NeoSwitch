@@ -71,7 +71,7 @@ claude plugin update neoswitch@neoswitch
 3. 為目前專案啟用 NeoSwitch 路由。
 4. 為 ACP 工作階段選擇 `gemini-4-neon`。
 
-如果要改用 Gemini API key，在 `/plugin` → `neoswitch` → **Gemini API key** 中填寫（Claude Code 會將它儲存在安全的外掛設定中），然後執行 `/neoswitch:on`。
+如果要改用 Gemini API key，在啟動 Claude Code 之前 export `GEMINI_API_KEY`，然後執行 `/neoswitch:on`，外掛沒有需要填寫的設定。如果之前用 `/neoswitch:login` 登入過，還要 export `NEOSWITCH_BACKEND=gemini`，否則會繼續使用登入時儲存的選擇。
 
 關閉並重新開啟該專案中的 Claude Code。檢查路由：
 
@@ -145,7 +145,7 @@ SessionStart hook 會啟動一個本機 daemon，並在 Claude Code 發出第一
 
 使用 OAuth 路由時，daemon 會啟動官方 `agy acp` 子處理程序。NeoSwitch 透過 ACP 工作階段送出轉換後的請求，再把傳回的回答或工具呼叫 JSON 轉回本機 Anthropic-compatible endpoint。一個 `agy` 處理程序服務所有工作階段，每個請求在各自的 ACP 工作階段中並行執行。每個請求都會拒絕 `agy` 自身的檔案、shell 與網路工具，因此工具只在 Claude Code 中執行，並遵循 Claude Code 的權限規則。
 
-如果同時存在其他 Gemini 憑證，可選的外掛設定 **Use Antigravity OAuth via ACP** 會強制使用 ACP 路由。沒有設定 Gemini 憑證時，正常執行 `/neoswitch:login` 會自動使用 ACP。
+`/neoswitch:login` 會把 Antigravity OAuth 儲存為後端，環境中為其他工具設定的 Gemini key 不會搶占它。沒有儲存的選擇時，環境中有 Gemini 憑證就用 Gemini API，否則用 Antigravity OAuth。`NEOSWITCH_BACKEND=antigravity|gemini|auto` 可以覆蓋以上兩者，`/neoswitch:status` 會顯示目前使用的後端及原因。
 
 ## 獨立 CLI
 
@@ -187,7 +187,7 @@ GEMINI_API_KEY='你的 API Key' neoswitch serve
 | `agy: command not found` | 安裝官方 Antigravity CLI，或設定 `ANTIGRAVITY_CLI_PATH`。 |
 | `no authorization code was entered` | 更新到最新外掛。目前流程使用 ACP `authenticate`，不讀取 shell stdin。 |
 | 新工作階段出現 `ECONNREFUSED` | 執行 `/neoswitch:status`。如果路由已啟用，檢查 daemon 訊息並重新啟動工作階段。在使用 Anthropic 的工作階段中執行 `/neoswitch:off`，修正憑證後再重新啟用。 |
-| 工作階段啟動時沒有 Gemini 憑證 | 執行 `/neoswitch:login`，或設定 Gemini API key 或 Vertex AI ADC。 |
+| 工作階段提示沒有設定後端 | 執行 `/neoswitch:login`，或在啟動 Claude Code 前 export `GEMINI_API_KEY` 或 Vertex AI 設定。 |
 | 外掛編譯失敗 | 安裝 Go，然後重新啟動 Claude Code。 |
 
 ## 相容性邊界
