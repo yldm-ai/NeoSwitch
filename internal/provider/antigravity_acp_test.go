@@ -7,15 +7,17 @@ import (
 	"errors"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	acp "github.com/coder/acp-go-sdk"
 	"google.golang.org/genai"
 
 	"github.com/yldm-ai/NeoSwitch/internal/translate"
 )
 
-// fakeACPEnv makes the test binary act as a scripted `agy acp` server when it is started as the ACP subprocess, so the JSON-RPC client is exercised over real pipes without the Antigravity CLI.
+// fakeACPEnv makes the test binary act as a scripted `agy acp` server when it is started as the ACP subprocess, so the client is exercised over real pipes without the Antigravity CLI.
 const fakeACPEnv = "NEOSWITCH_FAKE_ACP"
 
 func TestMain(m *testing.M) {
@@ -26,47 +28,128 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// runFakeACP serves ACP over stdin/stdout. Modes: "ok" answers every prompt; "no-image" also answers but does not advertise image prompts; "exit" dies on session/prompt; "hang" never answers session/prompt. An answer is the comma-separated list of prompt block types it received, as {"text": ...}.
+// streamEnvelope exercises escapes, a \u escape and a UTF-16 surrogate pair; the fake sends it one character per chunk so every escape is split across chunks.
+const (
+	streamEnvelope = `{"text":"say \"hi\"\n\u003c😀 \ud83d\ude00 done"}`
+	streamText     = "say \"hi\"\n<😀 😀 done"
+)
+
+// runFakeACP serves ACP over stdin/stdout. Every answering mode first sends session/request_permission and only answers once the client has rejected it. Modes:
+//   - ok: answers with the comma-separated prompt block types as {"text": ...}
+//   - no-image: like ok, without advertising image prompts
+//   - pair: holds prompts until two have arrived, then answers both
+//   - hang-first: the first prompt streams a thought and then hangs until session/cancel, which it answers with stopReason cancelled; later prompts answer "after-cancel" once that happened
+//   - quiet-first: the first prompt hangs without any output; later prompts answer normally
+//   - hang: prompts never answer and produce no output
+//   - exit: the process dies on session/prompt
+//   - stream, tool: answer with streamEnvelope or a tool call, one character per chunk
+//   - refusal: answers nothing with stopReason refusal
 func runFakeACP(mode string) {
 	in := bufio.NewScanner(os.Stdin)
 	in.Buffer(make([]byte, 64<<10), 32<<20)
 	out := json.NewEncoder(os.Stdout)
+	send := func(msg map[string]any) {
+		msg["jsonrpc"] = "2.0"
+		_ = out.Encode(msg)
+	}
+	type prompt struct {
+		id     json.RawMessage
+		sid    string
+		answer string
+	}
+	var (
+		sessions   int
+		prompts    int
+		waiting    []prompt
+		permission = map[string]prompt{}
+		hung       *prompt
+		cancelled  bool
+	)
+	update := func(sid, kind, text string) {
+		send(map[string]any{"method": "session/update", "params": map[string]any{
+			"sessionId": sid,
+			"update":    map[string]any{"sessionUpdate": kind, "content": map[string]string{"type": "text", "text": text}},
+		}})
+	}
+	usage := map[string]any{"inputTokens": 20000, "outputTokens": 20, "cachedReadTokens": 30, "totalTokens": 20020}
+	askPermission := func(p prompt) {
+		permission["perm-"+p.sid] = p
+		send(map[string]any{"id": "perm-" + p.sid, "method": "session/request_permission", "params": map[string]any{
+			"sessionId": p.sid, "toolCall": map[string]any{"toolCallId": "t1"}, "options": []any{},
+		}})
+	}
+	answer := func(p prompt) {
+		stop := "end_turn"
+		if mode == "refusal" {
+			stop = "refusal"
+		}
+		for _, r := range p.answer {
+			update(p.sid, "agent_message_chunk", string(r))
+		}
+		send(map[string]any{"id": p.id, "result": map[string]any{"stopReason": stop, "usage": usage}})
+	}
 	for in.Scan() {
 		var msg struct {
 			ID     json.RawMessage `json:"id"`
 			Method string          `json:"method"`
 			Params json.RawMessage `json:"params"`
+			Error  *struct {
+				Code int `json:"code"`
+			} `json:"error"`
 		}
 		if json.Unmarshal(in.Bytes(), &msg) != nil {
 			continue
 		}
-		reply := func(result any) {
-			_ = out.Encode(map[string]any{"jsonrpc": "2.0", "id": msg.ID, "result": result})
+		reply := func(result any) { send(map[string]any{"id": msg.ID, "result": result}) }
+		var params struct {
+			SessionID string `json:"sessionId"`
+			MethodID  string `json:"methodId"`
+			Prompt    []struct {
+				Type     string `json:"type"`
+				MimeType string `json:"mimeType"`
+				Data     string `json:"data"`
+			} `json:"prompt"`
 		}
+		_ = json.Unmarshal(msg.Params, &params)
 		switch msg.Method {
-		case "initialize":
-			reply(map[string]any{"protocolVersion": 1, "agentCapabilities": map[string]any{
-				"promptCapabilities": map[string]bool{"image": mode != "no-image"},
-			}})
-		case "session/new":
-			reply(map[string]string{"sessionId": "s1"})
-		case "session/set_config_option", "session/close":
-			reply(map[string]any{})
-		case "session/prompt":
-			switch mode {
-			case "exit":
-				os.Exit(1)
-			case "hang":
+		case "":
+			// A response from the client: only the permission requests expect one, and it must be a rejection.
+			var id string
+			_ = json.Unmarshal(msg.ID, &id)
+			p, ok := permission[id]
+			if !ok {
 				continue
 			}
-			var params struct {
-				Prompt []struct {
-					Type     string `json:"type"`
-					MimeType string `json:"mimeType"`
-					Data     string `json:"data"`
-				} `json:"prompt"`
+			delete(permission, id)
+			if msg.Error == nil || msg.Error.Code != -32601 {
+				send(map[string]any{"id": p.id, "error": map[string]any{"code": -1, "message": "client did not reject request_permission"}})
+				continue
 			}
-			_ = json.Unmarshal(msg.Params, &params)
+			answer(p)
+		case "initialize":
+			reply(map[string]any{
+				"protocolVersion":   1,
+				"agentCapabilities": map[string]any{"promptCapabilities": map[string]bool{"image": mode != "no-image"}},
+				"authMethods":       []any{map[string]string{"id": "oauth-personal", "name": "Log in with Google"}},
+			})
+		case "authenticate":
+			if params.MethodID != "oauth-personal" {
+				send(map[string]any{"id": msg.ID, "error": map[string]any{"code": -1, "message": "unexpected auth method " + params.MethodID}})
+				continue
+			}
+			reply(map[string]any{})
+		case "session/new":
+			sessions++
+			reply(map[string]string{"sessionId": "s" + strings.Repeat("x", sessions)})
+		case "session/set_config_option", "session/close":
+			reply(map[string]any{})
+		case "session/cancel":
+			if hung != nil && hung.sid == params.SessionID {
+				cancelled = true
+				send(map[string]any{"id": hung.id, "result": map[string]any{"stopReason": "cancelled"}})
+				hung = nil
+			}
+		case "session/prompt":
 			var types []string
 			for _, block := range params.Prompt {
 				if block.Type == "image" {
@@ -75,21 +158,47 @@ func runFakeACP(mode string) {
 				}
 				types = append(types, block.Type)
 			}
-			// A real agent may call client methods mid-prompt; NeoSwitch must answer them with an error rather than leave the agent waiting.
-			_ = out.Encode(map[string]any{"jsonrpc": "2.0", "id": "perm-1", "method": "session/request_permission", "params": map[string]any{}})
-			if !in.Scan() || !strings.Contains(in.Text(), `"perm-1"`) || !strings.Contains(in.Text(), "-32601") {
-				_ = out.Encode(map[string]any{"jsonrpc": "2.0", "id": msg.ID, "error": map[string]any{"code": -1, "message": "client did not reject request_permission"}})
+			summary, _ := json.Marshal(map[string]string{"text": strings.Join(types, ",")})
+			p := prompt{id: msg.ID, sid: params.SessionID, answer: string(summary)}
+			prompts++
+			switch mode {
+			case "exit":
+				os.Exit(1)
+			case "hang":
 				continue
+			case "quiet-first":
+				if prompts == 1 {
+					continue
+				}
+			case "hang-first":
+				if prompts == 1 {
+					update(p.sid, "agent_thought_chunk", "thinking")
+					hung = &p
+					continue
+				}
+				if cancelled {
+					p.answer = `{"text":"after-cancel"}`
+				} else {
+					p.answer = `{"text":"no-cancel"}`
+				}
+			case "pair":
+				waiting = append(waiting, p)
+				if len(waiting) < 2 {
+					continue
+				}
+				for _, w := range waiting {
+					askPermission(w)
+				}
+				waiting = nil
+				continue
+			case "stream":
+				p.answer = streamEnvelope
+			case "tool":
+				p.answer = `{"tool_use":{"name":"Read","input":{"file_path":"a.go"}}}`
+			case "refusal":
+				p.answer = ""
 			}
-			answer, _ := json.Marshal(map[string]string{"text": strings.Join(types, ",")})
-			half := len(answer) / 2
-			for _, chunk := range []string{string(answer[:half]), string(answer[half:])} {
-				_ = out.Encode(map[string]any{"jsonrpc": "2.0", "method": "session/update", "params": map[string]any{
-					"sessionId": "s1",
-					"update":    map[string]any{"sessionUpdate": "agent_message_chunk", "content": map[string]string{"type": "text", "text": chunk}},
-				}})
-			}
-			reply(map[string]string{"stopReason": "end_turn"})
+			askPermission(p)
 		}
 	}
 }
@@ -123,6 +232,35 @@ func TestACPGenerateCollectsChunksAndRejectsClientMethods(t *testing.T) {
 		if got := generatedText(t, resp); got != "text" {
 			t.Fatalf("request %d: got %q", i, got)
 		}
+		if resp.Candidates[0].FinishReason != genai.FinishReasonStop {
+			t.Fatalf("request %d: finish reason %q", i, resp.Candidates[0].FinishReason)
+		}
+		u := resp.UsageMetadata
+		if u == nil || u.PromptTokenCount != 20000 || u.CachedContentTokenCount != 30 || u.CandidatesTokenCount != 20 || u.ThoughtsTokenCount != 0 {
+			t.Fatalf("request %d: usage %+v", i, u)
+		}
+	}
+}
+
+func TestACPRunsConcurrentRequestsInOneProcess(t *testing.T) {
+	a := newFakeACP(t, "pair")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i := range errs {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			// The fake answers only once both prompts are in flight, so a client that serializes requests times out here.
+			_, errs[i] = a.Generate(ctx, textRequest("hi"))
+		}()
+	}
+	wg.Wait()
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
 	}
 }
 
@@ -142,9 +280,9 @@ func TestACPGenerateRecoversAfterAgentExit(t *testing.T) {
 	}
 }
 
-func TestACPGenerateHonorsContextDeadline(t *testing.T) {
-	a := newFakeACP(t, "hang")
-	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+func generateWithDeadline(t *testing.T, a *AntigravityACP) error {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
 	defer cancel()
 	done := make(chan error, 1)
 	go func() {
@@ -153,16 +291,144 @@ func TestACPGenerateHonorsContextDeadline(t *testing.T) {
 	}()
 	select {
 	case err := <-done:
-		if !errors.Is(err, context.DeadlineExceeded) {
-			t.Fatalf("expected context.DeadlineExceeded, got %v", err)
-		}
+		return err
 	case <-time.After(10 * time.Second):
-		t.Fatal("Generate ignored the context deadline while agy hung")
+		t.Fatal("Generate ignored the context deadline")
+		return nil
 	}
-	// A hung request must not keep the shared ACP process locked for later sessions.
+}
+
+func TestACPDeadlineCancelsOnlyItsSession(t *testing.T) {
+	a := newFakeACP(t, "hang-first")
+	if err := generateWithDeadline(t, a); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
+	}
+	// The hung prompt produced output, so agy is busy rather than wedged: it must get session/cancel and keep serving. A restarted fake would hang on its first prompt again.
+	resp, err := a.Generate(context.Background(), textRequest("hi"))
+	if err != nil {
+		t.Fatalf("request after a timed-out one: %v", err)
+	}
+	if got := generatedText(t, resp); got != "after-cancel" {
+		t.Fatalf("got %q, want the same agy to have received session/cancel", got)
+	}
+}
+
+func TestACPDeadlineRestartsSilentAgent(t *testing.T) {
+	a := newFakeACP(t, "hang")
+	if err := generateWithDeadline(t, a); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
+	}
+	// agy produced nothing before the deadline: it is restarted so later requests do not inherit a wedged process.
 	t.Setenv(fakeACPEnv, "ok")
 	if _, err := a.Generate(context.Background(), textRequest("hi")); err != nil {
-		t.Fatalf("request after a timed-out one: %v", err)
+		t.Fatalf("request after a wedged agy: %v", err)
+	}
+}
+
+func TestACPDeadlineKeepsAgentThatServesOtherSessions(t *testing.T) {
+	a := newFakeACP(t, "quiet-first")
+	timedOut := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_, err := a.Generate(ctx, textRequest("hi"))
+		timedOut <- err
+	}()
+	// Let the silent prompt reach agy first, then keep agy visibly busy with another session until the deadline passes.
+	time.Sleep(200 * time.Millisecond)
+	if _, err := a.Generate(context.Background(), textRequest("hi")); err != nil {
+		t.Fatalf("concurrent request: %v", err)
+	}
+	if err := <-timedOut; !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected context.DeadlineExceeded, got %v", err)
+	}
+	// agy answered another session moments ago, so it is not stuck and must keep running; a restarted fake would hang on this prompt.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if _, err := a.Generate(ctx, textRequest("hi")); err != nil {
+		t.Fatalf("request after the timeout: %v", err)
+	}
+}
+
+func collectStream(t *testing.T, a *AntigravityACP, req translate.Request) []*genai.GenerateContentResponse {
+	t.Helper()
+	var chunks []*genai.GenerateContentResponse
+	for resp, err := range a.Stream(context.Background(), req) {
+		if err != nil {
+			t.Fatal(err)
+		}
+		chunks = append(chunks, resp)
+	}
+	if len(chunks) == 0 {
+		t.Fatal("stream yielded nothing")
+	}
+	return chunks
+}
+
+func TestACPStreamDecodesTextIncrementally(t *testing.T) {
+	a := newFakeACP(t, "stream")
+	chunks := collectStream(t, a, textRequest("hi"))
+	var text strings.Builder
+	for _, chunk := range chunks {
+		for _, part := range chunk.Candidates[0].Content.Parts {
+			text.WriteString(part.Text)
+		}
+	}
+	if text.String() != streamText {
+		t.Fatalf("streamed %q, want %q", text.String(), streamText)
+	}
+	if len(chunks) < 5 {
+		t.Fatalf("expected the answer in many chunks, got %d", len(chunks))
+	}
+	if first := chunks[0].UsageMetadata; first == nil || first.PromptTokenCount <= 0 {
+		t.Fatalf("first chunk must carry an input estimate for message_start, got %+v", first)
+	}
+	last := chunks[len(chunks)-1]
+	if last.Candidates[0].FinishReason != genai.FinishReasonStop || last.UsageMetadata == nil || last.UsageMetadata.PromptTokenCount != 20000 {
+		t.Fatalf("unexpected final chunk: %+v / %+v", last.Candidates[0], last.UsageMetadata)
+	}
+}
+
+func TestACPEstimateLearnsAgentOverhead(t *testing.T) {
+	a := newFakeACP(t, "stream")
+	before, _ := a.CountTokens(context.Background(), textRequest("hi"))
+	_ = collectStream(t, a, textRequest("hi"))
+	// The fake bills 20000 input tokens; once seen, the estimate for the same prompt matches it, and so does the next message_start.
+	if after, _ := a.CountTokens(context.Background(), textRequest("hi")); after != 20000 || before >= after {
+		t.Fatalf("estimate before %d, after %d; want 20000 after", before, after)
+	}
+	if first := collectStream(t, a, textRequest("hi"))[0].UsageMetadata; first == nil || first.PromptTokenCount != 20000 {
+		t.Fatalf("first chunk usage %+v", first)
+	}
+}
+
+func TestACPStreamDeliversToolCallWhole(t *testing.T) {
+	a := newFakeACP(t, "tool")
+	chunks := collectStream(t, a, textRequest("hi"))
+	if len(chunks) != 1 {
+		t.Fatalf("a tool call must not be streamed in pieces, got %d chunks", len(chunks))
+	}
+	parts := chunks[0].Candidates[0].Content.Parts
+	if len(parts) != 1 || parts[0].FunctionCall == nil || parts[0].FunctionCall.Name != "Read" || parts[0].FunctionCall.Args["file_path"] != "a.go" {
+		t.Fatalf("unexpected parts: %#v", parts)
+	}
+}
+
+func TestACPRefusalWithoutText(t *testing.T) {
+	a := newFakeACP(t, "refusal")
+	resp, err := a.Generate(context.Background(), textRequest("hi"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Candidates[0].FinishReason != genai.FinishReasonSafety || len(resp.Candidates[0].Content.Parts) != 0 {
+		t.Fatalf("unexpected refusal: %+v", resp.Candidates[0])
+	}
+}
+
+func TestACPLoginUsesAdvertisedMethod(t *testing.T) {
+	a := newFakeACP(t, "ok")
+	if err := a.Login(context.Background()); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -240,5 +506,62 @@ func TestACPResponsePartsToolUse(t *testing.T) {
 	}
 	if parts[0].FunctionCall.Name != "Read" || parts[0].FunctionCall.Args["file_path"] != "/tmp/a" {
 		t.Fatalf("unexpected function call: %#v", parts[0].FunctionCall)
+	}
+}
+
+func TestACPResponsePartsKeepsTextBeforeToolUse(t *testing.T) {
+	parts, err := acpResponseParts(`{"text":"Reading it.","tool_use":{"name":"Read","input":{}}}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) != 2 || parts[0].Text != "Reading it." || parts[1].FunctionCall == nil {
+		t.Fatalf("unexpected parts: %#v", parts)
+	}
+}
+
+func TestACPResponsePartsAcceptsRawNewlinesInStrings(t *testing.T) {
+	parts, err := acpResponseParts("{\n  \"text\": \"line one\nline two\"\n}")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parts) != 1 || parts[0].Text != "line one\nline two" {
+		t.Fatalf("unexpected parts: %#v", parts)
+	}
+}
+
+func TestEnvelopeDecoder(t *testing.T) {
+	cases := []struct {
+		name, answer, streamed string
+		tool                   bool
+	}{
+		{"text", streamEnvelope, streamText, false},
+		{"fenced", "```json\n" + `{"text": "fenced"}` + "\n```", "fenced", false},
+		{"plain", "Just an answer.", "Just an answer.", false},
+		{"raw newline", "{\"text\":\"a\nb\"}", "a\nb", false},
+		{"text then tool", `{"text":"Reading.","tool_use":{"name":"Read","input":{}}}`, "Reading.", true},
+		{"tool", `{"tool_use":{"name":"Read","input":{}}}`, "", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var d envelopeDecoder
+			var streamed strings.Builder
+			for _, r := range tc.answer {
+				streamed.WriteString(d.feed(string(r)))
+			}
+			rest, err := d.finish(acp.PromptResponse{StopReason: acp.StopReasonEndTurn})
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, part := range rest {
+				streamed.WriteString(part.Text)
+			}
+			if streamed.String() != tc.streamed {
+				t.Fatalf("text %q, want %q", streamed.String(), tc.streamed)
+			}
+			hasTool := len(rest) > 0 && rest[len(rest)-1].FunctionCall != nil
+			if hasTool != tc.tool {
+				t.Fatalf("tool call delivered: %v, want %v (%#v)", hasTool, tc.tool, rest)
+			}
+		})
 	}
 }

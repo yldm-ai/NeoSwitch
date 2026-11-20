@@ -2,7 +2,10 @@ module github.com/yldm-ai/NeoSwitch
 
 go 1.27
 
-require google.golang.org/genai v1.79.1
+require (
+	github.com/coder/acp-go-sdk v0.20.0
+	google.golang.org/genai v1.79.1
+)
 
 require (
 	cloud.google.com/go v0.116.0 // indirect

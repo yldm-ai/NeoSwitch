@@ -1,79 +1,39 @@
 package provider
 
 import (
-	"bufio"
 	"context"
-	"crypto/rand"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"iter"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"time"
 
+	acp "github.com/coder/acp-go-sdk"
 	"google.golang.org/genai"
 
 	"github.com/yldm-ai/NeoSwitch/internal/translate"
 )
 
-// AntigravityACP uses the official agy ACP server as the upstream model
-// session. It never reads Antigravity credentials. agy resolves its own OAuth
-// profile from the platform keyring.
+// AntigravityACP uses the official agy ACP server as the upstream model session. It never reads Antigravity credentials: agy resolves its own OAuth profile from the platform keyring.
+//
+// One agy process serves every request. Each request gets its own ACP session, and agy runs sessions concurrently, so parallel Claude Code requests (subagents, background calls, several sessions sharing the daemon) do not queue behind each other.
 type AntigravityACP struct {
 	path  string
 	agent string
 	model string
 	cwd   string
 
-	mu          sync.Mutex
-	cmd         *exec.Cmd
-	stdin       io.WriteCloser
-	stdout      *bufio.Scanner
-	nextID      int64
-	initialized bool
-	// imagePrompts records whether the running agy advertised promptCapabilities.image in its initialize result.
-	imagePrompts bool
-}
+	mu   sync.Mutex
+	conn *acpConn
 
-func (a *AntigravityACP) Model() string { return a.model }
-
-// Login performs ACP's protocol-driven OAuth flow. The agy ACP server owns the
-// browser callback and keyring state, so this method never reads a token or
-// waits for an authorization code on stdin.
-func (a *AntigravityACP) Login(ctx context.Context) error {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.startLocked(); err != nil {
-		return err
-	}
-	defer a.resetLocked()
-	var initResult struct {
-		AuthMethods []struct {
-			ID string `json:"id"`
-		} `json:"authMethods"`
-	}
-	if err := a.callLocked(ctx, "initialize", map[string]any{
-		"protocolVersion": 1,
-		"clientCapabilities": map[string]any{
-			"auth": map[string]bool{"terminal": false},
-		},
-		"clientInfo": map[string]string{"name": "neoswitch", "version": "1"},
-	}, &initResult); err != nil {
-		return err
-	}
-	methodID := "oauth-personal"
-	if len(initResult.AuthMethods) > 0 {
-		methodID = initResult.AuthMethods[0].ID
-	}
-	if methodID == "" {
-		return errors.New("Antigravity ACP did not advertise an authentication method")
-	}
-	return a.callLocked(ctx, "authenticate", map[string]any{"methodId": methodID}, nil)
+	// promptOverhead is how many input tokens agy adds around every prompt (its own agent instructions, about 14k for bare-llm), learned from the usage of earlier answers. ACP reports usage only after an answer, so estimates made before one need it.
+	promptOverhead atomic.Int64
 }
 
 func NewAntigravityACPFromEnv(ctx context.Context) (*AntigravityACP, error) {
@@ -107,347 +67,419 @@ func NewAntigravityACPFromEnv(ctx context.Context) (*AntigravityACP, error) {
 	return &AntigravityACP{path: path, agent: agent, model: model, cwd: cwd}, nil
 }
 
-func (a *AntigravityACP) Generate(ctx context.Context, req translate.Request) (*genai.GenerateContentResponse, error) {
-	text, err := a.prompt(ctx, req)
+func (a *AntigravityACP) Model() string { return a.model }
+
+// Login performs ACP's protocol-driven OAuth flow. The agy ACP server owns the browser callback and keyring state, so this method never reads a token or waits for an authorization code on stdin. It uses a dedicated agy process that exits when the login finishes.
+func (a *AntigravityACP) Login(ctx context.Context) error {
+	c, err := startACP(a.path, a.agent, a.cwd)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	parts, err := acpResponseParts(text)
+	defer c.close()
+	init, err := c.conn.Initialize(ctx, acp.InitializeRequest{
+		ProtocolVersion:    acp.ProtocolVersionNumber,
+		ClientCapabilities: acp.ClientCapabilities{Auth: acp.AuthCapabilities{Terminal: false}},
+		ClientInfo:         &acp.Implementation{Name: "neoswitch", Version: "1"},
+	})
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("initialize Antigravity ACP: %w", err)
 	}
-	return &genai.GenerateContentResponse{
-		Candidates: []*genai.Candidate{{
-			Content:      &genai.Content{Role: genai.RoleModel, Parts: parts},
-			FinishReason: genai.FinishReasonStop,
-		}},
-	}, nil
+	methodID := acp.AuthMethodId("oauth-personal")
+	if len(init.AuthMethods) > 0 {
+		if init.AuthMethods[0].Agent == nil {
+			return errors.New("Antigravity ACP advertised an authentication method NeoSwitch cannot run")
+		}
+		methodID = init.AuthMethods[0].Agent.Id
+	}
+	if methodID == "" {
+		return errors.New("Antigravity ACP did not advertise an authentication method")
+	}
+	_, err = c.conn.Authenticate(ctx, acp.AuthenticateRequest{MethodId: methodID})
+	return err
 }
 
 func (a *AntigravityACP) Close() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	if a.cmd == nil || a.cmd.Process == nil {
+	if a.conn == nil {
 		return nil
 	}
-	_ = a.stdin.Close()
-	err := a.cmd.Process.Kill()
-	_ = a.cmd.Wait()
-	a.cmd = nil
-	a.stdin = nil
-	a.stdout = nil
-	a.initialized = false
+	err := a.conn.close()
+	a.conn = nil
 	return err
 }
 
+// Generate runs one prompt and returns the complete answer.
+func (a *AntigravityACP) Generate(ctx context.Context, req translate.Request) (*genai.GenerateContentResponse, error) {
+	var raw strings.Builder
+	result, err := a.run(ctx, req, func(text string) { raw.WriteString(text) })
+	if err != nil {
+		return nil, err
+	}
+	parts, err := acpAnswerParts(raw.String(), result)
+	if err != nil {
+		return nil, err
+	}
+	resp := acpFinalResponse(parts, result)
+	if resp.UsageMetadata == nil {
+		estimate, _ := a.CountTokens(ctx, req)
+		resp.UsageMetadata = &genai.GenerateContentResponseUsageMetadata{PromptTokenCount: int32(estimate)}
+	}
+	return resp, nil
+}
+
+// Stream relays the answer while agy generates it. Text answers are decoded out of the {"text": ...} envelope incrementally; tool calls are delivered whole in the final chunk, which also carries the finish reason and usage.
+//
+// ACP reports usage only when the prompt ends, but Claude Code sizes its context from the input tokens in message_start, which the first chunk becomes. That chunk therefore carries the prompt-size estimate; the final chunk carries agy's exact count.
 func (a *AntigravityACP) Stream(ctx context.Context, req translate.Request) iter.Seq2[*genai.GenerateContentResponse, error] {
 	return func(yield func(*genai.GenerateContentResponse, error) bool) {
-		result, err := a.Generate(ctx, req)
-		yield(result, err)
+		estimate, _ := a.CountTokens(ctx, req)
+		firstUsage := &genai.GenerateContentResponseUsageMetadata{PromptTokenCount: int32(estimate)}
+		// Ending the iteration early (Claude Code disconnected) cancels the prompt in agy.
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		queue := newChunkQueue()
+		type outcome struct {
+			result acp.PromptResponse
+			err    error
+		}
+		done := make(chan outcome, 1)
+		go func() {
+			result, err := a.run(ctx, req, queue.push)
+			done <- outcome{result, err}
+		}()
+		var decoder envelopeDecoder
+		relay := func() bool {
+			for _, chunk := range queue.drain() {
+				delta := decoder.feed(chunk)
+				if delta == "" {
+					continue
+				}
+				if !yield(acpTextChunk(delta, firstUsage), nil) {
+					return false
+				}
+				firstUsage = nil
+			}
+			return true
+		}
+		for {
+			select {
+			case <-queue.ready:
+				if !relay() {
+					return
+				}
+			case out := <-done:
+				// Every chunk is queued before the prompt returns, so draining here loses nothing.
+				if !relay() {
+					return
+				}
+				if out.err != nil {
+					yield(nil, out.err)
+					return
+				}
+				parts, err := decoder.finish(out.result)
+				if err != nil {
+					yield(nil, err)
+					return
+				}
+				final := acpFinalResponse(parts, out.result)
+				if final.UsageMetadata == nil {
+					// No streamed chunk and no usage from agy: keep the estimate rather than report zero.
+					final.UsageMetadata = firstUsage
+				}
+				yield(final, nil)
+				return
+			}
+		}
 	}
 }
 
+// CountTokens estimates the input tokens agy will bill for the request. ACP has no token-count method, so this is the prompt size at about four characters per token plus the overhead agy reported for earlier prompts; images are not counted.
 func (a *AntigravityACP) CountTokens(ctx context.Context, req translate.Request) (int, error) {
-	// ACP does not expose a token-count method. This estimate keeps Claude Code's count_tokens endpoint usable without claiming provider billing precision; images are not counted.
-	text, _ := acpPrompt(req, false)
-	return len([]rune(text)) / 4, nil
+	return promptTextTokens(req) + int(a.promptOverhead.Load()), nil
 }
 
-func (a *AntigravityACP) prompt(ctx context.Context, req translate.Request) (string, error) {
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	if err := a.startLocked(); err != nil {
-		return "", err
+func promptTextTokens(req translate.Request) int {
+	text, _ := acpPrompt(req, false)
+	return len([]rune(text)) / 4
+}
+
+// run sends the request as a prompt in a fresh ACP session and passes each answer chunk to onText as it arrives. The session is closed afterwards; when ctx ends first, the prompt is cancelled in agy.
+func (a *AntigravityACP) run(ctx context.Context, req translate.Request, onText func(string)) (acp.PromptResponse, error) {
+	c, err := a.connection(ctx)
+	if err != nil {
+		return acp.PromptResponse{}, err
 	}
-	if !a.initialized {
-		var initResult struct {
-			AgentCapabilities struct {
-				PromptCapabilities struct {
-					Image bool `json:"image"`
-				} `json:"promptCapabilities"`
-			} `json:"agentCapabilities"`
-		}
-		if err := a.callLocked(ctx, "initialize", map[string]any{
-			"protocolVersion":    1,
-			"clientCapabilities": map[string]any{},
-			"clientInfo":         map[string]string{"name": "neoswitch", "version": "1"},
-		}, &initResult); err != nil {
-			return "", err
-		}
-		a.initialized = true
-		a.imagePrompts = initResult.AgentCapabilities.PromptCapabilities.Image
+	session, err := c.conn.NewSession(ctx, acp.NewSessionRequest{Cwd: a.cwd, McpServers: []acp.McpServer{}})
+	if err != nil {
+		return acp.PromptResponse{}, a.requestError(ctx, c, "create Antigravity ACP session", err)
 	}
-	var session struct {
-		SessionID string `json:"sessionId"`
+	if session.SessionId == "" {
+		return acp.PromptResponse{}, errors.New("Antigravity ACP returned no session ID")
 	}
-	if err := a.callLocked(ctx, "session/new", map[string]any{"cwd": a.cwd, "mcpServers": []any{}}, &session); err != nil {
-		return "", err
+	sid := session.SessionId
+	defer func() {
+		// Close with a context of its own so a cancelled request still releases its session.
+		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), acpCloseTimeout)
+		defer cancel()
+		_, _ = c.conn.CloseSession(closeCtx, acp.CloseSessionRequest{SessionId: sid})
+	}()
+	if _, err := c.conn.SetSessionConfigOption(ctx, acp.SetSessionConfigOptionRequest{ValueId: &acp.SetSessionConfigOptionValueId{
+		SessionId: sid, ConfigId: "model", Value: acp.SessionConfigValueId(a.model),
+	}}); err != nil {
+		return acp.PromptResponse{}, a.requestError(ctx, c, "select Antigravity model "+a.model, err)
 	}
-	if session.SessionID == "" {
-		return "", errors.New("Antigravity ACP returned no session ID")
-	}
-	var options struct {
-		ConfigOptions []struct {
-			ID string `json:"id"`
-		} `json:"configOptions"`
-	}
-	if err := a.callLocked(ctx, "session/set_config_option", map[string]any{
-		"sessionId": session.SessionID,
-		"configId":  "model",
-		"value":     a.model,
-	}, &options); err != nil {
-		return "", err
-	}
-	var promptResult struct {
-		StopReason string `json:"stopReason"`
-	}
-	var response strings.Builder
-	text, images := acpPrompt(req, a.imagePrompts)
-	blocks := append([]map[string]string{{"type": "text", "text": text}}, images...)
-	err := a.callLocked(ctx, "session/prompt", map[string]any{
-		"sessionId": session.SessionID,
-		"prompt":    blocks,
-	}, &promptResult, func(method string, params json.RawMessage) {
-		if method != "session/update" {
-			return
-		}
-		var update struct {
-			Update struct {
-				SessionUpdate string `json:"sessionUpdate"`
-				Content       struct {
-					Text string `json:"text"`
-				} `json:"content"`
-			} `json:"update"`
-		}
-		if json.Unmarshal(params, &update) == nil && update.Update.SessionUpdate == "agent_message_chunk" {
-			response.WriteString(update.Update.Content.Text)
+	c.subscribe(sid, func(update acp.SessionUpdate) {
+		if chunk := update.AgentMessageChunk; chunk != nil && chunk.Content.Text != nil {
+			onText(chunk.Content.Text.Text)
 		}
 	})
-	// A prompt that failed at the transport level resets the process, and its sessions go with it.
-	if a.cmd != nil {
-		_ = a.callLocked(ctx, "session/close", map[string]any{"sessionId": session.SessionID}, nil)
-	}
+	defer c.unsubscribe(sid)
+	text, images := acpPrompt(req, c.imagePrompts)
+	blocks := append([]acp.ContentBlock{acp.TextBlock(text)}, images...)
+	result, err := c.conn.Prompt(ctx, acp.PromptRequest{SessionId: sid, Prompt: blocks})
 	if err != nil {
-		return "", err
+		if ctx.Err() != nil {
+			cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), acpCloseTimeout)
+			_ = c.conn.Cancel(cancelCtx, acp.CancelNotification{SessionId: sid})
+			cancel()
+		}
+		return acp.PromptResponse{}, a.requestError(ctx, c, "Antigravity ACP prompt", err)
 	}
-	if strings.TrimSpace(response.String()) == "" {
-		return "", errors.New("Antigravity ACP returned an empty response")
+	if result.StopReason == acp.StopReasonCancelled {
+		return acp.PromptResponse{}, errors.New("Antigravity ACP cancelled the prompt")
 	}
-	return response.String(), nil
+	// Learn only from text-only prompts: image tokens are not part of the text estimate and would inflate the overhead.
+	if result.Usage != nil && len(images) == 0 {
+		if overhead := result.Usage.InputTokens - int64(promptTextTokens(req)); overhead > 0 {
+			a.promptOverhead.Store(overhead)
+		}
+	}
+	return result, nil
 }
 
-func (a *AntigravityACP) startLocked() error {
-	if a.cmd != nil {
-		return nil
+// requestError turns a failed ACP call into the error the proxy reports. A context error is returned as such so the server maps a deadline to 504. When a deadline passes while agy has produced no output for any session in acpStuckAfter, agy is treated as stuck and restarted, so one wedged process cannot fail every later request. A slow request on a working agy only cancels its own session.
+func (a *AntigravityACP) requestError(ctx context.Context, c *acpConn, action string, err error) error {
+	select {
+	case <-c.conn.Done():
+		a.discard(c)
+		return fmt.Errorf("%s: Antigravity ACP exited unexpectedly", action)
+	default:
 	}
-	cmd := exec.Command(a.path, "acp", "--agent", a.agent, "--dangerously-skip-permissions")
-	cmd.Dir = a.cwd
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		if errors.Is(ctxErr, context.DeadlineExceeded) && c.quietFor(acpStuckAfter) {
+			a.discard(c)
+		}
+		return fmt.Errorf("%s: %w", action, ctxErr)
+	}
+	return fmt.Errorf("%s: %w", action, err)
+}
+
+// connection returns the running agy, starting and initializing one when there is none or the previous one exited.
+func (a *AntigravityACP) connection(ctx context.Context) (*acpConn, error) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.conn != nil {
+		select {
+		case <-a.conn.conn.Done():
+			_ = a.conn.close()
+			a.conn = nil
+		default:
+			return a.conn, nil
+		}
+	}
+	c, err := startACP(a.path, a.agent, a.cwd)
+	if err != nil {
+		return nil, err
+	}
+	init, err := c.conn.Initialize(ctx, acp.InitializeRequest{
+		ProtocolVersion:    acp.ProtocolVersionNumber,
+		ClientCapabilities: acp.ClientCapabilities{},
+		ClientInfo:         &acp.Implementation{Name: "neoswitch", Version: "1"},
+	})
+	if err != nil {
+		_ = c.close()
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, fmt.Errorf("initialize Antigravity ACP: %w", ctxErr)
+		}
+		return nil, fmt.Errorf("initialize Antigravity ACP: %w", err)
+	}
+	c.imagePrompts = init.AgentCapabilities.PromptCapabilities.Image
+	a.conn = c
+	return c, nil
+}
+
+// discard stops c if it is still the current connection; requests already holding it fail and the next request starts a new agy.
+func (a *AntigravityACP) discard(c *acpConn) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if a.conn == c {
+		a.conn = nil
+	}
+	_ = c.close()
+}
+
+const (
+	// acpCloseTimeout bounds the session/close and session/cancel messages sent after a request has ended.
+	acpCloseTimeout = 5 * time.Second
+	// acpStuckAfter is how long agy must have been silent on every session before a timed-out request restarts it.
+	acpStuckAfter = time.Minute
+)
+
+// acpLogger receives the SDK's connection diagnostics, which end up in the daemon log. Some of them carry the raw JSON-RPC line, which can hold prompt or answer text; that attribute is dropped because NeoSwitch logs no conversation content.
+var acpLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+	Level: slog.LevelWarn,
+	ReplaceAttr: func(_ []string, attr slog.Attr) slog.Attr {
+		if attr.Key == "raw" {
+			return slog.Attr{}
+		}
+		return attr
+	},
+}))
+
+// acpConn is one running `agy acp` process and the client side of its ACP connection.
+type acpConn struct {
+	cmd          *exec.Cmd
+	conn         *acp.ClientSideConnection
+	imagePrompts bool
+
+	mu    sync.Mutex
+	sinks map[acp.SessionId]func(acp.SessionUpdate)
+	// lastUpdate is when agy last sent a session update for any session, in Unix nanoseconds; zero means never.
+	lastUpdate atomic.Int64
+
+	closeOnce sync.Once
+	closeErr  error
+}
+
+var _ acp.Client = (*acpConn)(nil)
+
+func startACP(path, agent, cwd string) (*acpConn, error) {
+	cmd := exec.Command(path, "acp", "--agent", agent, "--dangerously-skip-permissions")
+	cmd.Dir = cwd
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("start Antigravity ACP: %w", err)
+		return nil, fmt.Errorf("start Antigravity ACP: %w", err)
 	}
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		_ = stdin.Close()
-		return fmt.Errorf("start Antigravity ACP: %w", err)
+		return nil, fmt.Errorf("start Antigravity ACP: %w", err)
 	}
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
-		_ = stdin.Close()
-		return fmt.Errorf("start Antigravity ACP: %w", err)
+		return nil, fmt.Errorf("start Antigravity ACP: %w", err)
 	}
-	a.cmd = cmd
-	a.stdin = stdin
-	a.stdout = bufio.NewScanner(stdout)
-	a.stdout.Buffer(make([]byte, 64<<10), 32<<20)
-	a.nextID = 1
+	c := &acpConn{cmd: cmd, sinks: map[acp.SessionId]func(acp.SessionUpdate){}}
+	c.conn = acp.NewClientSideConnection(c, stdin, stdout)
+	c.conn.SetLogger(acpLogger)
+	return c, nil
+}
+
+func (c *acpConn) close() error {
+	c.closeOnce.Do(func() {
+		if err := c.cmd.Process.Kill(); err != nil && !errors.Is(err, os.ErrProcessDone) {
+			c.closeErr = err
+		}
+		_ = c.cmd.Wait()
+	})
+	return c.closeErr
+}
+
+// quietFor reports whether agy has sent no session update for d.
+func (c *acpConn) quietFor(d time.Duration) bool {
+	last := c.lastUpdate.Load()
+	return last == 0 || time.Since(time.Unix(0, last)) > d
+}
+
+func (c *acpConn) subscribe(sid acp.SessionId, sink func(acp.SessionUpdate)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.sinks[sid] = sink
+}
+
+func (c *acpConn) unsubscribe(sid acp.SessionId) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.sinks, sid)
+}
+
+// SessionUpdate routes an update to the request that owns the session. It runs on the SDK's single notification goroutine shared by all sessions, so sinks must not block.
+func (c *acpConn) SessionUpdate(_ context.Context, n acp.SessionNotification) error {
+	c.lastUpdate.Store(time.Now().UnixNano())
+	c.mu.Lock()
+	sink := c.sinks[n.SessionId]
+	c.mu.Unlock()
+	if sink != nil {
+		sink(n.Update)
+	}
 	return nil
 }
 
-func (a *AntigravityACP) callLocked(ctx context.Context, method string, params any, result any, notify ...func(string, json.RawMessage)) error {
-	if a.cmd == nil {
-		return errors.New("Antigravity ACP is not running")
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	// The reads below block on agy's stdout, and every request shares this process under a.mu. Killing agy is the only way to unblock them when the caller gives up, so a hung agy cannot hold the lock past the request deadline. The next request starts a fresh process.
-	process := a.cmd.Process
-	stopKill := context.AfterFunc(ctx, func() { _ = process.Kill() })
-	defer stopKill()
-	transportErr := func(err error) error {
-		a.resetLocked()
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			return fmt.Errorf("Antigravity ACP %s: %w", method, ctxErr)
-		}
-		return err
-	}
-	id := a.nextID
-	a.nextID++
-	payload, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
-	if err != nil {
-		return err
-	}
-	if _, err := a.stdin.Write(append(payload, '\n')); err != nil {
-		return transportErr(fmt.Errorf("write Antigravity ACP request: %w", err))
-	}
-	for a.stdout.Scan() {
-		line := a.stdout.Bytes()
-		var envelope struct {
-			ID     json.RawMessage `json:"id"`
-			Method string          `json:"method"`
-			Params json.RawMessage `json:"params"`
-			Result json.RawMessage `json:"result"`
-			Error  *struct {
-				Code    int    `json:"code"`
-				Message string `json:"message"`
-			} `json:"error"`
-		}
-		if json.Unmarshal(line, &envelope) != nil {
-			continue
-		}
-		if envelope.Method != "" {
-			if len(notify) > 0 {
-				notify[0](envelope.Method, envelope.Params)
-			}
-			if len(envelope.ID) > 0 {
-				response, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": json.RawMessage(envelope.ID), "error": map[string]any{"code": -32601, "message": "NeoSwitch does not provide ACP client methods"}})
-				_, _ = a.stdin.Write(append(response, '\n'))
-			}
-			continue
-		}
-		if string(envelope.ID) != fmt.Sprint(id) {
-			continue
-		}
-		if envelope.Error != nil {
-			return fmt.Errorf("Antigravity ACP error %d: %s", envelope.Error.Code, envelope.Error.Message)
-		}
-		if result != nil && len(envelope.Result) > 0 {
-			if err := json.Unmarshal(envelope.Result, result); err != nil {
-				return fmt.Errorf("decode Antigravity ACP response: %w", err)
-			}
-		}
-		return nil
-	}
-	if err := a.stdout.Err(); err != nil {
-		return transportErr(fmt.Errorf("read Antigravity ACP response: %w", err))
-	}
-	return transportErr(errors.New("Antigravity ACP exited unexpectedly"))
+// The prompt tells agy not to use its own tools, and agy runs with --dangerously-skip-permissions, so it has no reason to call back into the client. Any such call is refused rather than left waiting.
+
+func (c *acpConn) RequestPermission(context.Context, acp.RequestPermissionRequest) (acp.RequestPermissionResponse, error) {
+	return acp.RequestPermissionResponse{}, acp.NewMethodNotFound(acp.ClientMethodSessionRequestPermission)
 }
 
-func (a *AntigravityACP) resetLocked() {
-	if a.cmd != nil && a.cmd.Process != nil {
-		_ = a.cmd.Process.Kill()
-		_ = a.cmd.Wait()
-	}
-	a.cmd = nil
-	a.stdin = nil
-	a.stdout = nil
-	a.initialized = false
-	a.imagePrompts = false
+func (c *acpConn) ReadTextFile(context.Context, acp.ReadTextFileRequest) (acp.ReadTextFileResponse, error) {
+	return acp.ReadTextFileResponse{}, acp.NewMethodNotFound(acp.ClientMethodFsReadTextFile)
 }
 
-// acpPrompt renders the request as the text of one ACP prompt. Images become ACP image blocks sent after that text when the agent accepts them (acceptImages); the text marks where each one belongs. Attachments ACP cannot carry are marked as omitted so the model knows they existed.
-func acpPrompt(req translate.Request, acceptImages bool) (string, []map[string]string) {
-	p := &promptBuilder{acceptImages: acceptImages}
-	p.out.WriteString("Act as the language model for Claude Code. Return exactly one JSON object and no markdown. For a normal answer use {\"text\":\"...\"}. To invoke one of the supplied Claude Code tools use {\"tool_use\":{\"name\":\"tool name\",\"input\":{...}}}. Do not use ACP tools, edit files, or run commands yourself.\n\n")
-	if req.Config != nil && req.Config.SystemInstruction != nil {
-		p.out.WriteString("System instructions:\n")
-		p.writeParts(req.Config.SystemInstruction.Parts)
-		p.out.WriteString("\n")
-	}
-	for _, content := range req.Contents {
-		p.out.WriteString(strings.ToUpper(string(content.Role)))
-		p.out.WriteString(":\n")
-		p.writeParts(content.Parts)
-		p.out.WriteString("\n\n")
-	}
-	if req.Config != nil && len(req.Config.Tools) > 0 {
-		declarations, _ := json.Marshal(req.Config.Tools)
-		p.out.WriteString("Claude Code tool definitions for context only:\n")
-		p.out.Write(declarations)
-		p.out.WriteString("\n")
-	}
-	return p.out.String(), p.images
+func (c *acpConn) WriteTextFile(context.Context, acp.WriteTextFileRequest) (acp.WriteTextFileResponse, error) {
+	return acp.WriteTextFileResponse{}, acp.NewMethodNotFound(acp.ClientMethodFsWriteTextFile)
 }
 
-func acpResponseParts(raw string) ([]*genai.Part, error) {
-	clean := strings.TrimSpace(raw)
-	if strings.HasPrefix(clean, "```") {
-		clean = strings.TrimPrefix(clean, "```")
-		if newline := strings.IndexByte(clean, '\n'); newline >= 0 {
-			clean = clean[newline+1:]
-		}
-		clean = strings.TrimSuffix(strings.TrimSpace(clean), "```")
-	}
-	var response struct {
-		Text    string `json:"text"`
-		ToolUse *struct {
-			Name  string          `json:"name"`
-			Input json.RawMessage `json:"input"`
-		} `json:"tool_use"`
-	}
-	if err := json.Unmarshal([]byte(clean), &response); err != nil {
-		return []*genai.Part{{Text: raw}}, nil
-	}
-	if response.ToolUse != nil {
-		if strings.TrimSpace(response.ToolUse.Name) == "" {
-			return nil, errors.New("Antigravity ACP returned a tool call without a name")
-		}
-		var input map[string]any
-		if len(response.ToolUse.Input) > 0 && string(response.ToolUse.Input) != "null" {
-			if err := json.Unmarshal(response.ToolUse.Input, &input); err != nil {
-				return nil, fmt.Errorf("decode Antigravity ACP tool call: %w", err)
-			}
-		}
-		id := "acp_tool_" + rand.Text()
-		return []*genai.Part{{FunctionCall: &genai.FunctionCall{ID: id, Name: response.ToolUse.Name, Args: input}}}, nil
-	}
-	if response.Text == "" {
-		return nil, errors.New("Antigravity ACP returned neither text nor a tool call")
-	}
-	return []*genai.Part{{Text: response.Text}}, nil
+func (c *acpConn) CreateElicitation(context.Context, acp.CreateElicitationRequest) (acp.CreateElicitationResponse, error) {
+	return acp.CreateElicitationResponse{}, acp.NewMethodNotFound(acp.ClientMethodElicitationCreate)
 }
 
-type promptBuilder struct {
-	out          strings.Builder
-	acceptImages bool
-	images       []map[string]string
+func (c *acpConn) CompleteElicitation(context.Context, acp.CompleteElicitationNotification) error {
+	return nil
 }
 
-func (p *promptBuilder) writeParts(parts []*genai.Part) {
-	for _, part := range parts {
-		if part == nil {
-			continue
-		}
-		if part.Text != "" {
-			p.out.WriteString(part.Text)
-			p.out.WriteString("\n")
-		}
-		if part.InlineData != nil {
-			p.attach(part.InlineData.MIMEType, part.InlineData.Data)
-		}
-		if part.FunctionCall != nil {
-			args, _ := json.Marshal(part.FunctionCall.Args)
-			fmt.Fprintf(&p.out, "[tool call %s %s]\n", part.FunctionCall.Name, args)
-		}
-		if part.FunctionResponse != nil {
-			response, _ := json.Marshal(part.FunctionResponse.Response)
-			fmt.Fprintf(&p.out, "[tool result %s %s]\n", part.FunctionResponse.Name, response)
-			for _, media := range part.FunctionResponse.Parts {
-				if media != nil && media.InlineData != nil {
-					p.attach(media.InlineData.MIMEType, media.InlineData.Data)
-				}
-			}
-		}
+func (c *acpConn) CreateTerminal(context.Context, acp.CreateTerminalRequest) (acp.CreateTerminalResponse, error) {
+	return acp.CreateTerminalResponse{}, acp.NewMethodNotFound(acp.ClientMethodTerminalCreate)
+}
+
+func (c *acpConn) KillTerminal(context.Context, acp.KillTerminalRequest) (acp.KillTerminalResponse, error) {
+	return acp.KillTerminalResponse{}, acp.NewMethodNotFound(acp.ClientMethodTerminalKill)
+}
+
+func (c *acpConn) TerminalOutput(context.Context, acp.TerminalOutputRequest) (acp.TerminalOutputResponse, error) {
+	return acp.TerminalOutputResponse{}, acp.NewMethodNotFound(acp.ClientMethodTerminalOutput)
+}
+
+func (c *acpConn) ReleaseTerminal(context.Context, acp.ReleaseTerminalRequest) (acp.ReleaseTerminalResponse, error) {
+	return acp.ReleaseTerminalResponse{}, acp.NewMethodNotFound(acp.ClientMethodTerminalRelease)
+}
+
+func (c *acpConn) WaitForTerminalExit(context.Context, acp.WaitForTerminalExitRequest) (acp.WaitForTerminalExitResponse, error) {
+	return acp.WaitForTerminalExitResponse{}, acp.NewMethodNotFound(acp.ClientMethodTerminalWaitForExit)
+}
+
+// chunkQueue hands answer chunks from the SDK's notification goroutine to the streaming request without ever blocking the former: a slow Claude Code connection must not stall updates for every other session.
+type chunkQueue struct {
+	mu     sync.Mutex
+	chunks []string
+	ready  chan struct{}
+}
+
+func newChunkQueue() *chunkQueue { return &chunkQueue{ready: make(chan struct{}, 1)} }
+
+func (q *chunkQueue) push(chunk string) {
+	q.mu.Lock()
+	q.chunks = append(q.chunks, chunk)
+	q.mu.Unlock()
+	select {
+	case q.ready <- struct{}{}:
+	default:
 	}
 }
 
-func (p *promptBuilder) attach(mimeType string, data []byte) {
-	if !p.acceptImages || !strings.HasPrefix(mimeType, "image/") {
-		fmt.Fprintf(&p.out, "[%s attachment omitted: the Antigravity ACP route cannot send it]\n", mimeType)
-		return
-	}
-	p.images = append(p.images, map[string]string{"type": "image", "mimeType": mimeType, "data": base64.StdEncoding.EncodeToString(data)})
-	fmt.Fprintf(&p.out, "[image %d (%s) attached]\n", len(p.images), mimeType)
+func (q *chunkQueue) drain() []string {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	chunks := q.chunks
+	q.chunks = nil
+	return chunks
 }
