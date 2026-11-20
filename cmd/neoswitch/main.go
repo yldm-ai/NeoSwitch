@@ -309,8 +309,9 @@ Usage:
   neoswitch antigravity probe                 verify the official agy session without reading its token
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [project]                     route them back to Anthropic
-  neoswitch status [project]                  show routing and daemon state
-  neoswitch backend [auto|antigravity|gemini|openai]  show or choose the upstream (openai is opt-in and experimental)
+  neoswitch status [-v] [project]             show whether a project uses NeoSwitch and what to do next (-v adds details)
+  neoswitch backend [auto|antigravity|gemini|openai]
+                                              show or choose the upstream (openai is opt-in and experimental)
   neoswitch doctor                            check that the credentials can use the model
   neoswitch models                            list the models the credentials can use (* = configured)
   neoswitch version                           print the NeoSwitch version

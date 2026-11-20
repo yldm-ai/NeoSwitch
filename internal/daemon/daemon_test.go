@@ -178,7 +178,7 @@ func TestDaemonServesUntilLastSessionExits(t *testing.T) {
 	done := make(chan error, 1)
 	spawn := func() error {
 		go func() {
-			done <- Run(context.Background(), s, proxy, Options{StartupGrace: time.Minute, PollInterval: 20 * time.Millisecond, Alive: procs.Alive})
+			done <- Run(context.Background(), s, proxy, Options{StartupGrace: time.Minute, PollInterval: 20 * time.Millisecond, Alive: procs.Alive, Version: "v9"})
 		}()
 		return nil
 	}
@@ -191,7 +191,7 @@ func TestDaemonServesUntilLastSessionExits(t *testing.T) {
 	if err := Attach(s, 200, func() error { t.Fatal("second attach must reuse the running daemon"); return nil }); err != nil {
 		t.Fatal(err)
 	}
-	if info, ok := Status(s); !ok || info.Sessions != 2 {
+	if info, ok := Status(s); !ok || info.Sessions != 2 || info.Version != "v9" {
 		t.Fatalf("status = %+v %v", info, ok)
 	}
 	resp, err := http.Get(s.BaseURL() + "/v1/messages")

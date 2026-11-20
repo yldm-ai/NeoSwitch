@@ -31,12 +31,15 @@ type Options struct {
 	Alive func(pid int) bool
 	// Backend describes the upstream this daemon serves, reported by Status.
 	Backend string
+	// Version is the NeoSwitch version of the daemon binary, reported by Status so a session started after an update can tell it is served by the earlier version.
+	Version string
 }
 
-// Info is what a running daemon reports about itself.
+// Info is what a running daemon reports about itself. Version is empty for daemons from versions that did not report it.
 type Info struct {
 	Sessions int    `json:"sessions"`
 	Backend  string `json:"backend"`
+	Version  string `json:"version,omitempty"`
 }
 
 // Run serves proxy on s.Listen until every attached Claude Code process has exited, or until StartupGrace passes without any attach. Lifetime is tied to the sessions rather than an idle timer, so a session that sits idle for hours keeps working and nothing outlives the last session.
@@ -77,7 +80,7 @@ func Run(ctx context.Context, s State, proxy http.Handler, opts Options) error {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(Info{Sessions: sessions.len(), Backend: opts.Backend})
+		_ = json.NewEncoder(w).Encode(Info{Sessions: sessions.len(), Backend: opts.Backend, Version: opts.Version})
 	})
 	mux.Handle("/", proxy)
 	server := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}

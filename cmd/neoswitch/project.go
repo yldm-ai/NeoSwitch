@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -15,7 +16,6 @@ import (
 	"syscall"
 
 	"github.com/yldm-ai/neo-switch/internal/daemon"
-	"github.com/yldm-ai/neo-switch/internal/provider"
 	"github.com/yldm-ai/neo-switch/internal/server"
 )
 
@@ -91,10 +91,20 @@ func off(args []string) error {
 }
 
 func status(args []string) error {
-	project, err := projectDir(args)
+	flags := flag.NewFlagSet("status", flag.ContinueOnError)
+	verbose := flags.Bool("v", false, "also print addresses, the backend choice and the background service state")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	project, err := projectDir(flags.Args())
 	if err != nil {
 		return err
 	}
+	return printStatus(os.Stdout, project, *verbose)
+}
+
+// printStatus answers in two or three plain lines whether this project and this session use NeoSwitch, whether it can work, and the one command to run next. Addresses, the backend choice and the daemon state follow only when verbose.
+func printStatus(w io.Writer, project string, verbose bool) error {
 	dir, err := daemon.Dir()
 	if err != nil {
 		return err
@@ -109,30 +119,94 @@ func status(args []string) error {
 			return err
 		}
 	}
-	model := os.Getenv("GEMINI_MODEL")
-	if model == "" {
-		model = provider.DefaultModel
+	// The session inherits the project's settings when it starts, so its ANTHROPIC_BASE_URL tells whether this session uses NeoSwitch, which can differ from the project right after on or off.
+	session := ok && os.Getenv("ANTHROPIC_BASE_URL") == state.BaseURL()
+	// configuredBackend checks credentials and agy locally without calling the model, so a missing sign-in is reported instead of a route that cannot work.
+	_, model, label, backendErr := configuredBackend(context.Background())
+	var info daemon.Info
+	running := false
+	if ok && (enabled || session) {
+		info, running = daemon.Status(state)
 	}
-	if kind, _, err := resolveBackend(); err == nil && kind == backendOpenAI {
-		model = os.Getenv("OPENAI_MODEL")
+	switch {
+	case !enabled && session:
+		fmt.Fprintln(w, "NeoSwitch is off for this project, but this session still uses it.")
+		fmt.Fprintln(w, "Start a new Claude Code session here to go back to Claude.")
+	case !enabled && backendErr != nil:
+		fmt.Fprintln(w, "This project uses Claude.")
+		fmt.Fprintln(w, sentence(backendErr.Error()))
+	case !enabled:
+		fmt.Fprintln(w, "This project uses Claude.")
+		fmt.Fprintf(w, "Run /neoswitch:on to switch it to %s.\n", modelName(model))
+	case backendErr != nil:
+		fmt.Fprintln(w, "NeoSwitch is on for this project, but it cannot reach a model.")
+		fmt.Fprintln(w, sentence(backendErr.Error()))
+		fmt.Fprintln(w, "Until then, run /neoswitch:off and start a new session to go back to Claude.")
+	case !session:
+		fmt.Fprintln(w, "NeoSwitch is on for this project, but this session still uses Claude.")
+		fmt.Fprintf(w, "Start a new Claude Code session here to use %s.\n", modelName(model))
+	case !running:
+		fmt.Fprintf(w, "This session is set to use %s, but NeoSwitch is not running, so it cannot answer.\n", modelName(model))
+		fmt.Fprintln(w, "Start a new Claude Code session here to restart it, or run /neoswitch:off to go back to Claude.")
+	default:
+		fmt.Fprintf(w, "This session uses %s through %s, and NeoSwitch is running.\n", modelName(model), plainLabel(label))
+		switch {
+		case info.Backend != "" && info.Backend != label:
+			fmt.Fprintf(w, "Other Claude Code windows still share the earlier setup (%s), so this session uses it too. Close all Claude Code windows and open them again to switch.\n", plainLabel(info.Backend))
+		case info.Version != version:
+			fmt.Fprintln(w, "NeoSwitch was updated, but this session still uses the earlier version. Close all Claude Code windows and open them again to use the update.")
+		default:
+			fmt.Fprintln(w, "Run /neoswitch:off to go back to Claude.")
+		}
 	}
-	fmt.Printf("project:  %s\n", project)
-	if !enabled {
-		fmt.Println("routing:  Anthropic (NeoSwitch off)")
+	if !verbose {
 		return nil
 	}
-	fmt.Printf("routing:  NeoSwitch %s -> %s\n", state.BaseURL(), model)
+	fmt.Fprintf(w, "\nproject:  %s\n", project)
+	if enabled {
+		fmt.Fprintf(w, "routing:  NeoSwitch %s\n", state.BaseURL())
+	} else {
+		fmt.Fprintln(w, "routing:  Anthropic (NeoSwitch off)")
+	}
+	if session {
+		fmt.Fprintln(w, "session:  NeoSwitch")
+	} else {
+		fmt.Fprintln(w, "session:  not through NeoSwitch")
+	}
 	if kind, reason, err := resolveBackend(); err != nil {
-		fmt.Printf("backend:  none: %v\n", err)
+		fmt.Fprintf(w, "backend:  none: %v\n", err)
+	} else if backendErr != nil {
+		fmt.Fprintf(w, "backend:  %s (%s), not usable: %v\n", kind, reason, backendErr)
 	} else {
-		fmt.Printf("backend:  %s (%s)\n", kind, reason)
+		fmt.Fprintf(w, "backend:  %s (%s), %s, model %s\n", kind, reason, label, model)
 	}
-	if info, running := daemon.Status(state); running {
-		fmt.Printf("daemon:   running on %s, %d Claude Code session(s) attached\n", info.Backend, info.Sessions)
+	if running {
+		fmt.Fprintf(w, "daemon:   running %s on %s, %d Claude Code session(s) attached\n", versionOrUnknown(info.Version), info.Backend, info.Sessions)
 	} else {
-		fmt.Println("daemon:   not running; it starts with the next Claude Code session in this project")
+		fmt.Fprintln(w, "daemon:   not running")
 	}
+	fmt.Fprintf(w, "version:  %s\n", version)
 	return nil
+}
+
+func versionOrUnknown(v string) string {
+	if v == "" {
+		return "an earlier version"
+	}
+	return v
+}
+
+// sentence turns an error message into a sentence for the user: capitalized and ending with a period.
+func sentence(message string) string {
+	message = strings.TrimSpace(message)
+	if message == "" {
+		return message
+	}
+	message = strings.ToUpper(message[:1]) + message[1:]
+	if !strings.HasSuffix(message, ".") {
+		message += "."
+	}
+	return message
 }
 
 // attach runs from the plugin's SessionStart hook. Claude Code waits for that hook before its first model request, so the daemon is up by the time the session needs it. Problems are reported to the user through the hook's systemMessage instead of failing silently.
@@ -171,12 +245,12 @@ func attach(args []string) error {
 	}
 	kind, _, err := resolveBackend()
 	if err != nil {
-		return hookMessage("NeoSwitch: " + err.Error())
+		return hookMessage(sessionBlocked(err.Error()))
 	}
 	// configuredBackend also moves a Gemini key saved by an earlier plugin version into GEMINI_API_KEY. Pinning the kind makes the daemon spawned below, whose environment drops Claude Code's variables, serve the backend checked here.
-	_, _, label, err := configuredBackend(context.Background())
+	_, model, label, err := configuredBackend(context.Background())
 	if err != nil {
-		return hookMessage("NeoSwitch: " + err.Error())
+		return hookMessage(sessionBlocked(err.Error()))
 	}
 	_ = os.Setenv(backendEnv, kind)
 	if err := daemon.Attach(state, *pid, func() error { return spawnDaemon(dir) }); err != nil {
@@ -185,20 +259,32 @@ func attach(args []string) error {
 			_, port, _ := net.SplitHostPort(busy.Listen)
 			return hookMessage("NeoSwitch: another program on this computer is using port " + port + ", which NeoSwitch needs, so this session cannot answer. Close that program and start a new Claude Code session, or run /neoswitch:off to go back to Claude.")
 		}
-		return hookMessage("NeoSwitch: " + err.Error() + "; see " + filepath.Join(dir, "daemon.log"))
+		return hookMessage("NeoSwitch could not start, so this session cannot answer. Start a new Claude Code session to try again, or run /neoswitch:off to go back to Claude. Details are in " + filepath.Join(dir, "daemon.log") + ".")
 	}
-	if info, running := daemon.Status(state); running && info.Backend != "" && info.Backend != label {
-		running := "NeoSwitch: the shared proxy still uses " + info.Backend + " because other Claude Code sessions are using it; this session gets " + label + " once they have all exited."
-		if notice != "" {
-			notice += " " + running
-		} else {
-			notice = running
-		}
-	}
+	info, running := daemon.Status(state)
+	return hookMessage(attachNotice(notice, model, label, info, running))
+}
+
+// sessionBlocked reports a setup problem found at session start, followed by the way back to Claude, because the session cannot answer until it is fixed.
+func sessionBlocked(problem string) string {
+	return "NeoSwitch: " + strings.TrimSuffix(sentence(problem), ".") + ". Until then this session cannot answer; run /neoswitch:off and start a new session to go back to Claude."
+}
+
+// attachNotice is the message a session sees after it attached. Without a problem to report it confirms the model, because Claude Code's header keeps showing the Claude model the session asks for.
+func attachNotice(notice, model, label string, info daemon.Info, running bool) string {
+	var notes []string
 	if notice != "" {
-		return hookMessage(notice)
+		notes = append(notes, notice)
 	}
-	return nil
+	switch {
+	case running && info.Backend != "" && info.Backend != label:
+		notes = append(notes, "NeoSwitch: other Claude Code windows still share the earlier setup ("+plainLabel(info.Backend)+"), so this session uses it too. Close all Claude Code windows and open them again to switch to "+modelName(model)+" through "+plainLabel(label)+".")
+	case running && info.Version != version:
+		notes = append(notes, "NeoSwitch: other Claude Code windows still use the earlier NeoSwitch version, so this session does too. Close all Claude Code windows and open them again to use the update.")
+	case notice == "":
+		notes = append(notes, "NeoSwitch: this session uses "+modelName(model)+" through "+plainLabel(label)+". Ignore the Claude model name in the header. The first reply can take a while.")
+	}
+	return strings.Join(notes, " ")
 }
 
 // gatewayModeOn reports whether the session runs in Claude Code's gateway mode. Project settings that turn it off are already applied to the hook's environment.
@@ -252,7 +338,7 @@ func runDaemon() error {
 		return err
 	}
 	if !ok {
-		return fmt.Errorf("no NeoSwitch state; run `neoswitch on` first")
+		return fmt.Errorf("NeoSwitch was never turned on; run /neoswitch:on first")
 	}
 	backend, model, backendName, err := configuredBackend(context.Background())
 	if err != nil {
@@ -265,7 +351,7 @@ func runDaemon() error {
 	defer stop()
 	fmt.Fprintf(os.Stderr, "NeoSwitch daemon on %s (%s, model %s)\n", state.BaseURL(), backendName, model)
 	handler := server.NewHandler(server.Config{Backend: backend, Model: model, Token: state.Token})
-	if err := daemon.Run(ctx, state, handler, daemon.Options{Backend: backendName}); err != nil {
+	if err := daemon.Run(ctx, state, handler, daemon.Options{Backend: backendName, Version: version}); err != nil {
 		return err
 	}
 	fmt.Fprintln(os.Stderr, "NeoSwitch daemon stopped: no Claude Code session attached")
