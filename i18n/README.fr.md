@@ -28,7 +28,7 @@ Vous basculez un projet à la fois ; vos autres projets continuent d'utiliser Cl
 /neoswitch:login
 ```
 
-La commande affiche l'avertissement sur les conditions de Google, ouvre la connexion Google dans votre navigateur via l'[outil en ligne de commande Antigravity de Google (`agy`)](https://antigravity.google/download), qui doit être installé sur cet ordinateur, puis bascule le projet. Si vous êtes à l'aise avec un terminal, une clé API Gemini fonctionne aussi : voir [docs/cli.md](../docs/cli.md#gemini-api-key) (en anglais).
+La commande affiche l'avertissement sur les conditions de Google, ouvre la connexion Google dans votre navigateur via l'[outil en ligne de commande Antigravity de Google (`agy`)](https://antigravity.google/download), puis bascule le projet. Si `agy` n'est pas encore sur cet ordinateur, elle l'installe d'abord dans `~/.local/bin` avec l'installateur officiel de Google (environ 230 Mo ; l'installateur ajoute aussi ce dossier au PATH de votre shell). Si vous êtes à l'aise avec un terminal, une clé API Gemini fonctionne aussi : voir [docs/cli.md](../docs/cli.md#gemini-api-key) (en anglais).
 
 > [!WARNING]
 > Les [Conditions d'utilisation de Google Antigravity](https://antigravity.google/terms) (section 6) interdisent d'utiliser Antigravity par l'intermédiaire d'autres outils, et NeoSwitch en est un. Google peut suspendre ou fermer les comptes Antigravity des personnes qui le font. `/neoswitch:login` répète cet avertissement à chaque fois. Ne vous connectez pas si vous n'acceptez pas ce risque.
@@ -48,7 +48,7 @@ La commande affiche l'avertissement sur les conditions de Google, ouvre la conne
 | Ce que vous voyez | Que faire |
 |---|---|
 | La note de session dit que NeoSwitch n'est pas encore configuré | Exécutez `/neoswitch:login`. Votre prochain message utilise Gemini 4 Neon. |
-| Un message dit que `agy` n'est pas installé | Installez l'[outil en ligne de commande Antigravity de Google (`agy`)](https://antigravity.google/download), puis exécutez de nouveau `/neoswitch:login`. |
+| Un message dit que `agy` n'est pas installé | `/neoswitch:login` n'a pas pu l'installer lui-même. Exécutez `curl -fsSL https://antigravity.google/cli/install.sh \| bash` dans un terminal ou installez-le depuis la [page de téléchargement de Google](https://antigravity.google/download), puis exécutez de nouveau `/neoswitch:login`. |
 | Chaque message échoue avec une erreur de connexion, ou la note de session dit que cette session ne peut pas répondre | Dans ce même projet, exécutez `/neoswitch:off`. Il rebascule le projet même si sa propre réponse affiche aussi une erreur de connexion. Tapez ensuite `/exit` et relancez `claude` : vous êtes revenu à Claude, et `/neoswitch:status` vous dit quoi corriger. |
 | La note dit que d'autres fenêtres de Claude Code partagent encore la configuration précédente | Fermez toutes les fenêtres de Claude Code, puis rouvrez Claude Code. |
 | La note dit qu'un autre programme utilise le port dont NeoSwitch a besoin | Fermez ce programme et relancez Claude Code, ou exécutez `/neoswitch:off`. |
@@ -85,7 +85,7 @@ claude plugin marketplace remove neoswitch
 | Le programme NeoSwitch que le plugin télécharge ou compile | `$XDG_CACHE_HOME/neoswitch/`, ou `~/.cache/neoswitch/` si `XDG_CACHE_HOME` n'est pas défini |
 | Réglages et journal : `proxy.json` (adresse, clé d'accès et voie choisie) et `daemon.log` | `NEOSWITCH_STATE_DIR` s'il est défini ; sinon `~/Library/Application Support/neoswitch/` sous macOS et `$XDG_CONFIG_HOME/neoswitch/` ou `~/.config/neoswitch/` sous Linux |
 
-La connexion Google est conservée par `agy`, pas par NeoSwitch, et reste en place.
+La connexion Google est conservée par `agy`, pas par NeoSwitch, et reste en place ; `agy` lui-même aussi, même si `/neoswitch:login` l'a installé.
 
 ## Ce que NeoSwitch modifie
 

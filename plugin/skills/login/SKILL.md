@@ -1,5 +1,5 @@
 ---
-description: Sign in with your Google account through Google's Antigravity sign-in and switch this project to Gemini 4 Neon. Google may suspend accounts used this way
+description: Sign in with your Google account through Google's Antigravity sign-in, installing Google's agy CLI first when it is missing, and switch this project to Gemini 4 Neon. Google may suspend accounts used this way
 disable-model-invocation: true
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/plugin/neoswitch.sh *)
 ---

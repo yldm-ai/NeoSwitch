@@ -30,7 +30,7 @@
   "why_local_desc": "ループバックのみ。OAuth トークンは <code>agy</code> の中にとどまり、NeoSwitch が読み取ることはありません。",
   "why_honest_title": "互換性を正直に記載",
   "why_honest_desc": "動くもの、一部だけ動くもの、未対応のものを下にまとめています。黙ってフォールバックすることはありません。",
-  "start_sub": "Claude Code が必要です。Go は任意です。Go があればプラグインは初回使用時にソースからバイナリをビルドし、なければ対応するリリースのバイナリをダウンロードしてチェックサムを検証します。Antigravity OAuth を使う場合は、公式の <code>agy</code> CLI も PATH 上に必要です。",
+  "start_sub": "Claude Code が必要です。Go は任意です。Go があればプラグインは初回使用時にソースからバイナリをビルドし、なければ対応するリリースのバイナリをダウンロードしてチェックサムを検証します。Antigravity OAuth では、公式の <code>agy</code> CLI がなければ <code>/neoswitch:login</code> がインストールします。",
   "step1_title": "プラグインをインストール",
   "step1_desc": "Claude Code 内で実行します。",
   "step2_title": "サインインしてルーティングを有効にする",

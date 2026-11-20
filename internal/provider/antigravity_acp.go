@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -39,16 +40,41 @@ type AntigravityACP struct {
 // ErrAntigravityCLIMissing means the official Antigravity CLI is not installed where NeoSwitch looks for it. Callers add the step that fixes it in their context.
 var ErrAntigravityCLIMissing = errors.New("Google's Antigravity command-line tool (agy) is not installed")
 
-func NewAntigravityACPFromEnv(ctx context.Context) (*AntigravityACP, error) {
-	path := strings.TrimSpace(os.Getenv("ANTIGRAVITY_CLI_PATH"))
-	if path == "" {
-		path = "agy"
-	}
-	if _, err := exec.LookPath(path); err != nil {
-		if path != "agy" {
-			return nil, fmt.Errorf("%w at %s", ErrAntigravityCLIMissing, path)
+// FindAntigravityCLI returns the agy executable NeoSwitch runs: ANTIGRAVITY_CLI_PATH when set, otherwise agy on PATH, otherwise agy in ~/.local/bin, where Google's official installer puts it. The installer adds that directory to shell profiles only, so a Claude Code started before the install, and the daemon it launches, do not have it on PATH.
+func FindAntigravityCLI() (string, error) {
+	if path := strings.TrimSpace(os.Getenv("ANTIGRAVITY_CLI_PATH")); path != "" {
+		if _, err := exec.LookPath(path); err != nil {
+			return "", fmt.Errorf("%w at %s", ErrAntigravityCLIMissing, path)
 		}
-		return nil, ErrAntigravityCLIMissing
+		return path, nil
+	}
+	if path, err := exec.LookPath("agy"); err == nil {
+		return path, nil
+	}
+	if path := AntigravityCLIInstallPath(); path != "" {
+		if _, err := exec.LookPath(path); err == nil {
+			return path, nil
+		}
+	}
+	return "", ErrAntigravityCLIMissing
+}
+
+// AntigravityCLIInstallPath is where Google's official installer puts agy on macOS and Linux, or "" when the home directory is unknown or the platform has no such installer.
+func AntigravityCLIInstallPath() string {
+	if runtime.GOOS == "windows" {
+		return ""
+	}
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return ""
+	}
+	return filepath.Join(home, ".local", "bin", "agy")
+}
+
+func NewAntigravityACPFromEnv(ctx context.Context) (*AntigravityACP, error) {
+	path, err := FindAntigravityCLI()
+	if err != nil {
+		return nil, err
 	}
 	agent := strings.TrimSpace(os.Getenv("ANTIGRAVITY_ACP_AGENT"))
 	if agent == "" {
@@ -56,13 +82,12 @@ func NewAntigravityACPFromEnv(ctx context.Context) (*AntigravityACP, error) {
 	}
 	cwd := strings.TrimSpace(os.Getenv("CLAUDE_PROJECT_DIR"))
 	if cwd == "" {
-		var err error
 		cwd, err = os.Getwd()
 		if err != nil {
 			return nil, fmt.Errorf("locate Antigravity ACP workspace: %w", err)
 		}
 	}
-	cwd, err := filepath.Abs(cwd)
+	cwd, err = filepath.Abs(cwd)
 	if err != nil {
 		return nil, fmt.Errorf("locate Antigravity ACP workspace: %w", err)
 	}

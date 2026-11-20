@@ -28,7 +28,7 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 /neoswitch:login
 ```
 
-它會先顯示 Google 的條款警告，再透過 Google 的 [Antigravity 命令列工具（`agy`）](https://antigravity.google/download)在瀏覽器裡開啟 Google 登入，最後為這個專案開啟 NeoSwitch。這台電腦上需要先裝好 `agy`。如果你習慣用終端機，也可以改用 Gemini API key：見 [docs/cli.md](../docs/cli.md#gemini-api-key)（英文）。
+它會先顯示 Google 的條款警告，再透過 Google 的 [Antigravity 命令列工具（`agy`）](https://antigravity.google/download)在瀏覽器裡開啟 Google 登入，最後為這個專案開啟 NeoSwitch。如果這台電腦上還沒有 `agy`，它會先用 Google 官方安裝腳本把 `agy` 裝到 `~/.local/bin`（約 230 MB；安裝腳本也會把這個目錄加進 shell 的 PATH）。如果你習慣用終端機，也可以改用 Gemini API key：見 [docs/cli.md](../docs/cli.md#gemini-api-key)（英文）。
 
 > [!WARNING]
 > [Google Antigravity 服務條款](https://antigravity.google/terms)（第 6 條）禁止透過其他工具使用 Antigravity，NeoSwitch 就屬於這類工具。Google 可能暫停或關閉這樣做的人的 Antigravity 帳號。`/neoswitch:login` 每次都會重複這則警告。不接受這個風險，就不要登入。
@@ -48,7 +48,7 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 | 你看到的情況 | 怎麼做 |
 |---|---|
 | 工作階段開頭的提示說 NeoSwitch 還沒設定好 | 執行 `/neoswitch:login`。下一則訊息就會使用 Gemini 4 Neon。 |
-| 提示說沒有安裝 `agy` | 先安裝 Google 的 [Antigravity 命令列工具（`agy`）](https://antigravity.google/download)，再執行一次 `/neoswitch:login`。 |
+| 提示說沒有安裝 `agy` | `/neoswitch:login` 沒能自動裝好它。在終端機執行 `curl -fsSL https://antigravity.google/cli/install.sh \| bash`，或從 [Google 的下載頁](https://antigravity.google/download)安裝，再執行一次 `/neoswitch:login`。 |
 | 每則訊息都出現連線錯誤，或者工作階段開頭的提示說本工作階段無法回答 | 就在這個專案裡執行 `/neoswitch:off`。即使它自己的回覆也顯示連線錯誤，專案也已經切回去了。然後輸入 `/exit` 並重新執行 `claude`：你回到了 Claude，再執行 `/neoswitch:status` 看看該修什麼。 |
 | 提示說其他 Claude Code 視窗還在共用先前的設定 | 關掉所有 Claude Code 視窗，再重新開啟 Claude Code。 |
 | 提示說有別的程式佔用了 NeoSwitch 需要的連接埠 | 關掉那個程式後重新啟動 Claude Code，或者執行 `/neoswitch:off`。 |
@@ -85,7 +85,7 @@ claude plugin marketplace remove neoswitch
 | 外掛下載或編譯出的 NeoSwitch 程式 | `$XDG_CACHE_HOME/neoswitch/`；未設定 `XDG_CACHE_HOME` 時為 `~/.cache/neoswitch/` |
 | 設定和日誌：`proxy.json`（位址、存取金鑰和所選方式）和 `daemon.log` | 設定了 `NEOSWITCH_STATE_DIR` 時就是它；否則 macOS 上是 `~/Library/Application Support/neoswitch/`，Linux 上是 `$XDG_CONFIG_HOME/neoswitch/` 或 `~/.config/neoswitch/` |
 
-Google 登入資訊由 `agy` 保存，不歸 NeoSwitch 管，移除後仍然保留。
+Google 登入資訊由 `agy` 保存，不歸 NeoSwitch 管，移除後仍然保留；`agy` 本身也一樣，包括 `/neoswitch:login` 幫你裝的那份。
 
 ## NeoSwitch 會改動什麼
 

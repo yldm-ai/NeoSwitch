@@ -140,7 +140,7 @@ Run `neoswitch off` in each project you enabled before removing NeoSwitch. To re
 | `OPENAI_MODEL` | OpenAI model, required for the `openai` backend |
 | `OPENAI_BASE_URL` | OpenAI API base URL including `/v1` (default: `https://api.openai.com/v1`) |
 | `CLAUDE_CLI_PATH` | Claude executable (default: `claude`) |
-| `ANTIGRAVITY_CLI_PATH` | Antigravity executable (default: `agy`) |
+| `ANTIGRAVITY_CLI_PATH` | Antigravity executable (default: `agy` on `PATH`, then `~/.local/bin/agy`, where Google's installer puts it). When set, `/neoswitch:login` does not install `agy` |
 | `NEOSWITCH_LISTEN` | `serve` listen address (default: `127.0.0.1:8080`) |
 | `NEOSWITCH_AUTH_TOKEN` | Optional token for standalone `serve` |
 

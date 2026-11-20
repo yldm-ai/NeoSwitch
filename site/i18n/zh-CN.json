@@ -30,7 +30,7 @@
   "why_local_desc": "只监听本机回环地址。OAuth token 始终留在 <code>agy</code> 内部，NeoSwitch 从不读取。",
   "why_honest_title": "如实说明兼容性",
   "why_honest_desc": "哪些功能可用、哪些部分可用、哪些缺失，都列在下文。不会静默回退到其他模型。",
-  "start_sub": "需要 Claude Code。Go 是可选的：有 Go 时，插件首次使用时会从源码编译二进制；没有 Go 时，插件会下载对应的 release 二进制并校验其 checksum。使用 Antigravity OAuth 时，还需要官方 <code>agy</code> CLI 位于 PATH 中。",
+  "start_sub": "需要 Claude Code。Go 是可选的：有 Go 时，插件首次使用时会从源码编译二进制；没有 Go 时，插件会下载对应的 release 二进制并校验其 checksum。使用 Antigravity OAuth 时，如果缺少 Google 官方的 <code>agy</code> CLI，<code>/neoswitch:login</code> 会自动安装。",
   "step1_title": "安装插件",
   "step1_desc": "在 Claude Code 中执行：",
   "step2_title": "登录并启用路由",

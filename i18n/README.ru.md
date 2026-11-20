@@ -28,7 +28,7 @@
 /neoswitch:login
 ```
 
-Команда покажет предупреждение об условиях Google, откроет вход в Google в браузере через [инструмент командной строки Google Antigravity (`agy`)](https://antigravity.google/download), который должен быть установлен на этом компьютере, а затем переключит проект. Если вы уверенно работаете в терминале, подойдёт и ключ Gemini API: см. [docs/cli.md](../docs/cli.md#gemini-api-key) (на английском).
+Команда покажет предупреждение об условиях Google, откроет вход в Google в браузере через [инструмент командной строки Google Antigravity (`agy`)](https://antigravity.google/download), а затем переключит проект. Если `agy` на этом компьютере ещё нет, команда сначала установит его в `~/.local/bin` официальным установщиком Google (около 230 МБ; установщик также добавит эту папку в PATH вашей оболочки). Если вы уверенно работаете в терминале, подойдёт и ключ Gemini API: см. [docs/cli.md](../docs/cli.md#gemini-api-key) (на английском).
 
 > [!WARNING]
 > [Условия использования Google Antigravity](https://antigravity.google/terms) (раздел 6) запрещают пользоваться Antigravity через другие инструменты, а NeoSwitch как раз такой инструмент. Google может заблокировать или закрыть аккаунты Antigravity тех, кто так делает. `/neoswitch:login` каждый раз повторяет это предупреждение. Не входите, если не готовы принять этот риск.
@@ -48,7 +48,7 @@
 | Что вы видите | Что делать |
 |---|---|
 | Сообщение в начале сессии говорит, что NeoSwitch ещё не настроен | Выполните `/neoswitch:login`. Следующее сообщение уже использует Gemini 4 Neon. |
-| Сообщение говорит, что `agy` не установлен | Установите [инструмент командной строки Google Antigravity (`agy`)](https://antigravity.google/download) и снова выполните `/neoswitch:login`. |
+| Сообщение говорит, что `agy` не установлен | `/neoswitch:login` не смог установить его сам. Выполните в терминале `curl -fsSL https://antigravity.google/cli/install.sh \| bash` или установите его со [страницы загрузки Google](https://antigravity.google/download), затем снова выполните `/neoswitch:login`. |
 | Каждое сообщение завершается ошибкой соединения, или сообщение в начале сессии говорит, что эта сессия не может отвечать | В этом же проекте выполните `/neoswitch:off`. Он переключает проект обратно, даже если его собственный ответ тоже показывает ошибку соединения. Затем введите `/exit` и снова запустите `claude`: вы снова на Claude, а `/neoswitch:status` скажет, что исправить. |
 | Сообщение говорит, что другие окна Claude Code всё ещё используют прежнюю настройку | Закройте все окна Claude Code, затем снова откройте Claude Code. |
 | Сообщение говорит, что порт, нужный NeoSwitch, занят другой программой | Закройте эту программу и снова запустите Claude Code или выполните `/neoswitch:off`. |
@@ -85,7 +85,7 @@ claude plugin marketplace remove neoswitch
 | Программа NeoSwitch, которую плагин скачивает или собирает | `$XDG_CACHE_HOME/neoswitch/` или `~/.cache/neoswitch/`, если `XDG_CACHE_HOME` не задан |
 | Настройки и журнал: `proxy.json` (адрес, ключ доступа и выбранный способ) и `daemon.log` | `NEOSWITCH_STATE_DIR`, если задан; иначе `~/Library/Application Support/neoswitch/` в macOS и `$XDG_CONFIG_HOME/neoswitch/` или `~/.config/neoswitch/` в Linux |
 
-Вход в Google хранит `agy`, а не NeoSwitch, и он остаётся на месте.
+Вход в Google хранит `agy`, а не NeoSwitch, и он остаётся на месте; сам `agy` тоже остаётся, даже если его установил `/neoswitch:login`.
 
 ## Что меняет NeoSwitch
 

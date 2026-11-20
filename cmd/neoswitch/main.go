@@ -72,9 +72,12 @@ func antigravity(args []string) error {
 	if len(args) != 1 || (args[0] != "probe" && args[0] != "login" && args[0] != "oauth") {
 		return fmt.Errorf("usage: neoswitch antigravity {login|probe}")
 	}
-	path := antigravityCLIPath()
 	if args[0] == "login" || args[0] == "oauth" {
-		return antigravityLogin(path)
+		return antigravityLogin()
+	}
+	path, err := provider.FindAntigravityCLI()
+	if err != nil {
+		return fmt.Errorf("%w: run `neoswitch antigravity login`, which installs it", err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
@@ -109,22 +112,19 @@ func antigravity(args []string) error {
 	return nil
 }
 
-func antigravityCLIPath() string {
-	if path := strings.TrimSpace(os.Getenv("ANTIGRAVITY_CLI_PATH")); path != "" {
-		return path
-	}
-	return "agy"
-}
-
 // antigravityLogin delegates authentication to the official CLI's ACP server, which owns the browser OAuth flow and stores the resulting profile in the platform keyring. Signing in is also the user's choice of backend, so it is saved: a Gemini key exported for other tools must not take over afterwards.
 //
-// A missing agy is reported before the Terms warning, which only matters once the sign-in can actually start; the warning is still shown before every sign-in.
-func antigravityLogin(path string) error {
-	os.Setenv("ANTIGRAVITY_CLI_PATH", path)
-	backend, err := provider.NewAntigravityACPFromEnv(context.Background())
-	if errors.Is(err, provider.ErrAntigravityCLIMissing) {
-		return fmt.Errorf("%w: install the Antigravity CLI from Google, then run /neoswitch:login again", err)
+// A missing agy is installed first with Google's official installer, unless ANTIGRAVITY_CLI_PATH names a specific agy: that is the user's own choice, so NeoSwitch reports it instead of installing another copy elsewhere. The Terms warning follows, because it only matters once the sign-in can actually start; it is shown before every sign-in.
+func antigravityLogin() error {
+	if _, err := provider.FindAntigravityCLI(); errors.Is(err, provider.ErrAntigravityCLIMissing) {
+		if strings.TrimSpace(os.Getenv("ANTIGRAVITY_CLI_PATH")) != "" {
+			return fmt.Errorf("%w: point ANTIGRAVITY_CLI_PATH at agy, or unset it so that /neoswitch:login installs agy, then run /neoswitch:login again", err)
+		}
+		if _, err := installAntigravityCLI(context.Background()); err != nil {
+			return err
+		}
 	}
+	backend, err := provider.NewAntigravityACPFromEnv(context.Background())
 	if err != nil {
 		return err
 	}
@@ -325,7 +325,7 @@ Environment:
   OPENAI_MODEL         OpenAI model, required for the openai backend
   OPENAI_BASE_URL      OpenAI API base URL including /v1 (default: https://api.openai.com/v1)
   CLAUDE_CLI_PATH      Claude executable (default: claude)
-  ANTIGRAVITY_CLI_PATH  Antigravity executable (default: agy)
+  ANTIGRAVITY_CLI_PATH  Antigravity executable (default: agy on PATH, then ~/.local/bin/agy)
   NEOSWITCH_LISTEN     serve listen address (default: 127.0.0.1:8080)
   NEOSWITCH_AUTH_TOKEN optional token for standalone serve`)
 }
