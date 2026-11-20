@@ -34,6 +34,16 @@ func TestBuildRendersEveryLanguage(t *testing.T) {
 		if n := strings.Count(html, `<link rel="alternate" hreflang=`); n != len(langs)+1 {
 			t.Errorf("%s: %d hreflang links, want %d", l.Code, n, len(langs)+1)
 		}
+		// Claude Code runs a pasted block as one command, so every copy button must hold exactly one.
+		copies := dataCopy.FindAllStringSubmatch(html, -1)
+		if len(copies) == 0 {
+			t.Errorf("%s: no copy buttons", l.Code)
+		}
+		for _, m := range copies {
+			if strings.Contains(m[1], "&#10;") || strings.Contains(m[1], "\n") {
+				t.Errorf("%s: copy button holds more than one line: %q", l.Code, m[1])
+			}
+		}
 	}
 	sm, err := os.ReadFile(filepath.Join(out, "sitemap.xml"))
 	if err != nil {
@@ -50,8 +60,9 @@ func TestBuildRendersEveryLanguage(t *testing.T) {
 }
 
 var (
-	codeTag = regexp.MustCompile(`<code>`)
-	href    = regexp.MustCompile(`href="([^"]*)"`)
+	codeTag  = regexp.MustCompile(`<code>`)
+	dataCopy = regexp.MustCompile(`<button class="copy" data-copy="([^"]*)"`)
+	href     = regexp.MustCompile(`href="([^"]*)"`)
 )
 
 // Translations must keep the inline markup of the English source: the same number of <code> spans and the same link targets, so a translator cannot drop a command name or break a link.

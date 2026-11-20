@@ -46,6 +46,9 @@ Execute estes comandos dentro do Claude Code:
 
 ```text
 /plugin marketplace add yldm-ai/neo-switch
+```
+
+```text
 /plugin install neoswitch@neoswitch
 ```
 

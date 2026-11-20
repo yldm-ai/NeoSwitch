@@ -100,10 +100,16 @@
 
   /* ---- terminal block ---- */
   .term { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; max-width: 640px; }
-  .term-bar { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
+  .term-bar { position: relative; display: flex; align-items: center; min-height: 42px; padding: 0 14px; border-bottom: 1px solid var(--line); font: 12px var(--mono); color: var(--muted); }
   .dots { display: flex; gap: 6px; }
   .dots i { width: 10px; height: 10px; border-radius: 50%; background: #2c3342; display: block; }
-  .term pre { margin: 0; padding: 16px 18px; font-size: 14px; line-height: 1.75; overflow-x: auto; }
+  .term-bar span { position: absolute; left: 50%; transform: translateX(-50%); }
+  .term-body { padding: 10px 12px 10px 18px; }
+  /* One row per command, each with its own copy button: Claude Code runs a pasted block as a single command, so a button must never copy two. */
+  .tl { display: flex; align-items: center; gap: 12px; min-height: 34px; }
+  .tl code { flex: 1; min-width: 0; overflow-x: auto; white-space: pre; background: none; border: 0; border-radius: 0; padding: 0; font-size: 14px; line-height: 1.75; }
+  .tl .copy { flex: none; }
+  .typing .copy { visibility: hidden; }
   .term .p { color: var(--accent); user-select: none; }
   .term .c { color: #66707f; }
 
@@ -256,10 +262,12 @@
       </a>
     </div>
     <div class="term reveal">
-      <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/plugin marketplace add yldm-ai/neo-switch&#10;/plugin install neoswitch@neoswitch&#10;/neoswitch:login">{{index .T "copy"}}</button></div>
-<pre data-type><span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">marketplace add</span> <span class="hl-arg">yldm-ai/neo-switch</span>
-<span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">install</span> <span class="hl-arg">neoswitch@neoswitch</span>
-<span class="p">&gt; </span><span class="hl-cmd">/neoswitch:login</span></pre>
+      <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span></div>
+      <div class="term-body" data-type>
+        <div class="tl"><code><span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">marketplace add</span> <span class="hl-arg">yldm-ai/neo-switch</span></code><button class="copy" data-copy="/plugin marketplace add yldm-ai/neo-switch">{{index .T "copy"}}</button></div>
+        <div class="tl"><code><span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">install</span> <span class="hl-arg">neoswitch@neoswitch</span></code><button class="copy" data-copy="/plugin install neoswitch@neoswitch">{{index .T "copy"}}</button></div>
+        <div class="tl"><code><span class="p">&gt; </span><span class="hl-cmd">/neoswitch:login</span></code><button class="copy" data-copy="/neoswitch:login">{{index .T "copy"}}</button></div>
+      </div>
     </div>
   </div>
 </header>
@@ -329,9 +337,11 @@
           <h3>{{index .T "step1_title"}}</h3>
           <p>{{index .T "step1_desc"}}</p>
           <div class="term">
-            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/plugin marketplace add yldm-ai/neo-switch&#10;/plugin install neoswitch@neoswitch">{{index .T "copy"}}</button></div>
-<pre><span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">marketplace add</span> <span class="hl-arg">yldm-ai/neo-switch</span>
-<span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">install</span> <span class="hl-arg">neoswitch@neoswitch</span></pre>
+            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span></div>
+            <div class="term-body">
+              <div class="tl"><code><span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">marketplace add</span> <span class="hl-arg">yldm-ai/neo-switch</span></code><button class="copy" data-copy="/plugin marketplace add yldm-ai/neo-switch">{{index .T "copy"}}</button></div>
+              <div class="tl"><code><span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">install</span> <span class="hl-arg">neoswitch@neoswitch</span></code><button class="copy" data-copy="/plugin install neoswitch@neoswitch">{{index .T "copy"}}</button></div>
+            </div>
           </div>
         </div>
       </div>
@@ -340,8 +350,10 @@
           <h3>{{index .T "step2_title"}}</h3>
           <p>{{index .T "step2_desc"}}</p>
           <div class="term">
-            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/neoswitch:login">{{index .T "copy"}}</button></div>
-<pre><span class="p">&gt; </span><span class="hl-cmd">/neoswitch:login</span></pre>
+            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span></div>
+            <div class="term-body">
+              <div class="tl"><code><span class="p">&gt; </span><span class="hl-cmd">/neoswitch:login</span></code><button class="copy" data-copy="/neoswitch:login">{{index .T "copy"}}</button></div>
+            </div>
           </div>
         </div>
       </div>
@@ -350,9 +362,11 @@
           <h3>{{index .T "step3_title"}}</h3>
           <p>{{index .T "step3_desc"}}</p>
           <div class="term">
-            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/neoswitch:status">{{index .T "copy"}}</button></div>
-<pre><span class="p">&gt; </span><span class="hl-cmd">/neoswitch:status</span>
-<span class="c">  NeoSwitch ... -&gt; </span><span class="hl-ok">gemini-4-neon</span></pre>
+            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span></div>
+            <div class="term-body">
+              <div class="tl"><code><span class="p">&gt; </span><span class="hl-cmd">/neoswitch:status</span></code><button class="copy" data-copy="/neoswitch:status">{{index .T "copy"}}</button></div>
+              <div class="tl"><code><span class="c">  NeoSwitch ... -&gt; </span><span class="hl-ok">gemini-4-neon</span></code></div>
+            </div>
           </div>
         </div>
       </div>
@@ -455,34 +469,54 @@
         if (!e.isIntersecting) return;
         e.target.classList.add('in');
         io.unobserve(e.target);
-        var pre = e.target.querySelector('pre[data-type]');
-        if (pre) typeOut(pre);
+        var body = e.target.querySelector('[data-type]');
+        if (body) typeOut(body);
       });
     }, { rootMargin: '0px 0px -8% 0px' });
     document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
   }
 
-  // typeOut retypes a highlighted terminal block character by character, keeping its spans: prompts appear at once, the rest is typed with a short pause at each line break. The block keeps its height so nothing below it shifts.
-  function typeOut(pre) {
-    var walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT), parts = [], n;
-    while ((n = walker.nextNode())) parts.push({ node: n, text: n.data, instant: n.parentNode.classList.contains('p') });
-    pre.style.minHeight = pre.getBoundingClientRect().height + 'px';
+  // typeOut retypes the code rows of a highlighted terminal block character by character, keeping their spans: prompts appear at once, the rest is typed with a short pause before each new row. The copy buttons stay hidden until typing ends, and the block keeps its height so nothing below it shifts.
+  function typeOut(body) {
+    var parts = [];
+    body.querySelectorAll('.tl code').forEach(function (code) {
+      var walker = document.createTreeWalker(code, NodeFilter.SHOW_TEXT), n;
+      while ((n = walker.nextNode())) parts.push({ node: n, code: code, text: n.data, instant: n.parentNode.classList.contains('p') });
+    });
+    body.style.minHeight = body.getBoundingClientRect().height + 'px';
+    body.classList.add('typing');
     parts.forEach(function (p) { p.node.data = ''; });
     var caret = document.createElement('span');
     caret.className = 'caret';
     caret.setAttribute('aria-hidden', 'true');
-    pre.appendChild(caret);
-    var i = 0, j = 0;
+    var i = 0, j = 0, row = null;
     function step() {
       while (i < parts.length && (parts[i].instant || j >= parts[i].text.length)) {
-        if (parts[i].instant) parts[i].node.data = parts[i].text;
+        if (parts[i].instant) {
+          if (parts[i].code !== row && row) return next(i, 450);
+          parts[i].node.data = parts[i].text;
+          enter(parts[i].code);
+        }
         i++;
         j = 0;
       }
-      if (i >= parts.length) return;
-      var ch = parts[i].text.charAt(j++);
-      parts[i].node.data = parts[i].text.slice(0, j);
-      setTimeout(step, ch === '\n' ? 450 : 22 + Math.random() * 38);
+      if (i >= parts.length) {
+        body.classList.remove('typing');
+        return;
+      }
+      if (parts[i].code !== row && row && j === 0) return next(i, 450);
+      enter(parts[i].code);
+      parts[i].node.data = parts[i].text.slice(0, ++j);
+      setTimeout(step, 22 + Math.random() * 38);
+    }
+    // enter moves the caret to the end of the row being typed; later text in that row is still empty, so it sits right after the typed characters.
+    function enter(code) {
+      row = code;
+      code.appendChild(caret);
+    }
+    function next(at, delay) {
+      row = parts[at].code;
+      setTimeout(step, delay);
     }
     setTimeout(step, 550);
   }
