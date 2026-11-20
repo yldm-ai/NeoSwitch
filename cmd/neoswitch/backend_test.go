@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -660,6 +661,53 @@ func TestKeyPage(t *testing.T) {
 	}
 	if projects, _ := daemon.Projects(state); len(projects) != 1 || projects[0] != project {
 		t.Fatalf("registry = %v", projects)
+	}
+}
+
+// A proxy that is already running keeps the key and backend it started with, so saving a key must ask for every window to close, whichever backend that proxy serves.
+func TestSaveKeyAsksToCloseWindowsWhileProxyRuns(t *testing.T) {
+	const key = "AIzaSyTest0123456789abcdefghijklmnopqrs"
+	for _, tc := range []struct {
+		name    string
+		running bool
+	}{
+		{"no proxy", false},
+		{"proxy running", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			state := isolateBackendEnv(t, true)
+			if tc.running {
+				proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path != "/neoswitch/status" || r.Header.Get("Authorization") != "Bearer tok" {
+						http.NotFound(w, r)
+						return
+					}
+					_ = json.NewEncoder(w).Encode(daemon.Info{Sessions: 1, Backend: backendLabel(backendGemini, "")})
+				}))
+				t.Cleanup(proxy.Close)
+				if err := os.MkdirAll(state, 0o700); err != nil {
+					t.Fatal(err)
+				}
+				saved, _ := json.Marshal(daemon.State{Listen: strings.TrimPrefix(proxy.URL, "http://"), Token: "tok"})
+				if err := os.WriteFile(filepath.Join(state, "proxy.json"), saved, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			data, status := saveGeminiKeyAndEnable(key, t.TempDir())
+			if status != http.StatusOK || data.Restart != tc.running {
+				t.Fatalf("status %d, restart %v, want %v: %+v", status, data.Restart, tc.running, data)
+			}
+			var page bytes.Buffer
+			if err := keyPageTemplate.Execute(&page, data); err != nil {
+				t.Fatal(err)
+			}
+			if got := strings.Contains(page.String(), "Close all Claude Code windows"); got != tc.running {
+				t.Fatalf("page asks to close all windows = %v, want %v\n%s", got, tc.running, page.String())
+			}
+			if got := strings.Contains(page.String(), "/exit"); got == tc.running {
+				t.Fatalf("page mentions /exit = %v, want %v\n%s", got, !tc.running, page.String())
+			}
+		})
 	}
 }
 

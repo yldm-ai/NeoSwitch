@@ -100,8 +100,26 @@ func keyCommand(args []string) error {
 	}
 	fmt.Println(url)
 	fmt.Println("The key goes from that page straight to NeoSwitch on this computer, not through the chat. The page closes after 10 minutes.")
-	fmt.Println("After you save the key, type /exit and start claude again.")
+	if proxyRunning() {
+		fmt.Println("After you save the key, close all Claude Code windows and open them again. While any of them is open, NeoSwitch keeps the earlier setup.")
+	} else {
+		fmt.Println("After you save the key, type /exit and start claude again.")
+	}
 	return nil
+}
+
+// proxyRunning reports whether the shared NeoSwitch proxy is running. It reads the backend and the Gemini key once at start and keeps them until every Claude Code window using it has closed, so a saved key reaches no session before then.
+func proxyRunning() bool {
+	dir, err := daemon.Dir()
+	if err != nil {
+		return false
+	}
+	state, ok, err := daemon.LoadState(dir)
+	if err != nil || !ok {
+		return false
+	}
+	_, running := daemon.Status(state)
+	return running
 }
 
 // serveKeyPage is the detached page server started by keyCommand. It reports one line on stdout, "ready <url>" or "error <reason>", and then writes nothing more there, because keyCommand has stopped reading.
@@ -224,6 +242,8 @@ func saveGeminiKeyAndEnable(key, project string) (keyPageData, int) {
 		return data, http.StatusInternalServerError
 	}
 	data.Saved = true
+	// A running proxy keeps the earlier key or backend, whichever it served, so the new key needs every window closed rather than one /exit.
+	data.Restart = proxyRunning()
 	if data.GitNote, err = enableProject(project); err != nil {
 		data.EnableError = sentence(err.Error())
 	}
@@ -250,6 +270,8 @@ type keyPageData struct {
 	EnableError string
 	GitNote     string
 	KeyURL      string
+	// Restart means a running proxy still serves the earlier setup, so every Claude Code window must close before the key is used.
+	Restart bool
 }
 
 func (p *keyPage) render(w http.ResponseWriter, status int, data keyPageData) {
@@ -282,8 +304,13 @@ code { background: #f1f1f1; padding: 0 .3rem; border-radius: 4px; }
 <p class="error" role="alert">NeoSwitch could not switch {{.Project}} to Gemini 4 Neon: {{.EnableError}}</p>
 <p>After fixing that, run <code>/neoswitch:on</code> in Claude Code.</p>
 {{else}}
+{{if .Restart}}
+<p>Claude Code in {{.Project}} uses Gemini 4 Neon with this key once every open Claude Code window has closed. Until then NeoSwitch keeps the earlier setup.</p>
+<p>Close all Claude Code windows, then start <code>claude</code> again. You can close this page.</p>
+{{else}}
 <p>Claude Code in {{.Project}} now uses Gemini 4 Neon with your Gemini API key, starting with its next session.</p>
 <p>In Claude Code, type <code>/exit</code>, then start <code>claude</code> again. You can close this page.</p>
+{{end}}
 {{if .GitNote}}<p>{{.GitNote}}</p>{{end}}
 {{end}}
 {{else}}
