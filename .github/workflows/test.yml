@@ -18,3 +18,22 @@ jobs:
       - run: go test ./...
       - run: go test -race ./...
       - run: go vet ./...
+
+  # Runs the real Claude Code CLI through NeoSwitch against a scripted Gemini server (see e2e/). No model or credentials are involved.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Pinned to the version the suite and testdata/claude-code-tools.json were verified with; bump it deliberately.
+      - run: npm install -g @anthropic-ai/claude-code@2.1.329
+      - run: claude --version
+      - run: go test -tags e2e ./...
+        env:
+          NEOSWITCH_E2E_REQUIRE_CLAUDE: "1"

@@ -122,7 +122,7 @@ After changing routing, start a new Claude Code session. The current session kee
 
 ## Compatibility
 
-Claude Code still runs the session, permissions, tool execution, MCP servers, skills, hooks, `CLAUDE.md` and `/resume`; NeoSwitch only replaces the model behind them. How well those features work depends on how well the model follows Claude Code's tool protocol, which has been exercised in everyday coding use but is not covered by an automated end-to-end suite.
+Claude Code still runs the session, permissions, tool execution, MCP servers, skills, hooks, `CLAUDE.md` and `/resume`; NeoSwitch only replaces the model behind them. How well those features work depends on how well the model follows Claude Code's tool protocol, which has been exercised in everyday coding use. An automated end-to-end suite runs the real Claude Code CLI through NeoSwitch against a scripted Gemini server on every change and checks that tool calls and results, file edits, Bash, parallel calls, permission denials, hooks, skills, `/resume`, subagents and MCP tools pass through the Gemini API route intact; it does not measure how well a real model uses them.
 
 | Capability | Gemini API / Vertex AI | Antigravity OAuth (ACP) |
 |---|---|---|

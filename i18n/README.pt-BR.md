@@ -122,7 +122,7 @@ Depois de alterar o roteamento, inicie uma nova sessão do Claude Code. A sessã
 
 ## Compatibilidade
 
-O Claude Code continua executando a sessão, as permissões, a execução de ferramentas, os servidores MCP, as skills, os hooks, o `CLAUDE.md` e o `/resume`; o NeoSwitch só substitui o modelo por trás deles. O quanto esses recursos funcionam bem depende de quão bem o modelo segue o protocolo de ferramentas do Claude Code, que foi exercitado no uso diário de programação, mas não é coberto por uma suíte automatizada de ponta a ponta.
+O Claude Code continua executando a sessão, as permissões, a execução de ferramentas, os servidores MCP, as skills, os hooks, o `CLAUDE.md` e o `/resume`; o NeoSwitch só substitui o modelo por trás deles. O quanto esses recursos funcionam bem depende de quão bem o modelo segue o protocolo de ferramentas do Claude Code, que foi exercitado no uso diário de programação. Uma suíte automatizada de ponta a ponta executa a cada mudança a CLI real do Claude Code através do NeoSwitch contra um servidor Gemini roteirizado e verifica que chamadas de ferramentas e seus resultados, edições de arquivos, Bash, chamadas paralelas, permissões negadas, hooks, skills, `/resume`, subagentes e ferramentas MCP passam intactos pela rota da API do Gemini; ela não mede quão bem um modelo real os usa.
 
 | Recurso | Gemini API / Vertex AI | Antigravity OAuth (ACP) |
 |---|---|---|
