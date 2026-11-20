@@ -34,6 +34,16 @@ func main() {
 		err = doctor()
 	case "models":
 		err = models()
+	case "on":
+		err = on(os.Args[2:])
+	case "off":
+		err = off(os.Args[2:])
+	case "status":
+		err = status(os.Args[2:])
+	case "attach":
+		err = attach(os.Args[2:])
+	case "daemon":
+		err = runDaemon()
 	case "help", "--help", "-h":
 		usage()
 		return
@@ -194,6 +204,9 @@ Usage:
   neoswitch claude [-- claude arguments...]   start Claude Code through a local proxy
   neoswitch serve                             run the Anthropic-compatible proxy
   neoswitch antigravity probe                 verify the official agy session without reading its token
+  neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
+  neoswitch off [project]                     route them back to Anthropic
+  neoswitch status [project]                  show routing and daemon state
   neoswitch doctor                            check local prerequisites
   neoswitch models                            print the configured Gemini model
 

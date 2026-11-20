@@ -1,0 +1,11 @@
+{
+  "name": "neoswitch",
+  "owner": { "name": "yldm-ai" },
+  "plugins": [
+    {
+      "name": "neoswitch",
+      "source": "./",
+      "description": "Run Claude Code against Gemini through a local Anthropic-to-Gemini proxy, per project"
+    }
+  ]
+}

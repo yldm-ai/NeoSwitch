@@ -52,6 +52,37 @@ Always set both: a Claude Code client given only a base URL sends its saved clau
 
 The proxy binds to `127.0.0.1` by default. Set `NEOSWITCH_LISTEN` to another loopback address only when needed. `GEMINI_BASE_URL` overrides the Gemini API host.
 
+## Claude Code plugin
+
+The plugin routes chosen projects to Gemini while plain `claude` keeps working everywhere else, with no wrapper command to remember.
+
+```text
+/plugin marketplace add yldm-ai/NeoSwitch
+/plugin install neoswitch@neoswitch
+```
+
+Set the Gemini API key in the plugin's configuration (`/plugin`, then neoswitch). Claude Code keeps it in the macOS Keychain. Without it, NeoSwitch falls back to `GEMINI_API_KEY` or Vertex AI credentials from the environment Claude Code was started in.
+
+| Command | Effect |
+|---|---|
+| `/neoswitch:on` | Route new sessions in this project to Gemini |
+| `/neoswitch:status` | Show routing and whether the proxy is running |
+| `/neoswitch:off` | Route new sessions in this project back to Anthropic |
+
+After `/neoswitch:on` or `/neoswitch:off`, start a new session in the project; the running session keeps its connection.
+
+How it works:
+
+- `/neoswitch:on` adds `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` to the project's `.claude/settings.local.json`, pointing at one loopback proxy shared by all enabled projects. Other settings in the file are preserved, and `/neoswitch:off` removes only those two entries.
+- A SessionStart hook starts the proxy before the session's first request and registers the Claude Code process with it. The proxy exits once every registered session has exited, so nothing keeps running after you close Claude Code.
+- On first use the plugin builds the bundled source with Go, so Go must be installed. macOS and Linux are supported.
+
+Things to know:
+
+- `.claude/settings.local.json` then holds the proxy token. Keep that file out of version control; `/neoswitch:on` warns when git does not ignore it.
+- Remote Control is unavailable in routed projects, because Claude Code disables it whenever `ANTHROPIC_BASE_URL` points away from Anthropic.
+- Anthropic documents that it does not support routing Claude Code to non-Claude models, so Claude Code updates can change behavior NeoSwitch depends on.
+
 ## Stability boundary
 
 NeoSwitch uses official Gemini API or Vertex AI credentials. Consumer OAuth flows, Antigravity scraping, hosts-file interception, and remote credential relays are intentionally outside the stable core. If the model is not available to the configured Google account, NeoSwitch fails with an explicit upstream error instead of silently switching models.

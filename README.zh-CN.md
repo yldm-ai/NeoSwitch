@@ -64,9 +64,43 @@ ANTHROPIC_BASE_URL=http://127.0.0.1:8080 ANTHROPIC_AUTH_TOKEN="$NEOSWITCH_AUTH_T
 
 Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOSWITCH_LISTEN` 到其他回环地址。`GEMINI_BASE_URL` 用于覆盖 Gemini API 的主机地址。
 
+## Claude Code 插件
+
+装上插件后，可以只把选定的项目切到 Gemini，其他项目里照常直接用 `claude`，不需要记额外的启动命令。
+
+```text
+/plugin marketplace add yldm-ai/NeoSwitch
+/plugin install neoswitch@neoswitch
+```
+
+在插件配置里填入 Gemini API Key（`/plugin` → neoswitch），Claude Code 会把它存进 macOS 钥匙串。不填的话，NeoSwitch 会使用启动 Claude Code 时环境里的 `GEMINI_API_KEY` 或 Vertex AI 凭证。
+
+| 命令 | 作用 |
+|---|---|
+| `/neoswitch:on` | 让这个项目之后的新会话走 Gemini |
+| `/neoswitch:status` | 查看路由状态和代理是否在运行 |
+| `/neoswitch:off` | 让这个项目之后的新会话改回 Anthropic |
+
+执行 `/neoswitch:on` 或 `/neoswitch:off` 之后，要在项目里开一个新会话才生效，正在运行的会话保持原来的连接。
+
+工作方式：
+
+- `/neoswitch:on` 在项目的 `.claude/settings.local.json` 里加入 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`，指向一个所有已启用项目共用的本机代理。文件里的其他设置原样保留，`/neoswitch:off` 只删除这两项。
+- SessionStart hook 会在会话发出第一个请求之前启动代理，并把这个 Claude Code 进程登记给代理。所有登记过的会话都退出后，代理自己退出，关掉 Claude Code 后不会留下后台进程。
+- 插件第一次使用时会用 Go 编译自带的源码，所以需要安装 Go。支持 macOS 和 Linux。
+
+注意事项：
+
+- 启用后 `.claude/settings.local.json` 里会存有代理 token，这个文件不要提交到版本库；如果 git 没有忽略它，`/neoswitch:on` 会给出提示。
+- 已启用的项目里无法使用 Remote Control：只要 `ANTHROPIC_BASE_URL` 不指向 Anthropic，Claude Code 就会禁用它。
+- Anthropic 的文档写明不支持把 Claude Code 路由到非 Claude 模型，所以 Claude Code 升级后，NeoSwitch 依赖的行为可能发生变化。
+
 ## 常用命令
 
 ```bash
+neoswitch on [项目目录]           # 让项目的新会话走 Gemini（插件的 /neoswitch:on 调用的就是它）
+neoswitch off [项目目录]          # 改回 Anthropic
+neoswitch status [项目目录]       # 查看路由和代理状态
 neoswitch doctor                 # 检查 Gemini 凭证和 Claude CLI
 neoswitch models                 # 查看当前配置的模型
 neoswitch antigravity probe      # 检查 agy 登录，不输出 token
