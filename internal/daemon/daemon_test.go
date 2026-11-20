@@ -55,8 +55,8 @@ func TestEnableAndDisablePreserveOtherSettings(t *testing.T) {
 		t.Fatalf("enable must turn Claude Code gateway mode off: %s", data)
 	}
 
-	if err := Disable(project, s); err != nil {
-		t.Fatal(err)
+	if changed, err := Disable(project, s); err != nil || !changed {
+		t.Fatalf("disable = %v %v", changed, err)
 	}
 	data, _ = os.ReadFile(path)
 	settings = map[string]any{}
@@ -68,21 +68,66 @@ func TestEnableAndDisablePreserveOtherSettings(t *testing.T) {
 }
 
 func TestDisableLeavesForeignBaseURL(t *testing.T) {
+	for name, content := range map[string]string{
+		"remote gateway": `{"env":{"ANTHROPIC_BASE_URL":"https://gateway.example","ANTHROPIC_AUTH_TOKEN":"theirs"}}`,
+		// A local gateway the user set up has a loopback URL but not NeoSwitch's second mark.
+		"local gateway":         `{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:9000","ANTHROPIC_AUTH_TOKEN":"theirs"}}`,
+		"local gateway, mode 1": `{"env":{"ANTHROPIC_BASE_URL":"http://127.0.0.1:9000","ANTHROPIC_AUTH_TOKEN":"theirs","CLAUDE_CODE_USE_GATEWAY":"1"}}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			project := t.TempDir()
+			path := settingsPath(project)
+			_ = os.MkdirAll(filepath.Dir(path), 0o755)
+			_ = os.WriteFile(path, []byte(content), 0o644)
+			s := State{Listen: "127.0.0.1:1", Token: "tok"}
+			if changed, err := Disable(project, s); err != nil || changed {
+				t.Fatalf("disable = %v %v", changed, err)
+			}
+			if data, _ := os.ReadFile(path); string(data) != content {
+				t.Fatalf("foreign gateway changed: %s", data)
+			}
+			if stale, err := StaleAddress(project, s); err != nil || stale != "" {
+				t.Fatalf("foreign gateway reported as stale: %q %v", stale, err)
+			}
+		})
+	}
+}
+
+func TestDisableRemovesEntriesOfAnEarlierState(t *testing.T) {
+	earlier := State{Listen: "127.0.0.1:4711", Token: "old"}
+	for name, current := range map[string]State{
+		"new state": {Listen: "127.0.0.1:4712", Token: "new"},
+		"no state":  {},
+	} {
+		t.Run(name, func(t *testing.T) {
+			project := t.TempDir()
+			if err := Enable(project, earlier); err != nil {
+				t.Fatal(err)
+			}
+			if on, _ := Enabled(project, current); on {
+				t.Fatal("an earlier address must not count as enabled")
+			}
+			if stale, err := StaleAddress(project, current); err != nil || stale != earlier.BaseURL() {
+				t.Fatalf("stale = %q %v", stale, err)
+			}
+			if changed, err := Disable(project, current); err != nil || !changed {
+				t.Fatalf("disable = %v %v", changed, err)
+			}
+			data, _ := os.ReadFile(settingsPath(project))
+			if strings.Contains(string(data), "ANTHROPIC") || strings.Contains(string(data), EnvUseGateway) {
+				t.Fatalf("entries left: %s", data)
+			}
+		})
+	}
+}
+
+func TestDisableWithoutSettingsWritesNothing(t *testing.T) {
 	project := t.TempDir()
-	path := settingsPath(project)
-	_ = os.MkdirAll(filepath.Dir(path), 0o755)
-	_ = os.WriteFile(path, []byte(`{"env":{"ANTHROPIC_BASE_URL":"https://gateway.example","ANTHROPIC_AUTH_TOKEN":"theirs"}}`), 0o644)
-	if err := Disable(project, State{Listen: "127.0.0.1:1", Token: "tok"}); err != nil {
-		t.Fatal(err)
+	if changed, err := Disable(project, State{Listen: "127.0.0.1:1", Token: "t"}); err != nil || changed {
+		t.Fatalf("disable = %v %v", changed, err)
 	}
-	data, _ := os.ReadFile(path)
-	if string(data) == "" || !json.Valid(data) {
-		t.Fatal("settings destroyed")
-	}
-	var settings map[string]map[string]string
-	_ = json.Unmarshal(data, &settings)
-	if settings["env"]["ANTHROPIC_BASE_URL"] != "https://gateway.example" || settings["env"]["ANTHROPIC_AUTH_TOKEN"] != "theirs" {
-		t.Fatalf("foreign gateway removed: %s", data)
+	if _, err := os.Stat(filepath.Join(project, ".claude")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("disable created settings: %v", err)
 	}
 }
 
@@ -119,11 +164,46 @@ func TestInvalidSettingsNameTheLine(t *testing.T) {
 	}
 }
 
-func TestCorruptStateNamesTheSlashCommand(t *testing.T) {
+func TestCorruptStateIsSetAside(t *testing.T) {
+	for name, content := range map[string]string{"truncated": "{", "no token": `{"listen":"127.0.0.1:1"}`} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			_ = os.WriteFile(statePath(dir), []byte(content), 0o600)
+			if _, ok, err := LoadState(dir); err != nil || ok {
+				t.Fatalf("damaged state must read as missing: %v %v", ok, err)
+			}
+			if data, err := os.ReadFile(statePath(dir) + ".bad"); err != nil || string(data) != content {
+				t.Fatalf("damaged state not kept aside: %q %v", data, err)
+			}
+			if _, err := EnsureState(dir); err != nil {
+				t.Fatal(err)
+			}
+			if _, ok, err := LoadState(dir); err != nil || !ok {
+				t.Fatalf("new state not usable: %v %v", ok, err)
+			}
+		})
+	}
+}
+
+func TestProjectRegistry(t *testing.T) {
 	dir := t.TempDir()
-	_ = os.WriteFile(filepath.Join(dir, "proxy.json"), []byte("{"), 0o600)
-	if _, _, err := LoadState(dir); err == nil || !strings.Contains(err.Error(), "/neoswitch:on") || strings.Contains(err.Error(), "`neoswitch") {
-		t.Fatalf("got %v", err)
+	for _, project := range []string{"/a", "/b", "/a", "/c"} {
+		if err := RecordProject(dir, project); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if got, _ := Projects(dir); strings.Join(got, ",") != "/a,/b,/c" {
+		t.Fatalf("projects = %v", got)
+	}
+	if err := ForgetProjects(dir, "/b", "/missing"); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := Projects(dir); strings.Join(got, ",") != "/a,/c" {
+		t.Fatalf("projects = %v", got)
+	}
+	_ = os.WriteFile(projectsPath(dir), []byte("{"), 0o600)
+	if got, err := Projects(dir); err != nil || len(got) != 0 {
+		t.Fatalf("a damaged registry must read as empty: %v %v", got, err)
 	}
 }
 

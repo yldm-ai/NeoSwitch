@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -252,6 +254,29 @@ func TestStatusAnswersInPlainLines(t *testing.T) {
 			notWant: []string{"Gemini 4 Neon"},
 		},
 		{
+			name: "on, state removed afterwards",
+			setup: func(t *testing.T, project string) {
+				installAgy(t)
+				mustOn(t, project)
+				if err := os.Remove(filepath.Join(os.Getenv("NEOSWITCH_STATE_DIR"), "proxy.json")); err != nil {
+					t.Fatal(err)
+				}
+			},
+			want: []string{"earlier NeoSwitch setup", "/neoswitch:on", "/neoswitch:off"},
+		},
+		{
+			name: "on, state damaged and another project turned on since",
+			setup: func(t *testing.T, project string) {
+				installAgy(t)
+				mustOn(t, project)
+				if err := os.WriteFile(filepath.Join(os.Getenv("NEOSWITCH_STATE_DIR"), "proxy.json"), []byte("{"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				mustOn(t, t.TempDir())
+			},
+			want: []string{"earlier NeoSwitch setup", "/neoswitch:on"},
+		},
+		{
 			name: "this session routed, service not running",
 			setup: func(t *testing.T, project string) {
 				installAgy(t)
@@ -366,5 +391,133 @@ func TestSessionStartProblemsNameTheFix(t *testing.T) {
 		if strings.Contains(message, jargon) {
 			t.Fatalf("%q contains %q", message, jargon)
 		}
+	}
+}
+
+func captureStdout(t *testing.T, f func() error) string {
+	t.Helper()
+	read, write, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved := os.Stdout
+	os.Stdout = write
+	err = f()
+	os.Stdout = saved
+	_ = write.Close()
+	data, _ := io.ReadAll(read)
+	if err != nil {
+		t.Fatalf("%v (output %s)", err, data)
+	}
+	return string(data)
+}
+
+func TestAttachReportsAnEarlierSetup(t *testing.T) {
+	for _, tc := range []struct {
+		name, gateway, want string
+	}{
+		{"NeoSwitch entries for an earlier address", "0", "earlier NeoSwitch setup"},
+		{"a local gateway of the user", "", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateBackendEnv(t, true)
+			t.Setenv("ANTHROPIC_BASE_URL", "http://127.0.0.1:1")
+			t.Setenv(daemon.EnvUseGateway, tc.gateway)
+			project := t.TempDir()
+			t.Setenv("CLAUDE_PROJECT_DIR", project)
+			out := captureStdout(t, func() error { return attach([]string{"--pid", "4242"}) })
+			if tc.want == "" {
+				if out != "" {
+					t.Fatalf("unexpected message: %s", out)
+				}
+				return
+			}
+			for _, want := range []string{`"systemMessage"`, "NeoSwitch: ", tc.want, "/neoswitch:on", "/neoswitch:off"} {
+				if !strings.Contains(out, want) {
+					t.Fatalf("output lacks %q: %s", want, out)
+				}
+			}
+			// The hook must not rewrite the settings; the user picks on or off.
+			if _, err := os.Stat(filepath.Join(project, ".claude")); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("attach wrote settings: %v", err)
+			}
+		})
+	}
+}
+
+func readEnv(t *testing.T, project string) map[string]any {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(project, ".claude", "settings.local.json"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(data, &settings); err != nil {
+		t.Fatal(err)
+	}
+	env, _ := settings["env"].(map[string]any)
+	return env
+}
+
+func TestOffAllRestoresEveryProject(t *testing.T) {
+	state := isolateBackendEnv(t, true)
+	first, second, removed, never := t.TempDir(), t.TempDir(), filepath.Join(t.TempDir(), "gone"), t.TempDir()
+	for _, project := range []string{first, second, removed} {
+		if err := os.MkdirAll(project, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		mustOn(t, project)
+	}
+	if err := os.RemoveAll(removed); err != nil {
+		t.Fatal(err)
+	}
+	// second keeps the address of a state that was removed since, which off must still clean up.
+	if err := os.Remove(filepath.Join(state, "proxy.json")); err != nil {
+		t.Fatal(err)
+	}
+	mustOn(t, first)
+	out := captureStdout(t, func() error { return off([]string{"all", never}) })
+	for _, want := range []string{first, second} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("output lacks %s:\n%s", want, out)
+		}
+	}
+	for _, unwanted := range []string{removed, never} {
+		if strings.Contains(out, unwanted) {
+			t.Fatalf("output lists %s:\n%s", unwanted, out)
+		}
+	}
+	for _, project := range []string{first, second} {
+		if env := readEnv(t, project); len(env) != 0 {
+			t.Fatalf("%s still has %v", project, env)
+		}
+	}
+	if projects, _ := daemon.Projects(state); len(projects) != 0 {
+		t.Fatalf("registry not cleared: %v", projects)
+	}
+	if out := captureStdout(t, func() error { return off([]string{"all", never}) }); !strings.Contains(out, "was not on in any project") {
+		t.Fatalf("second run: %s", out)
+	}
+}
+
+func TestOffOneProject(t *testing.T) {
+	state := isolateBackendEnv(t, true)
+	project, other := t.TempDir(), t.TempDir()
+	mustOn(t, project)
+	mustOn(t, other)
+	if out := captureStdout(t, func() error { return off([]string{project}) }); !strings.Contains(out, "is off for") {
+		t.Fatalf("got %s", out)
+	}
+	if projects, _ := daemon.Projects(state); strings.Join(projects, ",") != other {
+		t.Fatalf("registry = %v", projects)
+	}
+	if out := captureStdout(t, func() error { return off([]string{project}) }); !strings.Contains(out, "was not on") {
+		t.Fatalf("got %s", out)
+	}
+	if err := off([]string{"some", project}); err == nil {
+		t.Fatal("an unknown argument must be rejected")
 	}
 }

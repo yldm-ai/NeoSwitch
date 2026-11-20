@@ -308,7 +308,7 @@ Usage:
   neoswitch antigravity login                 sign in with the official agy browser OAuth flow
   neoswitch antigravity probe                 verify the official agy session without reading its token
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
-  neoswitch off [project]                     route them back to Anthropic
+  neoswitch off [all] [project]               route them back to Anthropic (all: every project NeoSwitch turned on)
   neoswitch status [-v] [project]             show whether a project uses NeoSwitch and what to do next (-v adds details)
   neoswitch backend [auto|antigravity|gemini|openai]  show or choose the upstream (openai is opt-in and experimental)
   neoswitch doctor                            check that the credentials can use the model

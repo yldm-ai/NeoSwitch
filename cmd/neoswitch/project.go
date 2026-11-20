@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strings"
 	"syscall"
 
@@ -39,34 +40,57 @@ func on(args []string) error {
 	if err != nil {
 		return err
 	}
-	// Turning a project on with no way to reach a model would only make every message of its next session fail. The check is local: it starts no agy and makes no network call, so an installed but signed-out agy still passes.
-	if _, _, err := resolveBackend(); err != nil {
-		return err
-	}
-	dir, err := daemon.Dir()
+	gitNote, err := enableProject(project)
 	if err != nil {
-		return err
-	}
-	state, err := daemon.EnsureState(dir)
-	if err != nil {
-		return err
-	}
-	if err := daemon.Enable(project, state); err != nil {
 		return err
 	}
 	fmt.Printf("NeoSwitch is on for %s.\n", project)
 	fmt.Println("Start a new Claude Code session in this project to use Gemini; the current session keeps its connection.")
-	// The settings file holds the proxy token. Excluding it in the clone's own exclude file keeps it out of commits without touching the shared .gitignore; the note is only for when that does not work.
-	settings := filepath.Join(".claude", "settings.local.json")
-	if ignored, known := gitIgnored(project, settings); known && !ignored {
-		if err := gitExclude(project, settings); err != nil || !isGitIgnored(project, settings) {
-			fmt.Println("Note: Git may include .claude/settings.local.json in commits. It holds NeoSwitch's local access key, so add it to .gitignore.")
-		}
+	if gitNote != "" {
+		fmt.Println(gitNote)
 	}
 	return nil
 }
 
+// enableProject turns NeoSwitch on for project and records it in the project registry. It prints nothing, because /neoswitch:key runs it from a page server whose output nobody reads; gitNote is a note for the user when the settings file may end up in commits.
+func enableProject(project string) (gitNote string, err error) {
+	// Turning a project on with no way to reach a model would only make every message of its next session fail. The check is local: it starts no agy and makes no network call, so an installed but signed-out agy still passes.
+	if _, _, err := resolveBackend(); err != nil {
+		return "", err
+	}
+	dir, err := daemon.Dir()
+	if err != nil {
+		return "", err
+	}
+	state, err := daemon.EnsureState(dir)
+	if err != nil {
+		return "", err
+	}
+	if err := daemon.Enable(project, state); err != nil {
+		return "", err
+	}
+	if err := daemon.RecordProject(dir, project); err != nil {
+		return "", err
+	}
+	// The settings file holds the proxy token. Excluding it in the clone's own exclude file keeps it out of commits without touching the shared .gitignore; the note is only for when that does not work.
+	settings := filepath.Join(".claude", "settings.local.json")
+	if ignored, known := gitIgnored(project, settings); known && !ignored {
+		if err := gitExclude(project, settings); err != nil || !isGitIgnored(project, settings) {
+			return "Note: Git may include .claude/settings.local.json in commits. It holds NeoSwitch's local access key, so add it to .gitignore.", nil
+		}
+	}
+	return "", nil
+}
+
+// off routes a project back to Anthropic. With "all" it does so for every project NeoSwitch turned on, which is what to run before removing the plugin; a project path may follow to include it too.
 func off(args []string) error {
+	all := len(args) > 0 && args[0] == "all"
+	if all {
+		args = args[1:]
+	}
+	if len(args) > 1 {
+		return errors.New("usage: neoswitch off [all] [project]")
+	}
 	project, err := projectDir(args)
 	if err != nil {
 		return err
@@ -75,18 +99,72 @@ func off(args []string) error {
 	if err != nil {
 		return err
 	}
-	state, ok, err := daemon.LoadState(dir)
+	// Without a state, Disable still removes entries an earlier state left, recognized by both of NeoSwitch's marks.
+	state, _, err := daemon.LoadState(dir)
 	if err != nil {
 		return err
 	}
-	if !ok {
-		fmt.Printf("NeoSwitch was never turned on; %s is unchanged.\n", project)
+	if !all {
+		changed, err := daemon.Disable(project, state)
+		if err != nil {
+			return err
+		}
+		if err := daemon.ForgetProjects(dir, project); err != nil {
+			return err
+		}
+		if !changed {
+			fmt.Printf("NeoSwitch was not on for %s; nothing changed.\n", project)
+			return nil
+		}
+		fmt.Printf("NeoSwitch is off for %s. New Claude Code sessions here use Claude again.\n", project)
 		return nil
 	}
-	if err := daemon.Disable(project, state); err != nil {
+	return offAll(os.Stdout, dir, state, project)
+}
+
+// offAll turns NeoSwitch off in every registered project and in current, and lists what it restored. Projects that no longer exist are dropped from the registry; projects it could not change are listed with the reason and stay registered.
+func offAll(w io.Writer, dir string, state daemon.State, current string) error {
+	projects, err := daemon.Projects(dir)
+	if err != nil {
 		return err
 	}
-	fmt.Printf("NeoSwitch is off for %s. New Claude Code sessions here use Anthropic again.\n", project)
+	if !slices.Contains(projects, current) {
+		projects = append(projects, current)
+	}
+	var restored, done, failed []string
+	for _, project := range projects {
+		if _, err := os.Stat(project); errors.Is(err, os.ErrNotExist) {
+			done = append(done, project)
+			continue
+		}
+		changed, err := daemon.Disable(project, state)
+		if err != nil {
+			failed = append(failed, fmt.Sprintf("  %s: %v", project, err))
+			continue
+		}
+		done = append(done, project)
+		if changed {
+			restored = append(restored, project)
+		}
+	}
+	if err := daemon.ForgetProjects(dir, done...); err != nil {
+		return err
+	}
+	if len(restored) == 0 {
+		fmt.Fprintln(w, "NeoSwitch was not on in any project; nothing changed.")
+	} else {
+		fmt.Fprintln(w, "NeoSwitch is off in these projects; new Claude Code sessions there use Claude again:")
+		for _, project := range restored {
+			fmt.Fprintln(w, "  "+project)
+		}
+	}
+	if len(failed) > 0 {
+		fmt.Fprintln(w, "NeoSwitch could not change these projects; fix the problem shown and run /neoswitch:off all again:")
+		for _, line := range failed {
+			fmt.Fprintln(w, line)
+		}
+		return errors.New("some projects still use NeoSwitch")
+	}
 	return nil
 }
 
@@ -119,6 +197,13 @@ func printStatus(w io.Writer, project string, verbose bool) error {
 			return err
 		}
 	}
+	// A project can still point at the address of an earlier state, after the state file was damaged or removed. Its sessions reach nothing, so it is reported rather than shown as off.
+	stale := ""
+	if !enabled {
+		if stale, err = daemon.StaleAddress(project, state); err != nil {
+			return err
+		}
+	}
 	// The session inherits the project's settings when it starts, so its ANTHROPIC_BASE_URL tells whether this session uses NeoSwitch, which can differ from the project right after on or off.
 	session := ok && os.Getenv("ANTHROPIC_BASE_URL") == state.BaseURL()
 	// configuredBackend checks credentials and agy locally without calling the model, so a missing sign-in is reported instead of a route that cannot work.
@@ -129,6 +214,9 @@ func printStatus(w io.Writer, project string, verbose bool) error {
 		info, running = daemon.Status(state)
 	}
 	switch {
+	case stale != "":
+		fmt.Fprintln(w, "This project is set to use an earlier NeoSwitch setup that no longer exists, so its sessions cannot answer.")
+		fmt.Fprintln(w, "Run /neoswitch:on to fix it and start a new session, or run /neoswitch:off to go back to Claude.")
 	case !enabled && session:
 		fmt.Fprintln(w, "NeoSwitch is off for this project, but this session still uses it.")
 		fmt.Fprintln(w, "Start a new Claude Code session here to go back to Claude.")
@@ -165,6 +253,8 @@ func printStatus(w io.Writer, project string, verbose bool) error {
 	fmt.Fprintf(w, "\nproject:  %s\n", project)
 	if enabled {
 		fmt.Fprintf(w, "routing:  NeoSwitch %s\n", state.BaseURL())
+	} else if stale != "" {
+		fmt.Fprintf(w, "routing:  earlier NeoSwitch address %s, not the current one\n", stale)
 	} else {
 		fmt.Fprintln(w, "routing:  Anthropic (NeoSwitch off)")
 	}
@@ -218,14 +308,18 @@ func attach(args []string) error {
 	}
 	dir, err := daemon.Dir()
 	if err != nil {
-		return hookMessage(err.Error())
+		return hookMessage("NeoSwitch: " + sentence(err.Error()))
 	}
 	state, ok, err := daemon.LoadState(dir)
 	if err != nil {
-		return hookMessage(err.Error())
+		return hookMessage("NeoSwitch: " + sentence(err.Error()))
 	}
 	// The hook inherits the session's settings env, so a matching base URL means this project is routed through NeoSwitch. It is the URL the session uses unless gateway mode overrides it, which is handled below.
 	if !ok || os.Getenv("ANTHROPIC_BASE_URL") != state.BaseURL() {
+		// NeoSwitch's entries with another address were left by an earlier state. The settings are not rewritten here: the user decides between on and off.
+		if daemon.IsProxyEntry(os.Getenv("ANTHROPIC_BASE_URL"), os.Getenv(daemon.EnvUseGateway)) {
+			return hookMessage(staleSetupMessage)
+		}
 		return nil
 	}
 	if *pid <= 1 {
@@ -264,6 +358,9 @@ func attach(args []string) error {
 	info, running := daemon.Status(state)
 	return hookMessage(attachNotice(notice, model, label, info, running))
 }
+
+// staleSetupMessage is what a session sees when its project points at the address of an earlier NeoSwitch state.
+const staleSetupMessage = "NeoSwitch: this project is set to use an earlier NeoSwitch setup that no longer exists, so this session cannot answer. Run /neoswitch:on and start a new session to use Gemini again, or run /neoswitch:off and start a new session to go back to Claude."
 
 // sessionBlocked reports a setup problem found at session start, followed by the way back to Claude, because the session cannot answer until it is fixed.
 func sessionBlocked(problem string) string {

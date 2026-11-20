@@ -37,6 +37,8 @@ func Dir() (string, error) {
 func statePath(dir string) string { return filepath.Join(dir, "proxy.json") }
 
 // LoadState reads the shared state; ok is false when `neoswitch on` has never run.
+//
+// A damaged state file is moved aside to proxy.json.bad and treated as missing, so every command keeps working. Projects that were on then point at an address the next state does not use; status and the SessionStart hook recognize them (StaleAddress) and tell the user to run /neoswitch:on, which writes the new address.
 func LoadState(dir string) (State, bool, error) {
 	data, err := os.ReadFile(statePath(dir))
 	if errors.Is(err, os.ErrNotExist) {
@@ -47,7 +49,11 @@ func LoadState(dir string) (State, bool, error) {
 	}
 	var s State
 	if err := json.Unmarshal(data, &s); err != nil || s.Listen == "" || s.Token == "" {
-		return State{}, false, fmt.Errorf("NeoSwitch's settings file %s is damaged. Delete it, then run /neoswitch:on again in every project where NeoSwitch was on", statePath(dir))
+		// Another NeoSwitch process may have moved it aside first.
+		if err := os.Rename(statePath(dir), statePath(dir)+".bad"); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return State{}, false, fmt.Errorf("NeoSwitch's settings file %s is damaged and could not be set aside: %w", statePath(dir), err)
+		}
+		return State{}, false, nil
 	}
 	return s, true, nil
 }
@@ -93,4 +99,29 @@ func writeState(dir string, s State) error {
 		return err
 	}
 	return os.Rename(tmp, statePath(dir))
+}
+
+// writePrivate replaces path with data through a new temp file in the same directory, created with mode 0600, so the content is never readable by other users or left half written.
+func writePrivate(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		_ = os.Remove(tmp.Name())
+		return err
+	}
+	return nil
 }
