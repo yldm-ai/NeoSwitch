@@ -3,6 +3,8 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -122,6 +124,24 @@ func TestCorruptStateNamesTheSlashCommand(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(dir, "proxy.json"), []byte("{"), 0o600)
 	if _, _, err := LoadState(dir); err == nil || !strings.Contains(err.Error(), "/neoswitch:on") || strings.Contains(err.Error(), "`neoswitch") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+func TestAttachFailsFastWhenAnotherProgramHoldsThePort(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	s := State{Listen: listener.Addr().String(), Token: "t"}
+	start := time.Now()
+	err = Attach(s, 100, func() error { t.Fatal("must not spawn a daemon that cannot listen"); return nil })
+	var busy *PortInUseError
+	if !errors.As(err, &busy) || busy.Listen != s.Listen {
+		t.Fatalf("got %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("took %s", elapsed)
 	}
 }
 

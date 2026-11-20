@@ -175,20 +175,62 @@ func Status(s State) (info Info, ok bool) {
 	return info, true
 }
 
-// Attach registers a Claude Code process with the daemon, starting the daemon through spawn first when none is running. It tries twice because a daemon that is shutting down (its last session just exited) can still answer the status probe and then refuse the attach.
+// PortInUseError means another program holds the proxy's saved port, so no NeoSwitch daemon can listen there.
+type PortInUseError struct {
+	Listen string
+}
+
+func (e *PortInUseError) Error() string { return "another program is using " + e.Listen }
+
+// portBusyWait is how long a held port may stay silent before it is blamed on another program. A NeoSwitch daemon that is starting or shutting down holds the port briefly without answering the status probe.
+var portBusyWait = 2 * time.Second
+
+// Attach registers a Claude Code process with the daemon, starting the daemon through spawn first when none is running. It tries twice because a daemon that is shutting down (its last session just exited) can still answer the status probe and then refuse the attach. A port held by another program fails at once with *PortInUseError instead of waiting for a daemon that can never listen.
 func Attach(s State, pid int, spawn func() error) error {
 	var err error
 	for attempt := 0; attempt < 2; attempt++ {
 		if err = attachOnce(s, pid, spawn); err == nil {
 			return nil
 		}
+		var busy *PortInUseError
+		if errors.As(err, &busy) {
+			return err
+		}
 		time.Sleep(500 * time.Millisecond)
 	}
 	return err
 }
 
+// portFree reports whether nothing listens on addr.
+func portFree(addr string) bool {
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return false
+	}
+	_ = listener.Close()
+	return true
+}
+
+// answersWithin reports whether a NeoSwitch daemon answers on s within d.
+func answersWithin(s State, d time.Duration) bool {
+	deadline := time.Now().Add(d)
+	for {
+		if _, ok := Status(s); ok {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 func attachOnce(s State, pid int, spawn func() error) error {
-	if _, ok := Status(s); !ok {
+	if _, ok := Status(s); !ok && !portFree(s.Listen) {
+		if !answersWithin(s, portBusyWait) {
+			return &PortInUseError{Listen: s.Listen}
+		}
+	} else if !ok {
 		if err := spawn(); err != nil {
 			return fmt.Errorf("start NeoSwitch daemon: %w", err)
 		}

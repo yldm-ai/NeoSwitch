@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -170,6 +172,11 @@ func attach(args []string) error {
 	}
 	_ = os.Setenv(backendEnv, kind)
 	if err := daemon.Attach(state, *pid, func() error { return spawnDaemon(dir) }); err != nil {
+		var busy *daemon.PortInUseError
+		if errors.As(err, &busy) {
+			_, port, _ := net.SplitHostPort(busy.Listen)
+			return hookMessage("NeoSwitch: another program on this computer is using port " + port + ", which NeoSwitch needs, so this session cannot answer. Close that program and start a new Claude Code session, or run /neoswitch:off to go back to Claude.")
+		}
 		return hookMessage("NeoSwitch: " + err.Error() + "; see " + filepath.Join(dir, "daemon.log"))
 	}
 	if info, running := daemon.Status(state); running && info.Backend != "" && info.Backend != label {
@@ -250,9 +257,11 @@ func runDaemon() error {
 	defer stop()
 	fmt.Fprintf(os.Stderr, "NeoSwitch daemon on %s (%s, model %s)\n", state.BaseURL(), backendName, model)
 	handler := server.NewHandler(server.Config{Backend: backend, Model: model, Token: state.Token})
-	err = daemon.Run(ctx, state, handler, daemon.Options{Backend: backendName})
+	if err := daemon.Run(ctx, state, handler, daemon.Options{Backend: backendName}); err != nil {
+		return err
+	}
 	fmt.Fprintln(os.Stderr, "NeoSwitch daemon stopped: no Claude Code session attached")
-	return err
+	return nil
 }
 
 // gitIgnored reports whether path is ignored in project's git repository; known is false outside a repository or without git.
