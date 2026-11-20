@@ -62,7 +62,7 @@ The plugin routes chosen projects to Gemini while plain `claude` keeps working e
 /plugin install neoswitch@neoswitch
 ```
 
-Set the Gemini API key in the plugin's configuration (`/plugin`, then neoswitch). Claude Code keeps it in the macOS Keychain. Without it, NeoSwitch falls back to `GEMINI_API_KEY` or Vertex AI credentials from the environment Claude Code was started in.
+In the plugin's configuration (`/plugin`, then neoswitch), enable **Use Antigravity OAuth via ACP** to route NeoSwitch through the official `agy acp` server and the signed-in Gemini 4 Neon account. Otherwise set the Gemini API key. Claude Code keeps plugin secrets in the macOS Keychain. With the OAuth option enabled, no Gemini API key is required.
 
 | Command | Effect |
 |---|---|
@@ -74,7 +74,9 @@ Set the Gemini API key in the plugin's configuration (`/plugin`, then neoswitch)
 
 After `/neoswitch:on` or `/neoswitch:off`, start a new session in the project; the running session keeps its connection.
 
-Run `/neoswitch:login` in Claude Code to start the official `agy` headless OAuth flow. It opens the browser when needed, stores the login in the platform keyring, and returns to Claude Code without opening the `agy` interactive UI. `/neoswitch:antigravity-login` remains an alias. This authenticates the Antigravity CLI and does not switch NeoSwitch's Gemini backend to Antigravity.
+Run `/neoswitch:login` in Claude Code to start the official `agy acp --login` OAuth flow. It opens the browser when needed, stores the login in the platform keyring, and returns to Claude Code without opening the `agy` interactive UI. `/neoswitch:antigravity-login` remains an alias.
+
+For the OAuth-backed Neon route, enable **Use Antigravity OAuth via ACP** in the plugin configuration, run `/neoswitch:login`, then run `/neoswitch:on` and start a new Claude Code session. NeoSwitch launches `agy acp` as the upstream agent and selects `gemini-4-neon` through ACP's session configuration.
 
 How it works:
 
@@ -90,8 +92,8 @@ Things to know:
 
 ## Stability boundary
 
-NeoSwitch uses official Gemini API or Vertex AI credentials. Consumer OAuth flows, Antigravity scraping, hosts-file interception, and remote credential relays are intentionally outside the stable core. If the model is not available to the configured Google account, NeoSwitch fails with an explicit upstream error instead of silently switching models.
+NeoSwitch uses official Gemini API or Vertex AI credentials by default. The optional Antigravity ACP route delegates authentication and model access to the unmodified local `agy acp` process. NeoSwitch never reads the OAuth profile or calls Antigravity's private HTTP APIs. Hosts-file interception and remote credential relays remain outside the supported paths.
 
 See [docs/protocol-contract.md](docs/protocol-contract.md) for the request/response contract and the compatibility test matrix.
 
-Antigravity account sessions are intentionally kept outside the stable model path. See [docs/antigravity.md](docs/antigravity.md).
+See [docs/antigravity.md](docs/antigravity.md) for the ACP route and account-session details.

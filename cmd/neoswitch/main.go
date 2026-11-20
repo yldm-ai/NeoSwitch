@@ -109,12 +109,7 @@ func antigravityCLIPath() string {
 // mode. agy owns the browser OAuth flow and stores its resulting profile in the
 // platform keyring without opening its interactive TUI.
 func antigravityLogin(path string) error {
-	command := exec.Command(path,
-		"-p", "Reply with exactly: neoswitch-oauth-ok",
-		"--output-format", "json",
-		"--disable-slash-commands",
-		"--print-timeout", "30s",
-	)
+	command := exec.Command(path, "acp", "--login")
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
@@ -124,12 +119,32 @@ func antigravityLogin(path string) error {
 		}
 		return fmt.Errorf("start Antigravity CLI %q for OAuth login: %w", path, err)
 	}
-	fmt.Println("ok: Antigravity OAuth login completed through agy headless mode")
+	fmt.Println("ok: Antigravity OAuth login completed through agy ACP")
 	return nil
 }
 
+func configuredBackend(ctx context.Context) (server.Backend, string, string, error) {
+	if usesAntigravityACP() {
+		backend, err := provider.NewAntigravityACPFromEnv(ctx)
+		if err != nil {
+			return nil, "", "", err
+		}
+		return backend, backend.Model(), "Antigravity ACP", nil
+	}
+	backend, err := provider.NewGeminiFromEnv(ctx)
+	if err != nil {
+		return nil, "", "", err
+	}
+	return backend, backend.Model, backend.BackendName(), nil
+}
+
+func usesAntigravityACP() bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv("NEOSWITCH_ANTIGRAVITY_ACP")))
+	return value == "1" || value == "true" || value == "yes"
+}
+
 func serve() error {
-	backend, err := provider.NewGeminiFromEnv(context.Background())
+	backend, model, _, err := configuredBackend(context.Background())
 	if err != nil {
 		return err
 	}
@@ -137,11 +152,11 @@ func serve() error {
 	if listen == "" {
 		listen = "127.0.0.1:8080"
 	}
-	return serveWithListener(backend, listen, os.Getenv("NEOSWITCH_AUTH_TOKEN"))
+	return serveWithListener(backend, model, listen, os.Getenv("NEOSWITCH_AUTH_TOKEN"))
 }
 
 func claude(args []string) error {
-	backend, err := provider.NewGeminiFromEnv(context.Background())
+	backend, model, _, err := configuredBackend(context.Background())
 	if err != nil {
 		return err
 	}
@@ -154,7 +169,6 @@ func claude(args []string) error {
 		_ = listener.Close()
 		return err
 	}
-	model := backend.Model
 	handler := server.NewHandler(server.Config{Backend: backend, Model: model, Token: token})
 	httpServer := &http.Server{Handler: handler, ReadHeaderTimeout: 10 * time.Second}
 	go func() { _ = httpServer.Serve(listener) }()
@@ -179,14 +193,14 @@ func claude(args []string) error {
 	return child.Run()
 }
 
-func serveWithListener(backend *provider.Gemini, listen, token string) error {
+func serveWithListener(backend server.Backend, model, listen, token string) error {
 	listener, err := net.Listen("tcp", listen)
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", listen, err)
 	}
 	defer listener.Close()
-	httpServer := &http.Server{Handler: server.NewHandler(server.Config{Backend: backend, Model: backend.Model, Token: token}), ReadHeaderTimeout: 10 * time.Second}
-	fmt.Fprintf(os.Stderr, "NeoSwitch listening on http://%s (model %s)\n", listener.Addr(), backend.Model)
+	httpServer := &http.Server{Handler: server.NewHandler(server.Config{Backend: backend, Model: model, Token: token}), ReadHeaderTimeout: 10 * time.Second}
+	fmt.Fprintf(os.Stderr, "NeoSwitch listening on http://%s (model %s)\n", listener.Addr(), model)
 	err = httpServer.Serve(listener)
 	if err == http.ErrServerClosed {
 		return nil
@@ -195,7 +209,7 @@ func serveWithListener(backend *provider.Gemini, listen, token string) error {
 }
 
 func doctor() error {
-	backend, err := provider.NewGeminiFromEnv(context.Background())
+	_, model, backendName, err := configuredBackend(context.Background())
 	if err != nil {
 		return err
 	}
@@ -206,7 +220,7 @@ func doctor() error {
 	if _, err := exec.LookPath(claudePath); err != nil {
 		return fmt.Errorf("Claude CLI %q was not found: %w", claudePath, err)
 	}
-	fmt.Printf("ok: %s credentials configured\nok: model %s\nok: Claude CLI %s\n", backend.BackendName(), backend.Model, claudePath)
+	fmt.Printf("ok: %s credentials configured\nok: model %s\nok: Claude CLI %s\n", backendName, model, claudePath)
 	return nil
 }
 

@@ -19,6 +19,7 @@ import (
 
 // pluginKeyEnv is how Claude Code hands the Gemini key saved in the plugin's sensitive userConfig (kept in the macOS Keychain) to hook processes.
 const pluginKeyEnv = "CLAUDE_PLUGIN_OPTION_GEMINI_API_KEY"
+const pluginAntigravityEnv = "CLAUDE_PLUGIN_OPTION_ANTIGRAVITY_OAUTH"
 
 func projectDir(args []string) (string, error) {
 	dir := os.Getenv("CLAUDE_PROJECT_DIR")
@@ -142,16 +143,26 @@ func attach(args []string) error {
 	if *pid <= 1 {
 		return hookMessage("NeoSwitch: the SessionStart hook did not pass the Claude Code process ID")
 	}
-	if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GOOGLE_API_KEY") == "" && os.Getenv(pluginKeyEnv) != "" {
+	if pluginAntigravityEnabled() {
+		_ = os.Setenv("NEOSWITCH_ANTIGRAVITY_ACP", "true")
+	} else if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GOOGLE_API_KEY") == "" && os.Getenv(pluginKeyEnv) != "" {
 		_ = os.Setenv("GEMINI_API_KEY", os.Getenv(pluginKeyEnv))
 	}
-	if _, err := provider.NewGeminiFromEnv(context.Background()); err != nil {
+	if _, _, _, err := configuredBackend(context.Background()); err != nil {
+		if pluginAntigravityEnabled() {
+			return hookMessage("NeoSwitch: " + err.Error() + ". Run /neoswitch:login first to authenticate Antigravity OAuth.")
+		}
 		return hookMessage("NeoSwitch: " + err.Error() + ". Set the Gemini API key in the plugin's settings (/plugin) or export it before starting Claude Code.")
 	}
 	if err := daemon.Attach(state, *pid, func() error { return spawnDaemon(dir) }); err != nil {
 		return hookMessage("NeoSwitch: " + err.Error() + "; see " + filepath.Join(dir, "daemon.log"))
 	}
 	return nil
+}
+
+func pluginAntigravityEnabled() bool {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(pluginAntigravityEnv)))
+	return value == "1" || value == "true" || value == "yes"
 }
 
 func hookMessage(message string) error {
@@ -198,14 +209,17 @@ func runDaemon() error {
 	if !ok {
 		return fmt.Errorf("no NeoSwitch state; run `neoswitch on` first")
 	}
-	backend, err := provider.NewGeminiFromEnv(context.Background())
+	backend, model, backendName, err := configuredBackend(context.Background())
 	if err != nil {
 		return err
 	}
+	if closer, ok := backend.(interface{ Close() error }); ok {
+		defer func() { _ = closer.Close() }()
+	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	fmt.Fprintf(os.Stderr, "NeoSwitch daemon on %s (%s, model %s)\n", state.BaseURL(), backend.BackendName(), backend.Model)
-	handler := server.NewHandler(server.Config{Backend: backend, Model: backend.Model, Token: state.Token})
+	fmt.Fprintf(os.Stderr, "NeoSwitch daemon on %s (%s, model %s)\n", state.BaseURL(), backendName, model)
+	handler := server.NewHandler(server.Config{Backend: backend, Model: model, Token: state.Token})
 	err = daemon.Run(ctx, state, handler, daemon.Options{})
 	fmt.Fprintln(os.Stderr, "NeoSwitch daemon stopped: no Claude Code session attached")
 	return err
