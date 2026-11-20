@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://neon-switch.yldm.ai/sitemap.xml
+Sitemap: https://neo-switch.yldm.ai/sitemap.xml

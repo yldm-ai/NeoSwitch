@@ -15,7 +15,7 @@ go build -o neoswitch ./cmd/neoswitch
 ./neoswitch doctor
 ```
 
-To try your checkout as a plugin, add the local directory as a marketplace inside Claude Code with `/plugin marketplace add /path/to/neon-switch`, then install `neoswitch@neoswitch`. The plugin builds the binary from that source on first use; after changing Go code, run `claude plugin marketplace update neoswitch` and `claude plugin update neoswitch@neoswitch`, then restart Claude Code.
+To try your checkout as a plugin, add the local directory as a marketplace inside Claude Code with `/plugin marketplace add /path/to/neo-switch`, then install `neoswitch@neoswitch`. The plugin builds the binary from that source on first use; after changing Go code, run `claude plugin marketplace update neoswitch` and `claude plugin update neoswitch@neoswitch`, then restart Claude Code.
 
 ## Before you open a pull request
 

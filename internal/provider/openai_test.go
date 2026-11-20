@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/yldm-ai/neon-switch/internal/server"
+	"github.com/yldm-ai/neo-switch/internal/server"
 )
 
 const openAITestKey = "sk-test-secret-0123456789"
