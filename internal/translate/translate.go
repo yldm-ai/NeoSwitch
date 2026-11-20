@@ -103,6 +103,9 @@ func ToGemini(in anthropic.MessagesRequest) (Request, error) {
 			content.Parts = append(content.Parts, parts...)
 		}
 		orderToolResults(content.Parts, results)
+		if message.Role == "assistant" {
+			signUnsignedStep(content.Parts)
+		}
 		// A message can legitimately translate to nothing (an assistant turn holding only Claude thinking blocks, or an empty text block). Gemini rejects contents without parts, so such turns are dropped rather than sent.
 		if len(content.Parts) > 0 {
 			contents = append(contents, content)

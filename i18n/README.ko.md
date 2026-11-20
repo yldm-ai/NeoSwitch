@@ -33,7 +33,7 @@ Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`
 > [!WARNING]
 > [Google Antigravity 서비스 약관](https://antigravity.google/terms)(제6조)은 다른 도구를 통해 Antigravity를 쓰는 것을 금지하며, NeoSwitch는 그런 도구에 해당합니다. Google은 그렇게 쓰는 사람의 Antigravity 및 Gemini CLI 계정을 정지하거나 해지할 수 있습니다. `/neoswitch:login`은 매번 이 경고를 다시 보여 줍니다. 이 위험을 받아들일 수 없다면 로그인하지 마세요.
 
-**3. Claude Code를 다시 시작합니다.** `/exit`를 입력한 뒤 같은 프로젝트에서 `claude`를 다시 실행하세요. 다른 Claude Code 창이 이미 NeoSwitch를 쓰고 있다면 먼저 모두 닫으세요. 그중 하나라도 열려 있는 동안 NeoSwitch는 이전 설정을 유지합니다.
+**3. 다음 메시지를 보냅니다.** 명령을 실행한 창은 다음 메시지부터 Gemini 4 Neon을 쓰고, 이 프로젝트의 새 세션도 마찬가지입니다. 명령의 답변이 대신 다시 시작하라고 하면(Claude Code를 게이트웨이로 시작했거나 다른 Claude Code 창이 아직 NeoSwitch의 이전 설정을 쓰는 경우), 안내된 창을 닫은 뒤 같은 프로젝트에서 `claude`를 다시 실행하세요.
 
 ## 전환 후 보이는 것
 
@@ -47,7 +47,7 @@ Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`
 
 | 보이는 내용 | 해결 방법 |
 |---|---|
-| 세션 시작 안내에 NeoSwitch가 아직 설정되지 않았다고 나옴 | `/neoswitch:login`을 실행한 뒤 `/exit`를 입력하고 `claude`를 다시 시작하세요. |
+| 세션 시작 안내에 NeoSwitch가 아직 설정되지 않았다고 나옴 | `/neoswitch:login`을 실행하세요. 다음 메시지부터 Gemini 4 Neon을 씁니다. |
 | `agy`가 설치되어 있지 않다는 메시지가 나옴 | Google의 [Antigravity 명령줄 도구(`agy`)](https://antigravity.google/download)를 설치한 뒤 `/neoswitch:login`을 다시 실행하세요. |
 | 모든 메시지가 연결 오류로 실패하거나, 세션 시작 안내에 이 세션은 답할 수 없다고 나옴 | 같은 프로젝트에서 `/neoswitch:off`를 실행하세요. 그 응답에도 연결 오류가 보이더라도 프로젝트는 이미 되돌려졌습니다. `/exit`를 입력하고 `claude`를 다시 시작하면 Claude로 돌아오며, `/neoswitch:status`가 무엇을 고쳐야 하는지 알려 줍니다. |
 | 다른 Claude Code 창이 이전 설정을 함께 쓰고 있다고 나옴 | Claude Code 창을 모두 닫은 뒤 다시 여세요. |
@@ -57,7 +57,7 @@ Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`
 
 ## 끄기, 업데이트, 제거
 
-- `/neoswitch:off`는 이 프로젝트를 Claude로 되돌립니다. `/neoswitch:on`은 다시 설정하지 않고 Gemini 4 Neon으로 다시 전환합니다. 어느 쪽이든 그다음에 새 세션을 시작하세요.
+- `/neoswitch:off`는 이 프로젝트의 새 세션을 Claude로 되돌립니다. 이미 Gemini 4 Neon을 쓰는 세션은 `/exit`를 입력할 때까지 그대로입니다. `/neoswitch:on`은 다시 설정하지 않고 다음 메시지부터 프로젝트를 Gemini 4 Neon으로 다시 전환합니다.
 
 플러그인을 업데이트하려면 터미널에서 다음을 실행한 뒤 Claude Code를 다시 시작하세요.
 

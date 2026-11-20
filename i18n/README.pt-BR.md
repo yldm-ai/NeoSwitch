@@ -33,7 +33,7 @@ Ele mostra o aviso sobre os termos do Google, abre o login do Google no navegado
 > [!WARNING]
 > Os [Termos de Serviço do Google Antigravity](https://antigravity.google/terms) (seção 6) proíbem usar o Antigravity por meio de outras ferramentas, e o NeoSwitch é uma delas. O Google pode suspender ou encerrar as contas do Antigravity e da Gemini CLI de quem fizer isso. `/neoswitch:login` repete este aviso toda vez. Não entre se você não aceita esse risco.
 
-**3. Reinicie o Claude Code.** Digite `/exit` e inicie `claude` de novo no mesmo projeto. Se outras janelas do Claude Code já usam o NeoSwitch, feche todas antes: o NeoSwitch mantém a configuração anterior enquanto alguma delas estiver aberta.
+**3. Envie sua próxima mensagem.** A janela em que você executou o comando usa o Gemini 4 Neon a partir da próxima mensagem, assim como as sessões novas deste projeto. Se a resposta do comando pedir que você reinicie, porque o Claude Code foi iniciado por um gateway ou porque outras janelas do Claude Code ainda usam uma configuração anterior do NeoSwitch, feche as janelas indicadas e inicie `claude` de novo no mesmo projeto.
 
 ## O que você vai ver
 
@@ -47,7 +47,7 @@ Ele mostra o aviso sobre os termos do Google, abre o login do Google no navegado
 
 | O que você vê | O que fazer |
 |---|---|
-| O aviso da sessão diz que o NeoSwitch ainda não está configurado | Execute `/neoswitch:login`, depois digite `/exit` e inicie `claude` de novo. |
+| O aviso da sessão diz que o NeoSwitch ainda não está configurado | Execute `/neoswitch:login`. Sua próxima mensagem usa o Gemini 4 Neon. |
 | Uma mensagem diz que o `agy` não está instalado | Instale a [ferramenta de linha de comando Antigravity do Google (`agy`)](https://antigravity.google/download) e execute `/neoswitch:login` de novo. |
 | Toda mensagem falha com um erro de conexão, ou o aviso da sessão diz que esta sessão não pode responder | Neste mesmo projeto, execute `/neoswitch:off`. Ele volta o projeto mesmo que a própria resposta também mostre um erro de conexão. Depois digite `/exit` e inicie `claude` de novo: você está de volta ao Claude, e `/neoswitch:status` diz o que corrigir. |
 | O aviso diz que outras janelas do Claude Code ainda compartilham a configuração anterior | Feche todas as janelas do Claude Code e abra o Claude Code de novo. |
@@ -57,7 +57,7 @@ Ele mostra o aviso sobre os termos do Google, abre o login do Google no navegado
 
 ## Desligar, atualizar ou remover
 
-- `/neoswitch:off` volta este projeto para o Claude. `/neoswitch:on` o troca de novo para o Gemini 4 Neon sem configurar nada outra vez. Inicie uma nova sessão depois de qualquer um dos dois.
+- `/neoswitch:off` volta este projeto para o Claude nas sessões novas; uma sessão que já usa o Gemini 4 Neon continua com ele até você digitar `/exit`. `/neoswitch:on` troca o projeto de novo para o Gemini 4 Neon sem configurar nada outra vez, a partir da próxima mensagem.
 
 Para atualizar o plugin, execute isto em um terminal e reinicie o Claude Code:
 

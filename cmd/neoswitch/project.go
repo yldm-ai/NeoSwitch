@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -34,6 +35,8 @@ func projectDir(args []string) (string, error) {
 }
 
 // on routes Claude Code sessions in one project to the shared NeoSwitch daemon. Only the project's settings.local.json is touched, so other projects keep using Anthropic.
+//
+// A Claude Code session that is not in gateway mode applies env written to its project settings on its next request, without restarting, and entries removed later stay applied. So when on runs inside such a session (/neoswitch:on, or /neoswitch:login which ends with it), that session moves to the proxy straight away: the daemon is started and the session attached before the settings are written, because otherwise its next request would find nothing listening.
 func on(args []string) error {
 	project, err := projectDir(args)
 	if err != nil {
@@ -51,11 +54,30 @@ func on(args []string) error {
 	if err != nil {
 		return err
 	}
+	pid, inside := callingSession()
+	var notice string
+	if inside && !gatewayModeOn() && pid > 1 {
+		if notice, err = serveSession(dir, state, pid); err != nil {
+			return fmt.Errorf("NeoSwitch was not turned on, so this session keeps using Claude: %w", err)
+		}
+	}
 	if err := daemon.Enable(project, state); err != nil {
 		return err
 	}
 	fmt.Printf("NeoSwitch is on for %s.\n", project)
-	fmt.Println("Start a new Claude Code session in this project to use Gemini; the current session keeps its connection.")
+	switch {
+	case !inside:
+		fmt.Println("New Claude Code sessions in this project use Gemini. Sessions already open here that were not started through a gateway switch with their next message; run /neoswitch:on in them so NeoSwitch answers them.")
+	case gatewayModeOn():
+		fmt.Println("This session was started through a gateway (" + daemon.EnvUseGateway + ") and keeps its connection. Start a new Claude Code session in this project to use Gemini.")
+	case pid <= 1:
+		fmt.Println("This Claude Code version does not tell NeoSwitch which session is running it, so this session cannot use Gemini. Start a new Claude Code session in this project.")
+	default:
+		fmt.Println("This session uses Gemini from your next message, and so do new Claude Code sessions in this project. Other Claude Code windows already open here switch too; run /neoswitch:on in each of them so NeoSwitch keeps answering them after this window closes.")
+	}
+	if notice != "" {
+		fmt.Println(notice)
+	}
 	// The settings file holds the proxy token. Excluding it in the clone's own exclude file keeps it out of commits without touching the shared .gitignore; the note is only for when that does not work.
 	settings := filepath.Join(".claude", "settings.local.json")
 	if ignored, known := gitIgnored(project, settings); known && !ignored {
@@ -64,6 +86,41 @@ func on(args []string) error {
 		}
 	}
 	return nil
+}
+
+// callingSession reports whether the command runs inside a Claude Code session (a slash command, the Bash tool, or a process they started), and that session's process ID, which Claude Code passes to child processes as CLAUDE_PID. pid is 0 when the Claude Code version does not provide it.
+func callingSession() (pid int, inside bool) {
+	if os.Getenv("CLAUDECODE") != "1" {
+		return 0, false
+	}
+	pid, _ = strconv.Atoi(strings.TrimSpace(os.Getenv("CLAUDE_PID")))
+	return pid, true
+}
+
+// serveSession makes the shared daemon serve the Claude Code process pid, starting it with the configured backend when none is running. The notice is non-empty when an already running daemon serves a different setup than the one configured now.
+func serveSession(dir string, state daemon.State, pid int) (notice string, err error) {
+	kind, _, err := resolveBackend()
+	if err != nil {
+		return "", err
+	}
+	// Pinning the kind makes the daemon spawned below, whose environment drops Claude Code's variables, serve the backend checked here.
+	_, model, label, err := configuredBackend(context.Background())
+	if err != nil {
+		return "", err
+	}
+	_ = os.Setenv(backendEnv, kind)
+	if err := daemon.Attach(state, pid, func() error { return spawnDaemon(dir) }); err != nil {
+		var busy *daemon.PortInUseError
+		if errors.As(err, &busy) {
+			_, port, _ := net.SplitHostPort(busy.Listen)
+			return "", fmt.Errorf("another program on this computer is using port %s, which NeoSwitch needs; close it and try again", port)
+		}
+		return "", fmt.Errorf("NeoSwitch could not start (details are in %s)", filepath.Join(dir, "daemon.log"))
+	}
+	if info, running := daemon.Status(state); running && (info.Backend != "" && info.Backend != label || info.Version != version) {
+		return attachNotice("", model, label, info, running), nil
+	}
+	return "", nil
 }
 
 func off(args []string) error {
@@ -86,7 +143,8 @@ func off(args []string) error {
 	if err := daemon.Disable(project, state); err != nil {
 		return err
 	}
-	fmt.Printf("NeoSwitch is off for %s. New Claude Code sessions here use Anthropic again.\n", project)
+	// A running session keeps env it already applied from the project settings after the entries are removed, so a session on NeoSwitch stays there; it stays attached to the daemon, which keeps answering it until it closes.
+	fmt.Printf("NeoSwitch is off for %s. New Claude Code sessions here use Anthropic again; sessions already open keep their current connection until they are closed.\n", project)
 	return nil
 }
 

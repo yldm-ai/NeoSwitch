@@ -33,7 +33,7 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 > [!WARNING]
 > [Google Antigravity 服務條款](https://antigravity.google/terms)（第 6 條）禁止透過其他工具使用 Antigravity，NeoSwitch 就屬於這類工具。Google 可能暫停或關閉這樣做的人的 Antigravity 和 Gemini CLI 帳號。`/neoswitch:login` 每次都會重複這則警告。不接受這個風險，就不要登入。
 
-**3. 重新啟動 Claude Code。** 輸入 `/exit`，然後在同一個專案裡重新執行 `claude`。如果還有別的 Claude Code 視窗已經在用 NeoSwitch，先把它們全部關掉：只要其中任何一個還開著，NeoSwitch 就會沿用先前的設定。
+**3. 傳送下一則訊息。** 執行指令的那個視窗從下一則訊息起就使用 Gemini 4 Neon，這個專案裡的新工作階段也一樣。如果指令的回覆要你重新啟動（Claude Code 是透過閘道啟動的，或是別的 Claude Code 視窗還在用 NeoSwitch 先前的設定），就關掉它提到的視窗，然後在同一個專案裡重新執行 `claude`。
 
 ## 開啟後你會看到
 
@@ -47,7 +47,7 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 
 | 你看到的情況 | 怎麼做 |
 |---|---|
-| 工作階段開頭的提示說 NeoSwitch 還沒設定好 | 執行 `/neoswitch:login`，然後輸入 `/exit` 並重新執行 `claude`。 |
+| 工作階段開頭的提示說 NeoSwitch 還沒設定好 | 執行 `/neoswitch:login`。下一則訊息就會使用 Gemini 4 Neon。 |
 | 提示說沒有安裝 `agy` | 先安裝 Google 的 [Antigravity 命令列工具（`agy`）](https://antigravity.google/download)，再執行一次 `/neoswitch:login`。 |
 | 每則訊息都出現連線錯誤，或者工作階段開頭的提示說本工作階段無法回答 | 就在這個專案裡執行 `/neoswitch:off`。即使它自己的回覆也顯示連線錯誤，專案也已經切回去了。然後輸入 `/exit` 並重新執行 `claude`：你回到了 Claude，再執行 `/neoswitch:status` 看看該修什麼。 |
 | 提示說其他 Claude Code 視窗還在共用先前的設定 | 關掉所有 Claude Code 視窗，再重新開啟 Claude Code。 |
@@ -57,7 +57,7 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 
 ## 關閉、更新與移除
 
-- `/neoswitch:off` 把目前專案切回 Claude。`/neoswitch:on` 把它再切回 Gemini 4 Neon，不必重新設定。兩者之後都要開一個新工作階段才會生效。
+- `/neoswitch:off` 讓這個專案的新工作階段切回 Claude；已經在用 Gemini 4 Neon 的工作階段會一直用到你輸入 `/exit`。`/neoswitch:on` 把專案再切回 Gemini 4 Neon，不必重新設定，從下一則訊息開始生效。
 
 更新外掛：在終端機裡執行下面兩條指令，然後重新啟動 Claude Code：
 
