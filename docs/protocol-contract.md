@@ -2,7 +2,7 @@
 
 ## Scope
 
-NeoSwitch presents the subset of the Anthropic Messages API that Claude Code needs and translates it to Gemini `generateContent` / `streamGenerateContent` through the official `google.golang.org/genai` SDK. The proxy is local-only by default and is not a general-purpose multi-provider gateway.
+NeoSwitch presents the subset of the Anthropic Messages API that Claude Code needs and translates it to Gemini `generateContent` / `streamGenerateContent` through the official `google.golang.org/genai` SDK. An experimental, opt-in OpenAI backend reuses the same translation; see [OpenAI backend (experimental)](#openai-backend-experimental). The proxy is local-only by default and is not a general-purpose multi-provider gateway.
 
 ## Endpoints
 
@@ -86,6 +86,42 @@ On Vertex AI the system instruction and tools are counted natively. The Gemini D
 - Missing credentials fail at startup.
 - No automatic retry or model fallback: Claude Code owns retries; genai's retry option is left unset.
 - Logs contain no prompts, tool arguments, credentials or responses.
+
+## OpenAI backend (experimental)
+
+`NEOSWITCH_BACKEND=openai` (or `neoswitch backend openai`) sends requests to the OpenAI Responses API (`POST /v1/responses`) through the official `github.com/openai/openai-go/v3` SDK. Automatic selection never picks it, even when `OPENAI_API_KEY` is set. The backend converts the translated Gemini request above into a Responses request and the result back into a Gemini response, so request validation, tool IDs, stop reasons, usage mapping, streaming events and the failure policy are shared with the Gemini backend. It has only been tested against a scripted upstream (`internal/provider/openai_test.go`), not a live OpenAI account.
+
+Configuration: `OPENAI_API_KEY` (required, never logged or echoed; key-shaped strings are removed from upstream error messages), `OPENAI_MODEL` (required; there is no default model), `OPENAI_BASE_URL` (optional, must include the version path, e.g. `https://api.openai.com/v1`). The SDK also honours `OPENAI_ORG_ID` and `OPENAI_PROJECT_ID`. SDK retries are disabled because Claude Code owns retries.
+
+Mapped:
+
+| Anthropic / Gemini side | Responses API |
+|---|---|
+| `system` and system messages | `instructions`, joined with blank lines |
+| user text, base64 images, base64 PDFs | `message` input items with `input_text`, `input_image` (data URL, detail `auto`), `input_file` (data URL) |
+| assistant text | assistant `message` input items with string content |
+| `tool_use` | `function_call` item; `call_id` is recovered from the NeoSwitch tool ID, which embeds the OpenAI `call_id` exactly as it embeds Gemini's call ID |
+| `tool_result` | `function_call_output` item with the same `call_id`; text as a string, images and PDFs as an `input_text` / `input_image` / `input_file` list |
+| tools | `function` tools with `input_schema` passed unmodified as `parameters` and `strict: false` (strict mode requires every property to be required, which Claude Code schemas are not) |
+| `tool_choice` `auto` / `any` / `none` / `tool` | `auto` / `required` / `none` / `{"type":"function","name":...}` |
+| `max_tokens`, `temperature`, `top_p` | `max_output_tokens`, `temperature`, `top_p` |
+| output `message` text, `function_call` items | text blocks, `tool_use` blocks; parallel calls each keep their own `call_id` |
+| status `completed` / `incomplete` (`max_output_tokens`) / `incomplete` (`content_filter`) / `refusal` content | `end_turn` or `tool_use` / `max_tokens` / `refusal` / `refusal` with the refusal text |
+| usage | `input_tokens` minus `cached_tokens` → `input_tokens`, `cached_tokens` → `cache_read_input_tokens`, `output_tokens` (which include reasoning tokens) → `output_tokens` |
+| streaming | `response.output_text.delta` → text deltas; each `function_call` is emitted whole when its `response.output_item.done` arrives; `response.completed` / `response.incomplete` carry the stop reason and usage |
+| HTTP errors | the upstream status, mapped by the failure policy above; `context_length_exceeded` becomes `prompt is too long` |
+| `response.failed` and stream `error` events | `rate_limit_exceeded` → 429, `server_error` → 500, `invalid_prompt` and image errors → 400, others → 502 |
+| `count_tokens` | `POST /v1/responses/input_tokens` with the same input, instructions, tools and tool choice (an exact count from OpenAI, not an estimate) |
+
+Not mapped:
+
+- `stop_sequences` and `top_k`: the Responses API has no equivalent; they are not sent.
+- `output_config.effort` / `/effort`: not sent as `reasoning.effort`, because `OPENAI_MODEL` can name a model without reasoning support, which rejects the parameter.
+- Reasoning items: returned reasoning is dropped and not replayed on the next turn. Requests use `store: false` and no `previous_response_id`, so reasoning models start each turn without their earlier reasoning.
+- The `is_error` flag of a `tool_result`: `function_call_output` has no error flag, so only the result text is sent.
+- Hosted tools (web search, file search, code interpreter, ...), images in assistant turns, media types other than images and PDF, and output items other than messages, function calls and reasoning (rejected as errors).
+- Function call arguments are not streamed incrementally; a tool call arrives whole.
+- Error messages are prefixed `OpenAI:` but still appear inside the server's generic `Gemini returned HTTP ...` wording.
 
 ## Compatibility matrix
 

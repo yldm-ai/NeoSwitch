@@ -10,7 +10,7 @@
 
 NeoSwitch를 사용하면 익숙한 워크플로를 바꾸지 않고 Claude Code에서 Gemini를 쓸 수 있습니다. Claude Code의 CLI, 명령, 권한, 도구, 스킬, MCP 서버, 훅은 그대로 유지되며, NeoSwitch는 작은 로컬 프록시를 실행해 Claude Code의 요청을 뒤에 있는 모델에 맞게 변환합니다.
 
-현재 NeoSwitch는 Claude Code를 Gemini 4 Neon으로 라우팅합니다. 다른 제공자는 계획되어 있지만 아직 지원하지 않습니다.
+현재 NeoSwitch는 Claude Code를 Gemini 4 Neon으로 라우팅합니다. OpenAI는 실험적 백엔드로 사용할 수 있습니다. 직접 선택해야 하며, 스크립트로 만든 업스트림에서만 테스트했습니다.
 
 ## NeoSwitch를 쓰는 이유
 
@@ -109,6 +109,18 @@ go run ./cmd/neoswitch claude
 
 `neoswitch doctor`는 모델을 조회하고 한 줄짜리 생성을 실행한 뒤, 자격 증명이 동작하는지 또는 동작하지 않는 이유를 보고합니다. 이유로는 거부된 자격 증명, 권한 부족, 리전 제한, 알 수 없는 모델, 할당량, 서비스 사용 불가가 있습니다.
 
+### OpenAI(실험적)
+
+OpenAI 백엔드는 공식 `openai-go` SDK를 통해 OpenAI Responses API로 요청을 보냅니다. 자동 선택은 이 백엔드를 고르지 않으므로 `NEOSWITCH_BACKEND=openai`를 설정하거나 `neoswitch backend openai`를 실행하세요. `OPENAI_MODEL`은 필수이며 NeoSwitch가 모델을 대신 고르지 않습니다. `OPENAI_BASE_URL`은 선택 사항이며 `/v1`을 포함해야 합니다. 스크립트로 만든 업스트림에서만 테스트했고 실제 OpenAI 계정으로는 검증하지 않았습니다. 매핑되는 항목과 매핑되지 않는 항목은 [docs/protocol-contract.md](../docs/protocol-contract.md#openai-backend-experimental)에 있습니다.
+
+```bash
+export NEOSWITCH_BACKEND=openai
+export OPENAI_API_KEY='your-key'
+export OPENAI_MODEL='model-name'
+neoswitch doctor
+go run ./cmd/neoswitch claude
+```
+
 ## 플러그인 명령
 
 | 명령 | 효과 |
@@ -147,7 +159,7 @@ SessionStart 훅은 첫 모델 요청 전에 로컬 데몬 하나를 시작하�
 
 OAuth 라우트에서는 데몬이 공식 `agy acp` 하위 프로세스를 시작합니다. NeoSwitch는 변환된 요청을 ACP 세션으로 보내고, 반환된 응답이나 tool-call JSON을 로컬 Anthropic 호환 엔드포인트 형식으로 다시 변환합니다. 하나의 `agy` 프로세스가 모든 세션을 처리하며, 요청은 각자의 ACP 세션에서 동시에 실행됩니다. `agy` 자체의 파일, 셸, 웹 도구는 모든 요청에서 거부되므로, 도구는 Claude Code 안에서 Claude Code의 권한 규칙에 따라서만 실행됩니다.
 
-`/neoswitch:login`은 Antigravity OAuth를 백엔드로 저장하므로, 다른 도구용으로 export한 Gemini 키가 이를 대체하지 않습니다. 저장된 선택이 없으면 환경에 Gemini 자격 증명이 있을 때 Gemini API를, 없으면 Antigravity OAuth를 사용합니다. `NEOSWITCH_BACKEND=antigravity|gemini|auto`로 둘 다 재정의할 수 있으며, `/neoswitch:status`에서 사용 중인 백엔드와 그 이유를 확인할 수 있습니다.
+`/neoswitch:login`은 Antigravity OAuth를 백엔드로 저장하므로, 다른 도구용으로 export한 Gemini 키가 이를 대체하지 않습니다. 저장된 선택이 없으면 환경에 Gemini 자격 증명이 있을 때 Gemini API를, 없으면 Antigravity OAuth를 사용합니다. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto`로 둘 다 재정의할 수 있으며, `/neoswitch:status`에서 사용 중인 백엔드와 그 이유를 확인할 수 있습니다.
 
 ## 독립 실행형 CLI
 
@@ -200,7 +212,7 @@ Anthropic은 Claude Code를 Claude가 아닌 모델로 라우팅하는 방법을
 
 ## 로드맵
 
-- 더 많은 모델 제공자 지원(OpenAI부터 시작). 이미 Anthropic 호환 엔드포인트를 제공하는 제공자는 `ANTHROPIC_BASE_URL`을 직접 설정해 사용할 수 있으며 NeoSwitch가 필요하지 않습니다.
+- 더 많은 모델 제공자 지원. OpenAI는 실험적 백엔드로 제공되며 실제 API에서의 검증이 남아 있습니다. 이미 Anthropic 호환 엔드포인트를 제공하는 제공자는 `ANTHROPIC_BASE_URL`을 직접 설정해 사용할 수 있으며 NeoSwitch가 필요하지 않습니다.
 - 플러그인용 사전 빌드 바이너리를 제공해 Go가 더 이상 필요하지 않도록 할 예정입니다.
 
 ## 개발

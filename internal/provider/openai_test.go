@@ -459,3 +459,16 @@ func TestOpenAIRequiresKeyAndModel(t *testing.T) {
 }
 
 var _ server.Backend = (*OpenAI)(nil)
+
+func TestOpenAIStreamingMaxTokens(t *testing.T) {
+	backend, _ := newOpenAITest(t, func(w http.ResponseWriter, path string, body map[string]any) {
+		sse(w,
+			`{"type":"response.output_text.delta","sequence_number":0,"item_id":"msg_1","output_index":0,"content_index":0,"delta":"partial","logprobs":[]}`,
+			`{"type":"response.incomplete","sequence_number":1,"response":{"id":"r","object":"response","status":"incomplete","incomplete_details":{"reason":"max_output_tokens"},"output":[],"usage":`+textUsage+`}}`,
+		)
+	})
+	recorder := post(t, backend, "/v1/messages", `{"max_tokens":5,"stream":true,"messages":[{"role":"user","content":"hi"}]}`)
+	if out := recorder.Body.String(); recorder.Code != http.StatusOK || !strings.Contains(out, `"stop_reason":"max_tokens"`) || !strings.Contains(out, `"text":"partial"`) {
+		t.Fatalf("got %d %s", recorder.Code, out)
+	}
+}

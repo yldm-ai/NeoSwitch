@@ -10,7 +10,7 @@
 
 NeoSwitch 让你在 Claude Code 中使用 Gemini，而不必改变已经熟悉的工作流。Claude Code 的 CLI、命令、权限、工具、skills、MCP 服务器和 hooks 都保持不变；NeoSwitch 在本机运行一个小型代理，把 Claude Code 的请求转换给背后的模型。
 
-目前 NeoSwitch 把 Claude Code 路由到 Gemini 4 Neon。其他模型提供商已在计划中，尚未支持。
+目前 NeoSwitch 把 Claude Code 路由到 Gemini 4 Neon。OpenAI 作为实验性后端可用：需要手动启用，且只在脚本模拟的上游上测试过。
 
 ## 为什么用 NeoSwitch
 
@@ -109,6 +109,18 @@ go run ./cmd/neoswitch claude
 
 `neoswitch doctor` 会查询模型并执行一次单行生成，然后报告凭证是否可用，或不可用的原因：凭证被拒绝、缺少权限、区域限制、未知模型、配额不足，或服务不可用。
 
+### OpenAI（实验性）
+
+OpenAI 后端通过官方 `openai-go` SDK 把请求发到 OpenAI Responses API。它需要手动启用，自动选择永远不会选中它，所以要设置 `NEOSWITCH_BACKEND=openai` 或运行 `neoswitch backend openai`。`OPENAI_MODEL` 必填，NeoSwitch 不会替你选模型。`OPENAI_BASE_URL` 可选，必须包含 `/v1`。它只在脚本模拟的上游上测试过，没有用真实的 OpenAI 账号验证。哪些内容做了映射、哪些没有，见 [docs/protocol-contract.md](../docs/protocol-contract.md#openai-backend-experimental)。
+
+```bash
+export NEOSWITCH_BACKEND=openai
+export OPENAI_API_KEY='your-key'
+export OPENAI_MODEL='model-name'
+neoswitch doctor
+go run ./cmd/neoswitch claude
+```
+
 ## 插件命令
 
 | 命令 | 作用 |
@@ -147,7 +159,7 @@ SessionStart hook 会启动一个本机 daemon，并在 Claude Code 发出第一
 
 使用 OAuth 路由时，daemon 会启动官方 `agy acp` 子进程。NeoSwitch 通过 ACP 会话发送转换后的请求，再把返回的回答或工具调用 JSON 转回本机 Anthropic-compatible endpoint。一个 `agy` 进程服务所有会话，各个请求在各自的 ACP 会话中并发执行。每个请求都会拒绝 `agy` 自带的文件、shell 和 web 工具，因此工具只在 Claude Code 中执行，并遵循 Claude Code 的权限规则。
 
-`/neoswitch:login` 会把 Antigravity OAuth 保存为后端，环境里为其他工具设置的 Gemini key 不会抢占它。没有保存的选择时，环境里有 Gemini 凭证就用 Gemini API，否则用 Antigravity OAuth。`NEOSWITCH_BACKEND=antigravity|gemini|auto` 可以覆盖以上两者，`/neoswitch:status` 会显示当前使用的后端及原因。
+`/neoswitch:login` 会把 Antigravity OAuth 保存为后端，环境里为其他工具设置的 Gemini key 不会抢占它。没有保存的选择时，环境里有 Gemini 凭证就用 Gemini API，否则用 Antigravity OAuth。`NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` 可以覆盖以上两者，`/neoswitch:status` 会显示当前使用的后端及原因。
 
 ## 独立 CLI
 
@@ -200,7 +212,7 @@ Anthropic 没有文档说明如何把 Claude Code 路由到非 Claude 模型，�
 
 ## 路线图
 
-- 支持更多模型提供商，首先是 OpenAI。已经提供 Anthropic-compatible endpoint 的提供商可以直接设置 `ANTHROPIC_BASE_URL` 使用，不需要 NeoSwitch。
+- 支持更多模型提供商。OpenAI 已作为实验性后端提供，仍需在真实 API 上验证。已经提供 Anthropic-compatible endpoint 的提供商可以直接设置 `ANTHROPIC_BASE_URL` 使用，不需要 NeoSwitch。
 - 为插件提供预编译二进制，不再需要 Go。
 
 ## 开发
