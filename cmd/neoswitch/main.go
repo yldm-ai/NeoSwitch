@@ -111,6 +111,10 @@ func antigravityCLIPath() string {
 func antigravityLogin(path string) error {
 	command := exec.Command(path, "acp", "--login")
 	command.Stdin = os.Stdin
+	if input, closeInput := antigravityLoginInput(); input != nil {
+		command.Stdin = input
+		defer closeInput()
+	}
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
 	if err := command.Run(); err != nil {
@@ -121,6 +125,21 @@ func antigravityLogin(path string) error {
 	}
 	fmt.Println("ok: Antigravity OAuth login completed through agy ACP")
 	return nil
+}
+
+// Claude Code runs skill shell substitutions without passing an interactive
+// stdin stream. Reattach agy's login prompt to the controlling terminal when
+// one exists so its URL/code flow remains usable from the Claude terminal.
+func antigravityLoginInput() (*os.File, func()) {
+	info, err := os.Stdin.Stat()
+	if err == nil && info.Mode()&os.ModeCharDevice != 0 {
+		return nil, func() {}
+	}
+	tty, err := os.OpenFile("/dev/tty", os.O_RDWR, 0)
+	if err != nil {
+		return nil, func() {}
+	}
+	return tty, func() { _ = tty.Close() }
 }
 
 func configuredBackend(ctx context.Context) (server.Backend, string, string, error) {
