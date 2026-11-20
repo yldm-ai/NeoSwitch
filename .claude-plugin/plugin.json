@@ -1,6 +1,6 @@
 {
   "name": "neoswitch",
-  "description": "Run Claude Code against Gemini through a local Anthropic-to-Gemini proxy, per project",
+  "description": "Use Claude Code with Gemini 4 Neon through a local Anthropic-compatible proxy. Route each project with Antigravity OAuth, Gemini API, or Vertex AI.",
   "author": { "name": "yldm-ai" },
   "repository": "https://github.com/yldm-ai/NeoSwitch",
   "license": "MIT",

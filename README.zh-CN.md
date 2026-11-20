@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/NeoSwitch.svg)](https://pkg.go.dev/github.com/yldm-ai/NeoSwitch) [![License](https://img.shields.io/github/license/yldm-ai/NeoSwitch)](https://github.com/yldm-ai/NeoSwitch/blob/main/LICENSE)
 
-NeoSwitch 通过本机 Anthropic-compatible Proxy，让 Claude Code 使用 Gemini 4 Neon。上游凭证支持两种方式：
+NeoSwitch 是一个 Claude Code 插件，通过本机 Anthropic-compatible Proxy 将项目路由到 Gemini 4 Neon。你可以选择 Antigravity OAuth、Gemini Developer API 或 Vertex AI，同时保留 Claude Code 的会话、流式输出和工具调用流程。
+
+上游凭证支持两种方式：
 
 - 通过官方本机 `agy acp` 使用 Antigravity OAuth。
 - 通过官方 `google.golang.org/genai` SDK 使用 Gemini Developer API 或 Vertex AI。
