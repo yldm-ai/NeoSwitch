@@ -158,7 +158,7 @@ func tools(in []anthropic.Tool) ([]*genai.Tool, error) {
 	declarations := make([]*genai.FunctionDeclaration, 0, len(in))
 	for i, tool := range in {
 		if tool.Type != "" && tool.Type != "custom" {
-			return nil, fmt.Errorf("tools[%d]: server tool %q cannot run on Gemini", i, tool.Type)
+			return nil, fmt.Errorf("tools[%d]: %w", i, unsupportedServerTool(tool.Type))
 		}
 		if strings.TrimSpace(tool.Name) == "" {
 			return nil, fmt.Errorf("tools[%d]: name must not be empty", i)
@@ -311,8 +311,22 @@ func mediaPart(block anthropic.ContentBlock) (*genai.Part, error) {
 		return &genai.Part{Text: block.Source.Data}, nil
 	default:
 		// URL sources would make NeoSwitch fetch arbitrary URLs on the caller's behalf; Gemini's fileData only accepts its own file URIs.
+		if block.Source.Type == "url" {
+			return nil, &UnsupportedError{Message: "NeoSwitch cannot send " + block.Type + "s given as web links to this model. Download the file and attach it instead."}
+		}
 		return nil, fmt.Errorf("%s source type %q is not supported", block.Type, block.Source.Type)
 	}
+}
+
+// unsupportedServerTool explains that a tool Anthropic runs on its own servers, such as web search, does not exist on the model NeoSwitch routes to.
+func unsupportedServerTool(typ string) error {
+	if strings.HasPrefix(typ, "web_search") {
+		return &UnsupportedError{Message: "Web search (WebSearch) does not work with NeoSwitch. Ask without web search, or run /neoswitch:off and start a new session to use Claude for it."}
+	}
+	if strings.HasPrefix(typ, "web_fetch") {
+		return &UnsupportedError{Message: "Fetching web pages with Claude's built-in web fetch does not work with NeoSwitch. Ask without it, or run /neoswitch:off and start a new session to use Claude for it."}
+	}
+	return &UnsupportedError{Message: fmt.Sprintf("Claude's built-in %q tool does not work with NeoSwitch. Ask without it, or run /neoswitch:off and start a new session to use Claude for it.", typ)}
 }
 
 // toolResultContent splits Anthropic tool_result content into the text Gemini receives in functionResponse.response and the images it receives as multimodal functionResponse parts.

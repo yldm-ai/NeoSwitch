@@ -18,6 +18,20 @@ type UpstreamError struct {
 
 func (e *UpstreamError) Error() string { return e.Reason }
 
+// UnavailableError means the upstream cannot answer any request until the user acts, for example by signing in again. Message is a complete sentence that names the fix; the server passes it to Claude Code unchanged, with a status Claude Code does not retry.
+type UnavailableError struct {
+	Message string
+}
+
+func (e *UnavailableError) Error() string { return e.Message }
+
+// UnsupportedError is a request feature NeoSwitch cannot carry to the model. Message is a complete sentence for the user; the server reports it without the request field path the error is wrapped in.
+type UnsupportedError struct {
+	Message string
+}
+
+func (e *UnsupportedError) Error() string { return e.Message }
+
 // FromGemini translates a complete (non-streaming) Gemini response.
 func FromGemini(resp *genai.GenerateContentResponse, model string) (anthropic.Response, error) {
 	out := anthropic.Response{
