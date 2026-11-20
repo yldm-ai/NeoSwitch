@@ -571,6 +571,17 @@ func TestLastSetupCommandDecidesBackend(t *testing.T) {
 	}
 }
 
+func TestTermsWarningPointsToKey(t *testing.T) {
+	for _, want := range []string{"may suspend", "accept that risk", "/neoswitch:key"} {
+		if !strings.Contains(antigravityTermsWarning, want) {
+			t.Fatalf("warning lacks %q", want)
+		}
+	}
+	if strings.Contains(strings.ToLower(antigravityTermsWarning), "default") {
+		t.Fatal("the warning must not call OAuth the default")
+	}
+}
+
 func TestKeyPage(t *testing.T) {
 	const key = "AIzaSyTest0123456789abcdefghijklmnopqrs"
 	state := isolateBackendEnv(t, true)

@@ -247,8 +247,8 @@ func doctor() error {
 	return nil
 }
 
-// antigravityTermsWarning is shown wherever NeoSwitch starts or checks the Antigravity OAuth route.
-const antigravityTermsWarning = "warning: the Google Antigravity Terms of Service forbid accessing Antigravity through third-party tools, and Google may suspend Antigravity or Gemini CLI accounts that do. Routing Claude Code through Antigravity OAuth falls under that rule; use a Gemini API key or Vertex AI instead."
+// antigravityTermsWarning is shown wherever NeoSwitch starts or checks the Antigravity OAuth route. It states the risk the user takes by choosing this route and names the route without it.
+const antigravityTermsWarning = "warning: the Google Antigravity Terms of Service forbid accessing Antigravity through third-party tools such as NeoSwitch, and Google may suspend the Antigravity or Gemini CLI account of anyone who does. Signing in with your Google account here means you accept that risk. A Gemini API key does not carry it: run /neoswitch:key to use one instead."
 
 // models lists the models the configured credentials can use, marking the configured one.
 func models() error {
