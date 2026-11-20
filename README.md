@@ -10,6 +10,7 @@ This repository contains the first protocol-contract MVP. It supports:
 
 - `neoswitch serve` — run the local Anthropic-compatible proxy.
 - `neoswitch claude` — start Claude Code through an ephemeral local proxy.
+- `neoswitch antigravity probe` — verify an existing `agy` login without reading its token; this is not a Claude Code backend.
 - text, images, tools, tool results, non-streaming responses, and buffered Anthropic SSE responses.
 - Gemini `generateContent` using `gemini-4-neon` by default.
 
@@ -43,3 +44,5 @@ The proxy binds to `127.0.0.1` by default. Set `NEOSWITCH_LISTEN` to another loo
 NeoSwitch uses official Gemini API credentials. Consumer OAuth flows, Antigravity scraping, hosts-file interception, and remote credential relays are intentionally outside the stable core. If the model is not available to the configured Google account, NeoSwitch fails with an explicit upstream error instead of silently switching models.
 
 See [docs/protocol-contract.md](docs/protocol-contract.md) for the request/response contract and the compatibility test matrix.
+
+Antigravity account sessions are intentionally kept outside the stable model path. See [docs/antigravity.md](docs/antigravity.md).

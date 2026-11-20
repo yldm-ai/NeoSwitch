@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,6 +28,8 @@ func main() {
 		err = serve()
 	case "claude":
 		err = claude(os.Args[2:])
+	case "antigravity":
+		err = antigravity(os.Args[2:])
 	case "doctor":
 		err = doctor()
 	case "models":
@@ -42,6 +45,47 @@ func main() {
 		fmt.Fprintln(os.Stderr, "neoswitch:", err)
 		os.Exit(1)
 	}
+}
+
+func antigravity(args []string) error {
+	if len(args) != 1 || args[0] != "probe" {
+		return fmt.Errorf("usage: neoswitch antigravity probe")
+	}
+	path := os.Getenv("ANTIGRAVITY_CLI_PATH")
+	if path == "" {
+		path = "agy"
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+	command := exec.CommandContext(ctx, path,
+		"-p", "Reply with exactly: neoswitch-ok",
+		"--output-format", "json",
+		"--disable-slash-commands",
+		"--print-timeout", "30s",
+	)
+	var stdout, stderr strings.Builder
+	command.Stdout = &stdout
+	command.Stderr = &stderr
+	if err := command.Run(); err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("Antigravity probe timed out; run %q interactively to re-authenticate", path)
+		}
+		// Do not echo stderr: it may contain account or local-path details.
+		return fmt.Errorf("Antigravity CLI probe failed; run %q interactively to inspect authentication", path)
+	}
+	var result struct {
+		Status   string `json:"status"`
+		Response string `json:"response"`
+		Error    string `json:"error"`
+	}
+	if err := json.Unmarshal([]byte(stdout.String()), &result); err != nil {
+		return fmt.Errorf("Antigravity returned an unexpected JSON envelope")
+	}
+	if result.Status != "SUCCESS" || result.Error != "" || strings.TrimSpace(result.Response) != "neoswitch-ok" {
+		return fmt.Errorf("Antigravity session probe was not successful; run %q interactively to inspect authentication", path)
+	}
+	fmt.Println("ok: Antigravity CLI session is usable")
+	return nil
 }
 
 func serve() error {
@@ -152,6 +196,7 @@ func usage() {
 Usage:
   neoswitch claude [-- claude arguments...]   start Claude Code through a local proxy
   neoswitch serve                             run the Anthropic-compatible proxy
+  neoswitch antigravity probe                 verify the official agy session without reading its token
   neoswitch doctor                            check local prerequisites
   neoswitch models                            print the configured Gemini model
 
@@ -160,6 +205,7 @@ Environment:
   GEMINI_MODEL         backend model (default: gemini-4-neon)
   GEMINI_BASE_URL      Gemini API base URL
   CLAUDE_CLI_PATH      Claude executable (default: claude)
+  ANTIGRAVITY_CLI_PATH  Antigravity executable (default: agy)
   NEOSWITCH_LISTEN     serve listen address (default: 127.0.0.1:8080)
   NEOSWITCH_AUTH_TOKEN optional token for standalone serve`)
 }
