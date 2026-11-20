@@ -2,84 +2,277 @@ package translate
 
 import (
 	"encoding/json"
+	"errors"
+	"os"
 	"strings"
 	"testing"
 
+	"google.golang.org/genai"
+
 	"github.com/yldm-ai/NeoSwitch/internal/anthropic"
-	"github.com/yldm-ai/NeoSwitch/internal/gemini"
 )
 
-func TestRequestMapsSystemToolsImagesAndToolResults(t *testing.T) {
-	request := anthropic.MessagesRequest{
-		Model:     "claude-sonnet",
-		MaxTokens: 512,
-		System:    json.RawMessage(`"You are precise."`),
-		Tools: []anthropic.Tool{{
-			Name:        "read_file",
-			Description: "Read a file",
-			InputSchema: json.RawMessage(`{"type":"object","properties":{"path":{"type":"string"}}}`),
-		}},
-		Messages: []anthropic.Message{
-			{Role: "user", Content: json.RawMessage(`[{"type":"text","text":"Inspect this"},{"type":"image","source":{"type":"base64","media_type":"image/png","data":"aGVsbG8="}}]`)},
-			{Role: "assistant", Content: json.RawMessage(`[{"type":"tool_use","id":"call-1","name":"read_file","input":{"path":"README.md"}}]`)},
-			{Role: "user", Content: json.RawMessage(`[{"type":"tool_result","tool_use_id":"call-1","content":"file contents"}]`)},
-		},
+func mustDecode(t *testing.T, body string) anthropic.MessagesRequest {
+	t.Helper()
+	var req anthropic.MessagesRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatal(err)
 	}
+	return req
+}
 
-	result, err := Request(request)
+func TestToGeminiMapsSystemToolsChoiceAndMedia(t *testing.T) {
+	req := mustDecode(t, `{
+		"model":"claude-opus","max_tokens":64,"temperature":0.5,"top_k":3,
+		"system":[{"type":"text","text":"be brief","cache_control":{"type":"ephemeral"}},{"type":"text","text":""}],
+		"tool_choice":{"type":"tool","name":"Read"},
+		"tools":[
+			{"name":"Read","description":"read a file","input_schema":{"$schema":"http://json-schema.org/draft-07/schema#","type":"object","properties":{"path":{"type":"string"}},"additionalProperties":false}},
+			{"name":"Bash","input_schema":{"type":"object","properties":{"timeout":{"type":"number","exclusiveMinimum":0}}}}
+		],
+		"messages":[{"role":"user","content":[
+			{"type":"text","text":"look"},
+			{"type":"text","text":""},
+			{"type":"image","source":{"type":"base64","media_type":"image/png","data":"aGVsbG8="}},
+			{"type":"document","source":{"type":"base64","media_type":"application/pdf","data":"JVBERi0="}},
+			{"type":"document","source":{"type":"text","media_type":"text/plain","data":"plain doc"}}
+		]}]}`)
+	got, err := ToGemini(req)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Request.SystemInstruction == nil || result.Request.SystemInstruction.Parts[0].Text != "You are precise." {
-		t.Fatalf("system instruction was not mapped: %#v", result.Request.SystemInstruction)
+	c := got.Config
+	if c.MaxOutputTokens != 64 || *c.Temperature != 0.5 || *c.TopK != 3 {
+		t.Fatalf("generation config = %+v", c)
 	}
-	if len(result.Request.Tools) != 1 || result.Request.Tools[0].FunctionDeclarations[0].Name != "read_file" {
-		t.Fatalf("tools were not mapped: %#v", result.Request.Tools)
+	if len(c.SystemInstruction.Parts) != 1 || c.SystemInstruction.Parts[0].Text != "be brief" {
+		t.Fatalf("system = %+v", c.SystemInstruction)
 	}
-	if got := len(result.Request.Contents); got != 3 {
-		t.Fatalf("contents = %d, want 3", got)
+	if len(c.Tools) != 1 || len(c.Tools[0].FunctionDeclarations) != 2 {
+		t.Fatalf("all declarations must share one tool entry: %+v", c.Tools)
 	}
-	if result.Request.Contents[0].Parts[1].InlineData == nil {
-		t.Fatalf("image was not mapped: %#v", result.Request.Contents[0].Parts)
+	schema := c.Tools[0].FunctionDeclarations[0].ParametersJsonSchema.(map[string]any)
+	if schema["additionalProperties"] != false || schema["$schema"] == nil {
+		t.Fatalf("JSON Schema must pass through unmodified: %v", schema)
 	}
-	responsePart := result.Request.Contents[2].Parts[0].FunctionResponse
-	if responsePart == nil || responsePart.Name != "read_file" {
-		t.Fatalf("tool result was not mapped: %#v", responsePart)
+	if c.Tools[0].FunctionDeclarations[0].Parameters != nil {
+		t.Fatal("the OpenAPI-subset parameters field must stay unset")
+	}
+	fc := c.ToolConfig.FunctionCallingConfig
+	if fc.Mode != genai.FunctionCallingConfigModeAny || len(fc.AllowedFunctionNames) != 1 || fc.AllowedFunctionNames[0] != "Read" {
+		t.Fatalf("tool choice = %+v", fc)
+	}
+	parts := got.Contents[0].Parts
+	if len(parts) != 4 {
+		t.Fatalf("empty text must be dropped, got %d parts", len(parts))
+	}
+	if string(parts[1].InlineData.Data) != "hello" || parts[1].InlineData.MIMEType != "image/png" {
+		t.Fatalf("image = %+v", parts[1].InlineData)
+	}
+	if parts[2].InlineData.MIMEType != "application/pdf" || parts[3].Text != "plain doc" {
+		t.Fatalf("documents = %+v %+v", parts[2], parts[3])
 	}
 }
 
-func TestRequestRejectsUnknownBlockAndMissingTool(t *testing.T) {
-	base := anthropic.MessagesRequest{MaxTokens: 10, Messages: []anthropic.Message{{Role: "user", Content: json.RawMessage(`[{"type":"audio"}]`)}}}
-	if _, err := Request(base); err == nil || !strings.Contains(err.Error(), "unsupported content block") {
-		t.Fatalf("unknown block error = %v", err)
+func TestToGeminiReplaysThoughtSignatureAndToolResults(t *testing.T) {
+	id := newToolID([]byte("sig-bytes"), "call-7")
+	body := `{"model":"m","max_tokens":10,"messages":[
+		{"role":"user","content":"list files"},
+		{"role":"assistant","content":[
+			{"type":"thinking","thinking":"from an earlier Claude turn","signature":"x"},
+			{"type":"text","text":"checking"},
+			{"type":"tool_use","id":"` + id + `","name":"Bash","input":{"command":"ls"}},
+			{"type":"tool_use","id":"toolu_from_anthropic","name":"Read","input":{}}
+		]},
+		{"role":"user","content":[
+			{"type":"tool_result","tool_use_id":"` + id + `","content":"a.go\nb.go"},
+			{"type":"tool_result","tool_use_id":"toolu_from_anthropic","is_error":true,"content":[
+				{"type":"text","text":"line 1"},{"type":"text","text":"line 2"},
+				{"type":"image","source":{"type":"base64","media_type":"image/jpeg","data":"aGk="}}
+			]},
+			{"type":"text","text":"<system-reminder>r</system-reminder>"}
+		]}]}`
+	got, err := ToGemini(mustDecode(t, body))
+	if err != nil {
+		t.Fatal(err)
 	}
-	base.Messages[0].Content = json.RawMessage(`[{"type":"tool_result","tool_use_id":"missing","content":"x"}]`)
-	if _, err := Request(base); err == nil || !strings.Contains(err.Error(), "unknown tool_use_id") {
-		t.Fatalf("missing tool error = %v", err)
+	model := got.Contents[1]
+	if model.Role != genai.RoleModel || len(model.Parts) != 3 {
+		t.Fatalf("thinking must be dropped from the model turn: %+v", model.Parts)
+	}
+	call := model.Parts[1]
+	if string(call.ThoughtSignature) != "sig-bytes" || call.FunctionCall.ID != "call-7" || call.FunctionCall.Args["command"] != "ls" {
+		t.Fatalf("signature and call id must be replayed: %+v %+v", call, call.FunctionCall)
+	}
+	if model.Parts[2].ThoughtSignature != nil {
+		t.Fatal("foreign tool IDs carry no signature")
+	}
+	results := got.Contents[2].Parts
+	first := results[0].FunctionResponse
+	if first.Name != "Bash" || first.ID != "call-7" || first.Response["output"] != "a.go\nb.go" {
+		t.Fatalf("first result = %+v", first)
+	}
+	second := results[1].FunctionResponse
+	if second.Name != "Read" || second.Response["error"] != "line 1\nline 2" || len(second.Parts) != 1 || string(second.Parts[0].InlineData.Data) != "hi" {
+		t.Fatalf("error result with image = %+v", second)
+	}
+	if results[2].Text == "" {
+		t.Fatal("text after tool results must be kept")
 	}
 }
 
-func TestResponseMapsTextAndToolUse(t *testing.T) {
-	response, err := Response(gemini.GenerateContentResponse{
-		Candidates: []gemini.Candidate{{
-			Content: gemini.Content{Parts: []gemini.Part{
-				{Text: "I will inspect it."},
-				{FunctionCall: &gemini.FunctionCall{Name: "read_file", Args: map[string]interface{}{"path": "README.md"}}},
+// Claude Code 2.1.x sends its environment block as a role "system" message after the first user turn.
+func TestToGeminiAppendsMidConversationSystemMessages(t *testing.T) {
+	got, err := ToGemini(mustDecode(t, `{"system":"base","messages":[
+		{"role":"user","content":"hi"},
+		{"role":"system","content":[{"type":"text","text":"# Environment"}],"output_config":{}},
+		{"role":"assistant","content":"ok"}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	system := got.Config.SystemInstruction.Parts
+	if len(system) != 2 || system[0].Text != "base" || system[1].Text != "# Environment" {
+		t.Fatalf("system = %+v", system)
+	}
+	if len(got.Contents) != 2 || got.Contents[0].Role != genai.RoleUser || got.Contents[1].Role != genai.RoleModel {
+		t.Fatalf("contents = %+v", got.Contents)
+	}
+}
+
+func TestToGeminiRejectsWhatItCannotRepresent(t *testing.T) {
+	cases := map[string]string{
+		"unknown block":       `{"messages":[{"role":"user","content":[{"type":"text","text":"a"},{"type":"future_block"}]}]}`,
+		"unknown tool_use_id": `{"messages":[{"role":"user","content":[{"type":"tool_result","tool_use_id":"nope","content":"x"}]}]}`,
+		"server tool":         `{"tools":[{"type":"web_search_20250305","name":"web_search"}],"messages":[{"role":"user","content":"a"}]}`,
+		"url image":           `{"messages":[{"role":"user","content":[{"type":"image","source":{"type":"url","url":"https://example.com/a.png"}}]}]}`,
+		"bad base64":          `{"messages":[{"role":"user","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"%%%"}}]}]}`,
+		"tool_use from user":  `{"messages":[{"role":"user","content":[{"type":"tool_use","id":"t","name":"x","input":{}}]}]}`,
+		"only empty content":  `{"messages":[{"role":"user","content":[{"type":"text","text":""}]}]}`,
+		"unknown role":        `{"messages":[{"role":"developer","content":"a"}]}`,
+		"system image":        `{"messages":[{"role":"system","content":[{"type":"image","source":{"type":"base64","media_type":"image/png","data":"aGk="}}]},{"role":"user","content":"a"}]}`,
+	}
+	for name, body := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, err := ToGemini(mustDecode(t, body)); err == nil {
+				t.Fatal("expected an error")
+			}
+		})
+	}
+}
+
+// TestToGeminiAcceptsClaudeCodeToolSchemas runs every built-in tool schema from a captured Claude Code request through the translator and checks they reach Gemini as JSON Schema, byte-for-byte equivalent.
+func TestToGeminiAcceptsClaudeCodeToolSchemas(t *testing.T) {
+	data, err := os.ReadFile("testdata/claude-code-tools.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Tools []anthropic.Tool `json:"tools"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if len(fixture.Tools) < 10 {
+		t.Fatalf("fixture has %d tools", len(fixture.Tools))
+	}
+	req := anthropic.MessagesRequest{MaxTokens: 1, Tools: fixture.Tools, Messages: []anthropic.Message{{Role: "user", Content: json.RawMessage(`"hi"`)}}}
+	got, err := ToGemini(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declarations := got.Config.Tools[0].FunctionDeclarations
+	for i, tool := range fixture.Tools {
+		want, _ := json.Marshal(mustAny(t, tool.InputSchema))
+		have, _ := json.Marshal(declarations[i].ParametersJsonSchema)
+		if string(want) != string(have) {
+			t.Fatalf("%s schema changed in translation", tool.Name)
+		}
+	}
+}
+
+func mustAny(t *testing.T, raw json.RawMessage) any {
+	t.Helper()
+	var v any
+	if err := json.Unmarshal(raw, &v); err != nil {
+		t.Fatal(err)
+	}
+	return v
+}
+
+func TestFromGeminiMapsTextToolUseAndUsage(t *testing.T) {
+	resp := &genai.GenerateContentResponse{
+		Candidates: []*genai.Candidate{{
+			FinishReason: genai.FinishReasonStop,
+			Content: &genai.Content{Parts: []*genai.Part{
+				{Text: "internal reasoning", Thought: true},
+				{Text: "I'll look."},
+				{FunctionCall: &genai.FunctionCall{Name: "Read", Args: map[string]any{"path": "a"}}, ThoughtSignature: []byte{0, 1, 255}},
+				{FunctionCall: &genai.FunctionCall{Name: "Glob"}},
 			}},
-			FinishReason: "STOP",
 		}},
-		UsageMetadata: gemini.UsageMetadata{PromptTokenCount: 7, CandidatesTokenCount: 9},
-	}, "claude-sonnet")
+		UsageMetadata: &genai.GenerateContentResponseUsageMetadata{PromptTokenCount: 100, CachedContentTokenCount: 40, CandidatesTokenCount: 7, ThoughtsTokenCount: 5},
+	}
+	got, err := FromGemini(resp, "claude-opus")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if response.StopReason != "tool_use" || len(response.Content) != 2 {
-		t.Fatalf("response = %#v", response)
+	if got.Model != "claude-opus" || got.StopReason != "tool_use" || len(got.Content) != 3 {
+		t.Fatalf("response = %+v", got)
 	}
-	if response.Content[1].Type != "tool_use" || response.Content[1].Name != "read_file" {
-		t.Fatalf("tool response = %#v", response.Content[1])
+	if got.Content[0].Text != "I'll look." {
+		t.Fatalf("thought parts must not leak into text: %+v", got.Content)
 	}
-	if response.Usage.InputTokens != 7 || response.Usage.OutputTokens != 9 {
-		t.Fatalf("usage = %#v", response.Usage)
+	use := got.Content[1]
+	if !strings.HasPrefix(use.ID, toolIDPrefix) || string(use.Input) != `{"path":"a"}` {
+		t.Fatalf("tool_use = %+v", use)
+	}
+	if meta := parseToolID(use.ID); string(meta.Signature) != string([]byte{0, 1, 255}) {
+		t.Fatalf("signature not embedded: %+v", meta)
+	}
+	if string(got.Content[2].Input) != "{}" || got.Content[2].ID == use.ID {
+		t.Fatalf("argument-less call = %+v", got.Content[2])
+	}
+	if got.Usage != (anthropic.Usage{InputTokens: 60, OutputTokens: 12, CacheReadInputTokens: 40}) {
+		t.Fatalf("usage = %+v", got.Usage)
+	}
+}
+
+func TestFromGeminiFinishReasons(t *testing.T) {
+	text := &genai.Content{Parts: []*genai.Part{{Text: "x"}}}
+	for reason, want := range map[genai.FinishReason]string{
+		genai.FinishReasonStop:      "end_turn",
+		genai.FinishReasonMaxTokens: "max_tokens",
+		genai.FinishReasonSafety:    "refusal",
+	} {
+		got, err := FromGemini(&genai.GenerateContentResponse{Candidates: []*genai.Candidate{{Content: text, FinishReason: reason}}}, "m")
+		if err != nil || got.StopReason != want {
+			t.Fatalf("%s: stop = %q err = %v", reason, got.StopReason, err)
+		}
+	}
+	for _, reason := range []genai.FinishReason{genai.FinishReasonMalformedFunctionCall, genai.FinishReasonMissingThoughtSignature, genai.FinishReasonOther} {
+		_, err := FromGemini(&genai.GenerateContentResponse{Candidates: []*genai.Candidate{{FinishReason: reason}}}, "m")
+		var upstream *UpstreamError
+		if !errors.As(err, &upstream) || !strings.Contains(err.Error(), string(reason)) {
+			t.Fatalf("%s must fail the turn, got %v", reason, err)
+		}
+	}
+	blocked, err := FromGemini(&genai.GenerateContentResponse{PromptFeedback: &genai.GenerateContentResponsePromptFeedback{BlockReason: genai.BlockedReasonSafety}}, "m")
+	if err != nil || blocked.StopReason != "refusal" || blocked.Content == nil {
+		t.Fatalf("blocked prompt = %+v %v", blocked, err)
+	}
+	if _, err := FromGemini(&genai.GenerateContentResponse{}, "m"); err == nil {
+		t.Fatal("no candidates without a block reason is an upstream error")
+	}
+}
+
+func TestToolIDIsAnthropicCompatible(t *testing.T) {
+	id := newToolID([]byte(strings.Repeat("\xff", 300)), "c")
+	for _, r := range id {
+		if !(r == '_' || r == '-' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			t.Fatalf("id contains %q", r)
+		}
+	}
+	if parseToolID("toolu_ns_not-base64!").Signature != nil {
+		t.Fatal("corrupt IDs must decode to no metadata")
 	}
 }

@@ -8,24 +8,28 @@ NeoSwitch 的定位很明确：Claude Code 继续负责 Agent 运行时、工具
 
 ## 当前状态
 
-这是第一个协议合同 MVP，目前支持：
+目前支持：
 
 - `neoswitch serve`：启动本地 Anthropic-compatible Proxy。
 - `neoswitch claude`：通过临时本地 Proxy 启动 Claude Code。
 - `neoswitch antigravity probe`：验证现有 `agy` 登录是否可用，不读取 Antigravity token；它不是 Claude Code 后端。
-- 文本、图片、工具声明、工具结果、非流式响应，以及缓冲式 Anthropic SSE 响应。
-- 默认使用 Gemini `generateContent` 和 `gemini-4-neon`。
-
-当前版本的 `stream: true` 会等待 Gemini 完整响应后，再生成合法的 Anthropic SSE 事件。这会牺牲首 token 延迟，但可以避免把不完整的工具调用发送给 Claude Code。原生上游流式传输会在独立的兼容性测试通过后接入。
+- 文本、图片、PDF、Claude Code 的工具 schema、多轮工具调用（包括 Gemini 的 thought signature）、流式与非流式响应，以及 `count_tokens`。
+- 通过官方 `google.golang.org/genai` SDK 接入 Gemini Developer API 或 Vertex AI，默认模型 `gemini-4-neon`。
 
 ## 快速开始
 
-### 1. 准备官方 Gemini API Key
+### 1. 准备凭证
 
-NeoSwitch 稳定路径使用官方 Gemini API 凭证。请先设置：
+使用 Gemini API Key：
 
 ```bash
 export GEMINI_API_KEY='你的 Gemini API Key'
+```
+
+或者使用 Vertex AI 和 Application Default Credentials：
+
+```bash
+export GOOGLE_GENAI_USE_VERTEXAI=true GOOGLE_CLOUD_PROJECT=my-project GOOGLE_CLOUD_LOCATION=global
 ```
 
 ### 2. 启动 Claude Code
@@ -49,11 +53,16 @@ go run ./cmd/neoswitch claude
 如果你要把 NeoSwitch 接到其他 Anthropic-compatible 客户端：
 
 ```bash
-GEMINI_API_KEY='你的 Gemini API Key' \
-go run ./cmd/neoswitch serve
+export NEOSWITCH_AUTH_TOKEN="$(openssl rand -hex 24)"
+GEMINI_API_KEY='你的 Gemini API Key' go run ./cmd/neoswitch serve
+
+# 在客户端的环境里
+ANTHROPIC_BASE_URL=http://127.0.0.1:8080 ANTHROPIC_AUTH_TOKEN="$NEOSWITCH_AUTH_TOKEN" claude
 ```
 
-Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOSWITCH_LISTEN` 到其他回环地址。`GEMINI_BASE_URL` 可以指向兼容的 Google Gemini endpoint；默认使用 Gemini Developer API。
+两个变量都要设置：如果 Claude Code 只拿到 base URL，会把已登录的 claude.ai 凭证发给 Proxy。`neoswitch claude` 会自动用随机端口和一次性 token 完成这一步。
+
+Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOSWITCH_LISTEN` 到其他回环地址。`GEMINI_BASE_URL` 用于覆盖 Gemini API 的主机地址。
 
 ## 常用命令
 
@@ -71,7 +80,7 @@ go run ./cmd/neoswitch
 
 ## 稳定性边界
 
-NeoSwitch 的稳定核心只使用官方 Gemini API Key 或 Vertex/ADC 凭证。以下方式不属于稳定核心：
+NeoSwitch 的稳定核心只使用官方 Gemini API Key 或 Vertex AI（ADC）凭证。以下方式不属于稳定核心：
 
 - 读取或导出 Antigravity OAuth/token profile。
 - 抓取 Antigravity 内部接口。

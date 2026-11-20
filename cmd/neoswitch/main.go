@@ -89,7 +89,7 @@ func antigravity(args []string) error {
 }
 
 func serve() error {
-	backend, err := provider.NewGeminiFromEnv()
+	backend, err := provider.NewGeminiFromEnv(context.Background())
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func serve() error {
 }
 
 func claude(args []string) error {
-	backend, err := provider.NewGeminiFromEnv()
+	backend, err := provider.NewGeminiFromEnv(context.Background())
 	if err != nil {
 		return err
 	}
@@ -155,12 +155,9 @@ func serveWithListener(backend *provider.Gemini, listen, token string) error {
 }
 
 func doctor() error {
-	if strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) == "" {
-		return fmt.Errorf("GEMINI_API_KEY is not set")
-	}
-	model := os.Getenv("GEMINI_MODEL")
-	if model == "" {
-		model = "gemini-4-neon"
+	backend, err := provider.NewGeminiFromEnv(context.Background())
+	if err != nil {
+		return err
 	}
 	claudePath := os.Getenv("CLAUDE_CLI_PATH")
 	if claudePath == "" {
@@ -169,14 +166,14 @@ func doctor() error {
 	if _, err := exec.LookPath(claudePath); err != nil {
 		return fmt.Errorf("Claude CLI %q was not found: %w", claudePath, err)
 	}
-	fmt.Printf("ok: Gemini credentials present\nok: model %s\nok: Claude CLI %s\n", model, claudePath)
+	fmt.Printf("ok: %s credentials configured\nok: model %s\nok: Claude CLI %s\n", backend.BackendName(), backend.Model, claudePath)
 	return nil
 }
 
 func models() error {
 	model := os.Getenv("GEMINI_MODEL")
 	if model == "" {
-		model = "gemini-4-neon"
+		model = provider.DefaultModel
 	}
 	fmt.Println(model)
 	return nil
@@ -201,7 +198,9 @@ Usage:
   neoswitch models                            print the configured Gemini model
 
 Environment:
-  GEMINI_API_KEY       official Gemini API key (required)
+  GEMINI_API_KEY       Gemini Developer API key
+  GOOGLE_GENAI_USE_VERTEXAI=true with GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION
+                       use Vertex AI with Application Default Credentials instead
   GEMINI_MODEL         backend model (default: gemini-4-neon)
   GEMINI_BASE_URL      Gemini API base URL
   CLAUDE_CLI_PATH      Claude executable (default: claude)
