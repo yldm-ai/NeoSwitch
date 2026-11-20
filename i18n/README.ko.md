@@ -86,7 +86,7 @@ Neon을 사용하려는 프로젝트에서 다음을 실행합니다.
 
 상태에는 `NeoSwitch ... -> gemini-4-neon`이 표시되어야 합니다. Claude Code는 세션 헤더에 `claude-opus-5-5`처럼 요청한 모델 이름을 계속 표시할 수 있습니다. 실제 업스트림 라우트는 `/neoswitch:status`에 표시되는 것입니다.
 
-`/neoswitch:antigravity-login`은 `/neoswitch:login`의 별칭입니다. `/neoswitch:on`과 `/neoswitch:off`는 로그인 없이 라우팅만 변경합니다.
+`/neoswitch:on`과 `/neoswitch:off`는 로그인 없이 라우팅만 변경합니다.
 
 ## 기타 자격 증명 방식
 

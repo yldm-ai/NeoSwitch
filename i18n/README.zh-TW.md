@@ -86,7 +86,7 @@ claude plugin update neoswitch@neoswitch
 
 狀態應顯示 `NeoSwitch ... -> gemini-4-neon`。Claude Code 的工作階段頂端仍可能顯示它請求的標籤，例如 `claude-opus-5-5`；實際的上游路由以 `/neoswitch:status` 顯示的為準。
 
-`/neoswitch:antigravity-login` 是 `/neoswitch:login` 的別名。`/neoswitch:on` 與 `/neoswitch:off` 只切換路由，不會登入。
+`/neoswitch:on` 與 `/neoswitch:off` 只切換路由，不會登入。
 
 ## 其他憑證方式
 

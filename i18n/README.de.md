@@ -86,7 +86,7 @@ Schließen Sie Claude Code in diesem Projekt und öffnen Sie es erneut. Prüfen 
 
 Der Status sollte `NeoSwitch ... -> gemini-4-neon` anzeigen. Claude Code kann im Sitzungskopf weiterhin die angeforderte Bezeichnung anzeigen, etwa `claude-opus-5-5`; maßgeblich ist die Upstream-Route, die `/neoswitch:status` anzeigt.
 
-`/neoswitch:antigravity-login` ist ein Alias für `/neoswitch:login`. `/neoswitch:on` und `/neoswitch:off` schalten das Routing ohne Anmeldung um.
+`/neoswitch:on` und `/neoswitch:off` schalten das Routing ohne Anmeldung um.
 
 ## Weitere Zugangsdaten-Wege
 

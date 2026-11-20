@@ -86,7 +86,7 @@ Close and reopen Claude Code in that project. Check the route with:
 
 The status should show `NeoSwitch ... -> gemini-4-neon`. Claude Code can still display its requested label, such as `claude-opus-5-5`, in the session header; the upstream route is the one `/neoswitch:status` shows.
 
-`/neoswitch:antigravity-login` is an alias for `/neoswitch:login`. `/neoswitch:on` and `/neoswitch:off` change routing without signing in.
+`/neoswitch:on` and `/neoswitch:off` change routing without signing in.
 
 ## Other credential paths
 

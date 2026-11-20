@@ -86,7 +86,7 @@ Neon を使いたいプロジェクトで次を実行します。
 
 `NeoSwitch ... -> gemini-4-neon` と表示されるはずです。Claude Code のセッションヘッダーには、`claude-opus-5-5` のようにリクエストしたラベルが表示されることがありますが、上流のルートは `/neoswitch:status` に表示されるものです。
 
-`/neoswitch:antigravity-login` は `/neoswitch:login` のエイリアスです。`/neoswitch:on` と `/neoswitch:off` はサインインせずにルーティングだけを切り替えます。
+`/neoswitch:on` と `/neoswitch:off` はサインインせずにルーティングだけを切り替えます。
 
 ## その他の認証方法
 

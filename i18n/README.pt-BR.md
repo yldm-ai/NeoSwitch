@@ -86,7 +86,7 @@ Feche e reabra o Claude Code nesse projeto. Verifique a rota com:
 
 O status deve mostrar `NeoSwitch ... -> gemini-4-neon`. O Claude Code ainda pode exibir o rótulo solicitado, como `claude-opus-5-5`, no cabeçalho da sessão; a rota de origem é a que `/neoswitch:status` mostra.
 
-`/neoswitch:antigravity-login` é um alias de `/neoswitch:login`. `/neoswitch:on` e `/neoswitch:off` alteram o roteamento sem fazer login.
+`/neoswitch:on` e `/neoswitch:off` alteram o roteamento sem fazer login.
 
 ## Outros caminhos de credenciais
 
