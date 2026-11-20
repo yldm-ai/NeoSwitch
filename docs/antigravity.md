@@ -26,6 +26,8 @@ Images, including screenshots returned by Claude Code tools, are sent as ACP ima
 
 One `agy acp` process serves the daemon, and every request runs in its own ACP session. `agy` runs sessions concurrently, so subagents, background requests and several Claude Code sessions do not wait for each other. Text answers stream to Claude Code as `agy` generates them; tool calls arrive whole.
 
+Claude Code's effort setting (`/effort`, `--effort`, `medium` by default) selects `agy`'s thought level for each request: `low`, `medium`, `high` and `xhigh` map directly and `max` uses `xhigh`. The thought level dominates the wait before the first token, so `low` answers simple questions noticeably faster. When `agy` does not offer a level, the request runs at `agy`'s default.
+
 Answers report the input and output tokens `agy` bills, so Claude Code's context usage and automatic compaction see real numbers. `agy` adds its own agent instructions (about 14k tokens) to every prompt. That overhead is included in the reported usage, and `count_tokens` adds it to its estimate once the first answer has reported it.
 
 Each request is bounded by the proxy's 10-minute upstream timeout. When the timeout expires or Claude Code disconnects, NeoSwitch cancels that session in `agy` and leaves the others running. If `agy` produced no output at all for a request that timed out, it is treated as stuck and restarted for the next request.

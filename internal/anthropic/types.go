@@ -15,6 +15,13 @@ type MessagesRequest struct {
 	TopP        *float64        `json:"top_p,omitempty"`
 	TopK        *int            `json:"top_k,omitempty"`
 	Stop        []string        `json:"stop_sequences,omitempty"`
+	// OutputConfig carries the effort Claude Code sends with every request (its /effort and --effort setting, "medium" by default).
+	OutputConfig *OutputConfig `json:"output_config,omitempty"`
+}
+
+type OutputConfig struct {
+	// Effort is low, medium, high, xhigh or max.
+	Effort string `json:"effort,omitempty"`
 }
 
 type Message struct {

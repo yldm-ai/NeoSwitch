@@ -105,7 +105,7 @@ SessionStart hook 会在 Claude Code 发出第一个模型请求前启动一个�
 
 启用 OAuth 路由时，daemon 会启动官方 `agy acp` 子进程。NeoSwitch 把转换后的请求发给 ACP session，再把返回的回答或 Claude-compatible tool-call JSON 转回本机 Anthropic-compatible endpoint。OAuth 凭证和浏览器回调始终由 `agy` 管理。
 
-所有会话共用一个 `agy` 进程，各个请求在各自的 ACP session 里并发执行。文本边生成边流式返回，token 用量会回传给 Claude Code。
+所有会话共用一个 `agy` 进程，各个请求在各自的 ACP session 里并发执行。文本边生成边流式返回，token 用量会回传给 Claude Code，Claude Code 的 `/effort` 设置决定 Neon 的思考深度。
 
 如果环境里同时存在其他 Gemini 凭证，可以在插件配置里打开 **Use Antigravity OAuth via ACP** 强制使用 ACP。没有 Gemini 凭证时，正常运行 `/neoswitch:login` 会自动选择 ACP。
 

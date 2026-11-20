@@ -276,3 +276,34 @@ func TestToolIDIsAnthropicCompatible(t *testing.T) {
 		t.Fatal("corrupt IDs must decode to no metadata")
 	}
 }
+
+func TestToGeminiMapsEffortToThinkingLevel(t *testing.T) {
+	cases := []struct {
+		outputConfig string
+		want         genai.ThinkingLevel
+	}{
+		{`,"output_config":{"effort":"low"}`, genai.ThinkingLevelLow},
+		{`,"output_config":{"effort":"medium"}`, genai.ThinkingLevelMedium},
+		{`,"output_config":{"effort":"high"}`, genai.ThinkingLevelHigh},
+		{`,"output_config":{"effort":"xhigh"}`, genai.ThinkingLevelXhigh},
+		{`,"output_config":{"effort":"max"}`, genai.ThinkingLevelXhigh},
+		{`,"output_config":{"effort":"turbo"}`, ""},
+		{`,"output_config":{}`, ""},
+		{``, ""},
+	}
+	for _, tc := range cases {
+		// Captured from Claude Code 2.1.329: adaptive thinking plus output_config.effort on every request.
+		req := mustDecode(t, `{"model":"claude-opus-5-5","max_tokens":128000,"thinking":{"type":"adaptive","display":"omitted"}`+tc.outputConfig+`,"messages":[{"role":"user","content":"hi"}]}`)
+		got, err := ToGemini(req)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.outputConfig, err)
+		}
+		if got.ThinkingLevel != tc.want {
+			t.Fatalf("%s: thinking level %q, want %q", tc.outputConfig, got.ThinkingLevel, tc.want)
+		}
+		// The Gemini API request itself is unchanged until per-model support for each level is verified.
+		if got.Config.ThinkingConfig != nil {
+			t.Fatalf("%s: unexpected Gemini thinking config %+v", tc.outputConfig, got.Config.ThinkingConfig)
+		}
+	}
+}

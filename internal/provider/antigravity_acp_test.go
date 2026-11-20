@@ -41,6 +41,7 @@ const (
 //   - hang-first: the first prompt streams a thought and then hangs until session/cancel, which it answers with stopReason cancelled; later prompts answer "after-cancel" once that happened
 //   - quiet-first: the first prompt hangs without any output; later prompts answer normally
 //   - hang: prompts never answer and produce no output
+//   - effort: sessions offer thought_level low and high; answers with the level the client selected, or "unset"
 //   - exit: the process dies on session/prompt
 //   - stream, tool: answer with streamEnvelope or a tool call, one character per chunk
 //   - refusal: answers nothing with stopReason refusal
@@ -64,6 +65,7 @@ func runFakeACP(mode string) {
 		permission = map[string]prompt{}
 		hung       *prompt
 		cancelled  bool
+		levels     = map[string]string{}
 	)
 	update := func(sid, kind, text string) {
 		send(map[string]any{"method": "session/update", "params": map[string]any{
@@ -140,8 +142,26 @@ func runFakeACP(mode string) {
 			reply(map[string]any{})
 		case "session/new":
 			sessions++
-			reply(map[string]string{"sessionId": "s" + strings.Repeat("x", sessions)})
-		case "session/set_config_option", "session/close":
+			result := map[string]any{"sessionId": "s" + strings.Repeat("x", sessions)}
+			if mode == "effort" {
+				result["configOptions"] = []any{map[string]any{
+					"type": "select", "id": "thought_level", "name": "Thinking", "currentValue": "high",
+					"options": []any{map[string]string{"value": "low", "name": "Low"}, map[string]string{"value": "high", "name": "High"}},
+				}}
+			}
+			reply(result)
+		case "session/set_config_option":
+			var option struct {
+				SessionID string `json:"sessionId"`
+				ConfigID  string `json:"configId"`
+				Value     string `json:"value"`
+			}
+			_ = json.Unmarshal(msg.Params, &option)
+			if option.ConfigID == "thought_level" {
+				levels[option.SessionID] = option.Value
+			}
+			reply(map[string]any{})
+		case "session/close":
 			reply(map[string]any{})
 		case "session/cancel":
 			if hung != nil && hung.sid == params.SessionID {
@@ -191,6 +211,12 @@ func runFakeACP(mode string) {
 				}
 				waiting = nil
 				continue
+			case "effort":
+				level := levels[p.sid]
+				if level == "" {
+					level = "unset"
+				}
+				p.answer = `{"text":"` + level + `"}`
 			case "stream":
 				p.answer = streamEnvelope
 			case "tool":
@@ -429,6 +455,30 @@ func TestACPLoginUsesAdvertisedMethod(t *testing.T) {
 	a := newFakeACP(t, "ok")
 	if err := a.Login(context.Background()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestACPEffortSelectsOfferedThoughtLevel(t *testing.T) {
+	a := newFakeACP(t, "effort")
+	for _, tc := range []struct {
+		level genai.ThinkingLevel
+		want  string
+	}{
+		{genai.ThinkingLevelLow, "low"},
+		{genai.ThinkingLevelHigh, "high"},
+		// Not offered by this agy: the request still runs, at agy's default.
+		{genai.ThinkingLevelXhigh, "unset"},
+		{"", "unset"},
+	} {
+		req := textRequest("hi")
+		req.ThinkingLevel = tc.level
+		resp, err := a.Generate(context.Background(), req)
+		if err != nil {
+			t.Fatalf("%q: %v", tc.level, err)
+		}
+		if got := generatedText(t, resp); got != tc.want {
+			t.Fatalf("%q: agy thought level %q, want %q", tc.level, got, tc.want)
+		}
 	}
 }
 

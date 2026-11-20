@@ -229,6 +229,14 @@ func (a *AntigravityACP) run(ctx context.Context, req translate.Request, onText 
 	}}); err != nil {
 		return acp.PromptResponse{}, a.requestError(ctx, c, "select Antigravity model "+a.model, err)
 	}
+	// Claude Code's effort picks agy's thought level, which dominates time to first token. It is only a speed and depth hint, so it is skipped when this agy does not offer the level rather than failing the request.
+	if level := acp.SessionConfigValueId(strings.ToLower(string(req.ThinkingLevel))); level != "" && offersConfigValue(session.ConfigOptions, acpThoughtLevel, level) {
+		if _, err := c.conn.SetSessionConfigOption(ctx, acp.SetSessionConfigOptionRequest{ValueId: &acp.SetSessionConfigOptionValueId{
+			SessionId: sid, ConfigId: acpThoughtLevel, Value: level,
+		}}); err != nil {
+			return acp.PromptResponse{}, a.requestError(ctx, c, "select Antigravity thought level "+string(level), err)
+		}
+	}
 	c.subscribe(sid, func(update acp.SessionUpdate) {
 		if chunk := update.AgentMessageChunk; chunk != nil && chunk.Content.Text != nil {
 			onText(chunk.Content.Text.Text)
@@ -324,7 +332,35 @@ const (
 	acpCloseTimeout = 5 * time.Second
 	// acpStuckAfter is how long agy must have been silent on every session before a timed-out request restarts it.
 	acpStuckAfter = time.Minute
+	// acpThoughtLevel is agy's session config option for reasoning depth (low, medium, high, xhigh).
+	acpThoughtLevel acp.SessionConfigId = "thought_level"
 )
+
+// offersConfigValue reports whether a session's select option id offers value.
+func offersConfigValue(options []acp.SessionConfigOption, id acp.SessionConfigId, value acp.SessionConfigValueId) bool {
+	for _, option := range options {
+		if option.Select == nil || option.Select.Id != id {
+			continue
+		}
+		if ungrouped := option.Select.Options.Ungrouped; ungrouped != nil {
+			for _, choice := range *ungrouped {
+				if choice.Value == value {
+					return true
+				}
+			}
+		}
+		if grouped := option.Select.Options.Grouped; grouped != nil {
+			for _, group := range *grouped {
+				for _, choice := range group.Options {
+					if choice.Value == value {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
 
 // acpLogger receives the SDK's connection diagnostics, which end up in the daemon log. Some of them carry the raw JSON-RPC line, which can hold prompt or answer text; that attribute is dropped because NeoSwitch logs no conversation content.
 var acpLogger = slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
