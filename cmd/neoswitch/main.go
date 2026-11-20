@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sen/neoswitch/internal/provider"
-	"github.com/sen/neoswitch/internal/server"
+	"github.com/yldm-ai/NeoSwitch/internal/provider"
+	"github.com/yldm-ai/NeoSwitch/internal/server"
 )
 
 func main() {

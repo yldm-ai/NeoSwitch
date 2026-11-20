@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sen/neoswitch/internal/anthropic"
-	"github.com/sen/neoswitch/internal/gemini"
+	"github.com/yldm-ai/NeoSwitch/internal/anthropic"
+	"github.com/yldm-ai/NeoSwitch/internal/gemini"
 )
 
 type Result struct {

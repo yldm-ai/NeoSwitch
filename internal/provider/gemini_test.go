@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sen/neoswitch/internal/gemini"
+	"github.com/yldm-ai/NeoSwitch/internal/gemini"
 )
 
 func TestGeminiGenerateUsesExpectedEndpointAndAuth(t *testing.T) {
