@@ -16,7 +16,7 @@ import (
 type State struct {
 	Listen string `json:"listen"`
 	Token  string `json:"token"`
-	// Backend is the upstream the user chose, "antigravity" or "gemini"; empty means choose from the environment. /neoswitch:login sets it so a Gemini key exported for other tools does not override the account the user signed in with.
+	// Backend is the upstream the user chose, "antigravity", "gemini" or "openai"; empty means choose from the environment. /neoswitch:login sets it so a Gemini key exported for other tools does not override the account the user signed in with.
 	Backend string `json:"backend,omitempty"`
 }
 
