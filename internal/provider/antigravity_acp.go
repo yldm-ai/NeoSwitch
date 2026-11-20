@@ -36,13 +36,19 @@ type AntigravityACP struct {
 	promptOverhead atomic.Int64
 }
 
+// ErrAntigravityCLIMissing means the official Antigravity CLI is not installed where NeoSwitch looks for it. Callers add the step that fixes it in their context.
+var ErrAntigravityCLIMissing = errors.New("Google's Antigravity command-line tool (agy) is not installed")
+
 func NewAntigravityACPFromEnv(ctx context.Context) (*AntigravityACP, error) {
 	path := strings.TrimSpace(os.Getenv("ANTIGRAVITY_CLI_PATH"))
 	if path == "" {
 		path = "agy"
 	}
 	if _, err := exec.LookPath(path); err != nil {
-		return nil, fmt.Errorf("Antigravity CLI %q was not found: %w", path, err)
+		if path != "agy" {
+			return nil, fmt.Errorf("%w at %s", ErrAntigravityCLIMissing, path)
+		}
+		return nil, ErrAntigravityCLIMissing
 	}
 	agent := strings.TrimSpace(os.Getenv("ANTIGRAVITY_ACP_AGENT"))
 	if agent == "" {
@@ -76,13 +82,9 @@ func (a *AntigravityACP) Login(ctx context.Context) error {
 		return err
 	}
 	defer c.close()
-	init, err := c.conn.Initialize(ctx, acp.InitializeRequest{
-		ProtocolVersion:    acp.ProtocolVersionNumber,
-		ClientCapabilities: acp.ClientCapabilities{Auth: acp.AuthCapabilities{Terminal: false}},
-		ClientInfo:         &acp.Implementation{Name: "neoswitch", Version: "1"},
-	})
+	init, err := c.initialize(ctx, acp.ClientCapabilities{Auth: acp.AuthCapabilities{Terminal: false}})
 	if err != nil {
-		return fmt.Errorf("initialize Antigravity ACP: %w", err)
+		return errors.New("Google's Antigravity command-line tool (agy) did not respond. Update or reinstall it, then run /neoswitch:login again")
 	}
 	methodID := acp.AuthMethodId("oauth-personal")
 	if len(init.AuthMethods) > 0 {
@@ -94,8 +96,16 @@ func (a *AntigravityACP) Login(ctx context.Context) error {
 	if methodID == "" {
 		return errors.New("Antigravity ACP did not advertise an authentication method")
 	}
-	_, err = c.conn.Authenticate(ctx, acp.AuthenticateRequest{MethodId: methodID})
-	return err
+	if _, err := c.conn.Authenticate(ctx, acp.AuthenticateRequest{MethodId: methodID}); err != nil {
+		// The JSON-RPC error itself means nothing to the user; its message, such as "Authentication required", is kept as the reason.
+		reason := err.Error()
+		var rpcErr *acp.RequestError
+		if errors.As(err, &rpcErr) {
+			reason = rpcErr.Message
+		}
+		return fmt.Errorf("the Google sign-in was not completed (%s). Run /neoswitch:login to try again", reason)
+	}
+	return nil
 }
 
 // ListModels returns the models agy offers this account, in agy's order. agy advertises them as the values of a new session's model option, so this opens one session without prompting it. Like Login it uses a dedicated agy process, which it stops before returning.
@@ -105,11 +115,7 @@ func (a *AntigravityACP) ListModels(ctx context.Context) ([]string, error) {
 		return nil, err
 	}
 	defer c.close()
-	if _, err := c.conn.Initialize(ctx, acp.InitializeRequest{
-		ProtocolVersion:    acp.ProtocolVersionNumber,
-		ClientCapabilities: acp.ClientCapabilities{},
-		ClientInfo:         &acp.Implementation{Name: "neoswitch", Version: "1"},
-	}); err != nil {
+	if _, err := c.initialize(ctx, acp.ClientCapabilities{}); err != nil {
 		return nil, fmt.Errorf("initialize Antigravity ACP: %w", err)
 	}
 	session, err := c.conn.NewSession(ctx, acp.NewSessionRequest{Cwd: a.cwd, McpServers: []acp.McpServer{}})
@@ -301,11 +307,13 @@ func (a *AntigravityACP) run(ctx context.Context, req translate.Request, onText 
 }
 
 // requestError turns a failed ACP call into the error the proxy reports. A context error is returned as such so the server maps a deadline to 504. When a deadline passes while agy has produced no output for any session in acpStuckAfter, agy is treated as stuck and restarted, so one wedged process cannot fail every later request. A slow request on a working agy only cancels its own session.
+//
+// Other failures reach Claude Code as plain sentences: the JSON-RPC error agy sent goes to the daemon log only. An agy that exited or asks for authentication cannot answer any request, so it is reported as unavailable, which Claude Code does not retry.
 func (a *AntigravityACP) requestError(ctx context.Context, c *acpConn, action string, err error) error {
 	select {
 	case <-c.conn.Done():
 		a.discard(c)
-		return fmt.Errorf("%s: Antigravity ACP exited unexpectedly", action)
+		return acpUnavailable(fmt.Errorf("%s: agy exited unexpectedly: %w", action, err))
 	default:
 	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
@@ -314,7 +322,21 @@ func (a *AntigravityACP) requestError(ctx context.Context, c *acpConn, action st
 		}
 		return fmt.Errorf("%s: %w", action, ctxErr)
 	}
-	return fmt.Errorf("%s: %w", action, err)
+	var rpcErr *acp.RequestError
+	if errors.As(err, &rpcErr) && rpcErr.Code == acpAuthRequired {
+		return acpUnavailable(fmt.Errorf("%s: %w", action, err))
+	}
+	acpLogger.Warn("Antigravity request failed", "action", action, "error", err)
+	return &translate.UpstreamError{Reason: "Antigravity could not answer this request. Try again; if it keeps failing, run /neoswitch:login to sign in again."}
+}
+
+// acpUnavailableMessage is what Claude Code shows when agy cannot serve any request: it did not start, did not finish the handshake, exited, or asks for a sign-in.
+const acpUnavailableMessage = "Antigravity is not responding, possibly because you are signed out. Run /neoswitch:login to sign in again, or run /neoswitch:off and start a new session to go back to Claude."
+
+// acpUnavailable logs the cause, which can hold raw JSON-RPC text, and returns the plain error the proxy reports.
+func acpUnavailable(cause error) error {
+	acpLogger.Warn("Antigravity unavailable", "error", cause)
+	return &translate.UnavailableError{Message: acpUnavailableMessage}
 }
 
 // connection returns the running agy, starting and initializing one when there is none or the previous one exited.
@@ -332,19 +354,15 @@ func (a *AntigravityACP) connection(ctx context.Context) (*acpConn, error) {
 	}
 	c, err := startACP(a.path, a.agent, a.cwd)
 	if err != nil {
-		return nil, err
+		return nil, acpUnavailable(err)
 	}
-	init, err := c.conn.Initialize(ctx, acp.InitializeRequest{
-		ProtocolVersion:    acp.ProtocolVersionNumber,
-		ClientCapabilities: acp.ClientCapabilities{},
-		ClientInfo:         &acp.Implementation{Name: "neoswitch", Version: "1"},
-	})
+	init, err := c.initialize(ctx, acp.ClientCapabilities{})
 	if err != nil {
 		_ = c.close()
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, fmt.Errorf("initialize Antigravity ACP: %w", ctxErr)
 		}
-		return nil, fmt.Errorf("initialize Antigravity ACP: %w", err)
+		return nil, acpUnavailable(fmt.Errorf("initialize Antigravity ACP: %w", err))
 	}
 	c.imagePrompts = init.AgentCapabilities.PromptCapabilities.Image
 	a.conn = c
@@ -361,7 +379,12 @@ func (a *AntigravityACP) discard(c *acpConn) {
 	_ = c.close()
 }
 
+// acpInitializeTimeout bounds the ACP handshake with a new agy. A working agy answers it at once; one that hangs (a broken update, a prompt waiting for input) would otherwise hold the request silently for the whole upstream timeout. Generation itself is not limited by it.
+var acpInitializeTimeout = 30 * time.Second
+
 const (
+	// acpAuthRequired is the ACP error code for a request that needs the user to authenticate first.
+	acpAuthRequired = -32000
 	// acpCloseTimeout bounds the session/close and session/cancel messages sent after a request has ended.
 	acpCloseTimeout = 5 * time.Second
 	// acpStuckAfter is how long agy must have been silent on every session before a timed-out request restarts it.
@@ -453,6 +476,17 @@ func startACP(path, agent, cwd string) (*acpConn, error) {
 	c.conn = acp.NewClientSideConnection(c, stdin, stdout)
 	c.conn.SetLogger(acpLogger)
 	return c, nil
+}
+
+// initialize performs the ACP handshake within acpInitializeTimeout.
+func (c *acpConn) initialize(ctx context.Context, capabilities acp.ClientCapabilities) (acp.InitializeResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, acpInitializeTimeout)
+	defer cancel()
+	return c.conn.Initialize(ctx, acp.InitializeRequest{
+		ProtocolVersion:    acp.ProtocolVersionNumber,
+		ClientCapabilities: capabilities,
+		ClientInfo:         &acp.Implementation{Name: "neoswitch", Version: "1"},
+	})
 }
 
 func (c *acpConn) close() error {

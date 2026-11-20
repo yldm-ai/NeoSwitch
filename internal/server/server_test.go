@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"iter"
 	"net/http"
 	"net/http/httptest"
@@ -209,13 +210,44 @@ func TestUpstreamStatusMapping(t *testing.T) {
 		{genai.APIError{Code: 404, Message: "model not found"}, 404, "not_found_error", "model not found"},
 		{genai.APIError{Code: 503, Message: "overloaded"}, 529, "overloaded_error", "overloaded"},
 		{genai.APIError{Code: 500, Message: "internal"}, 500, "api_error", "internal"},
-		{context.DeadlineExceeded, 504, "api_error", "did not respond"},
+		{genai.APIError{Code: 400, Message: "API key not valid. Please pass a valid API key.", Status: "INVALID_ARGUMENT"}, 400, "invalid_request_error", "Google rejected the Gemini API key"},
+		{genai.APIError{Code: 400, Message: "bad key", Details: []map[string]any{{"reason": "API_KEY_INVALID"}}}, 400, "invalid_request_error", "Google rejected the Gemini API key"},
+		{context.DeadlineExceeded, 504, "api_error", "did not answer within 10 minutes"},
 		{errors.New("dial tcp: refused"), 502, "api_error", "refused"},
+		{fmt.Errorf("start: %w", &translate.UnavailableError{Message: "Run /neoswitch:login to sign in again."}), 403, "permission_error", "Run /neoswitch:login to sign in again."},
 	} {
 		status, typ, message := upstreamStatus(tc.err)
 		if status != tc.status || typ != tc.typ || !strings.Contains(message, tc.message) {
 			t.Errorf("%v -> %d %s %q", tc.err, status, typ, message)
 		}
+		if strings.Contains(message, "Gemini request failed") {
+			t.Errorf("%v: message %q names Gemini for a failure on any backend", tc.err, message)
+		}
+	}
+}
+
+func TestUnavailableUpstreamIsReportedVerbatim(t *testing.T) {
+	const message = "Antigravity is not responding. Run /neoswitch:login to sign in again."
+	backend := &fakeBackend{err: &translate.UnavailableError{Message: message}}
+	for _, body := range []string{textRequest, streamRequest} {
+		rec := post(t, NewHandler(Config{Token: "secret", Backend: backend}), "/v1/messages", body)
+		var got struct {
+			Error struct{ Type, Message string } `json:"error"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+			t.Fatalf("%s: %v", rec.Body, err)
+		}
+		if rec.Code != http.StatusForbidden || got.Error.Type != "permission_error" || got.Error.Message != message {
+			t.Fatalf("%d %s", rec.Code, rec.Body)
+		}
+	}
+}
+
+func TestUnsupportedFeatureHasNoFieldPath(t *testing.T) {
+	body := `{"model":"m","max_tokens":10,"tools":[{"type":"web_search_20250305","name":"web_search"}],"messages":[{"role":"user","content":"hi"}]}`
+	rec := post(t, NewHandler(Config{Token: "secret", Backend: &fakeBackend{}}), "/v1/messages", body)
+	if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "Web search (WebSearch) does not work with NeoSwitch") || strings.Contains(rec.Body.String(), "tools[0]") {
+		t.Fatalf("%d %s", rec.Code, rec.Body)
 	}
 }
 

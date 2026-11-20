@@ -3,6 +3,8 @@ package daemon
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -97,6 +99,52 @@ func TestEnableRefusesInvalidSettings(t *testing.T) {
 	}
 }
 
+func TestInvalidSettingsNameTheLine(t *testing.T) {
+	for name, tc := range map[string]struct{ content, want string }{
+		"trailing comma": {"{\n  \"env\": {\n    \"A\": \"1\",\n  }\n}\n", "line 4 has a formatting mistake"},
+		"truncated":      {"{\n  \"env\": ", "line 2 has a formatting mistake"},
+		"not an object":  {"[1, 2]", "must hold a single JSON object"},
+		"env not object": {`{"env": "x"}`, `"env" entry is not a JSON object`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			project := t.TempDir()
+			path := settingsPath(project)
+			_ = os.MkdirAll(filepath.Dir(path), 0o755)
+			_ = os.WriteFile(path, []byte(tc.content), 0o644)
+			err := Enable(project, State{Listen: "127.0.0.1:1", Token: "t"})
+			if err == nil || !strings.Contains(err.Error(), tc.want) || strings.Contains(err.Error(), "invalid character") {
+				t.Fatalf("got %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCorruptStateNamesTheSlashCommand(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "proxy.json"), []byte("{"), 0o600)
+	if _, _, err := LoadState(dir); err == nil || !strings.Contains(err.Error(), "/neoswitch:on") || strings.Contains(err.Error(), "`neoswitch") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestAttachFailsFastWhenAnotherProgramHoldsThePort(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	s := State{Listen: listener.Addr().String(), Token: "t"}
+	start := time.Now()
+	err = Attach(s, 100, func() error { t.Fatal("must not spawn a daemon that cannot listen"); return nil })
+	var busy *PortInUseError
+	if !errors.As(err, &busy) || busy.Listen != s.Listen {
+		t.Fatalf("got %v", err)
+	}
+	if elapsed := time.Since(start); elapsed > 5*time.Second {
+		t.Fatalf("took %s", elapsed)
+	}
+}
+
 type fakeProcs struct {
 	mu    sync.Mutex
 	alive map[int]bool
@@ -130,7 +178,7 @@ func TestDaemonServesUntilLastSessionExits(t *testing.T) {
 	done := make(chan error, 1)
 	spawn := func() error {
 		go func() {
-			done <- Run(context.Background(), s, proxy, Options{StartupGrace: time.Minute, PollInterval: 20 * time.Millisecond, Alive: procs.Alive})
+			done <- Run(context.Background(), s, proxy, Options{StartupGrace: time.Minute, PollInterval: 20 * time.Millisecond, Alive: procs.Alive, Version: "v9"})
 		}()
 		return nil
 	}
@@ -143,7 +191,7 @@ func TestDaemonServesUntilLastSessionExits(t *testing.T) {
 	if err := Attach(s, 200, func() error { t.Fatal("second attach must reuse the running daemon"); return nil }); err != nil {
 		t.Fatal(err)
 	}
-	if info, ok := Status(s); !ok || info.Sessions != 2 {
+	if info, ok := Status(s); !ok || info.Sessions != 2 || info.Version != "v9" {
 		t.Fatalf("status = %+v %v", info, ok)
 	}
 	resp, err := http.Get(s.BaseURL() + "/v1/messages")

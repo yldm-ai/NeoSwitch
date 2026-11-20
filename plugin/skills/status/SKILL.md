@@ -1,5 +1,5 @@
 ---
-description: Show whether this project uses NeoSwitch and whether its proxy is running
+description: Show whether this project uses Claude or Gemini 4 Neon, and what to do next
 disable-model-invocation: true
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/plugin/neoswitch.sh *)
 ---

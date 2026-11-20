@@ -1,5 +1,5 @@
 ---
-description: Route new Claude Code sessions in this project back to Anthropic
+description: Switch this project back to Claude
 disable-model-invocation: true
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/plugin/neoswitch.sh *)
 ---

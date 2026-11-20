@@ -8,14 +8,30 @@ bin="$cache/neoswitch-$(printf '%s' "$root" | cksum | cut -d' ' -f1)"
 if [ -x "$bin" ] && [ -z "$(find "$root/cmd" "$root/internal" "$root/go.mod" "$root/go.sum" -newer "$bin" \( -name '*.go' -o -name 'go.*' \) -print 2>/dev/null | head -n 1)" ]; then
 	exec "$bin" "$@"
 fi
+version=v$(tr -d ' \t\r\n' <"$root/VERSION")
+preparing="NeoSwitch: getting ready after an install or update; this can take up to a minute."
+
+# prune removes the binaries of other plugin versions from the cache, keeping $1, the one about to run, and builds or downloads still in progress. A daemon started from a removed binary keeps running; the next session start tells the user it is outdated.
+prune() {
+	for old in "$cache"/neoswitch-*; do
+		case $old in
+		"$1" | *.tmp) ;;
+		*) if [ -f "$old" ]; then rm -f "$old"; fi ;;
+		esac
+	done
+}
+
 if command -v go >/dev/null 2>&1; then
 	mkdir -p "$cache"
-	(cd "$root" && go build -trimpath -o "$bin.tmp" ./cmd/neoswitch) >&2
+	echo "$preparing" >&2
+	# The version names the plugin's source: the release it follows plus the plugin directory, which Claude Code names after the installed version or commit.
+	plugin_dir=$(printf '%s' "$(basename "$root")" | tr -c 'A-Za-z0-9._-' '_')
+	(cd "$root" && go build -trimpath -ldflags "-X main.version=$version+source.$plugin_dir" -o "$bin.tmp" ./cmd/neoswitch) >&2
 	mv "$bin.tmp" "$bin"
+	prune "$bin"
 	exec "$bin" "$@"
 fi
 
-version=v$(tr -d ' \t\r\n' <"$root/VERSION")
 case $(uname -s) in
 Darwin) os=darwin ;;
 Linux) os=linux ;;
@@ -46,7 +62,8 @@ if [ ! -x "$release" ]; then
 	tmp=$(mktemp -d "$cache/.download.XXXXXX")
 	trap 'rm -rf "$tmp"' EXIT
 	trap 'exit 1' INT TERM
-	echo "NeoSwitch: Go not found, downloading $asset ..." >&2
+	echo "$preparing" >&2
+	echo "NeoSwitch: downloading $asset ..." >&2
 	if ! curl -fsSL --connect-timeout 15 --max-time 300 -o "$tmp/checksums.txt" "$base/checksums.txt" || ! curl -fsSL --connect-timeout 15 --max-time 300 -o "$tmp/$asset" "$base/$asset"; then
 		echo "NeoSwitch could not download $asset from $base; check the network, or install Go from https://go.dev/dl so the plugin can build it." >&2
 		exit 1
@@ -62,5 +79,6 @@ if [ ! -x "$release" ]; then
 	rm -rf "$tmp"
 	trap - EXIT INT TERM
 	echo "NeoSwitch: verified $asset." >&2
+	prune "$release"
 fi
 exec "$release" "$@"

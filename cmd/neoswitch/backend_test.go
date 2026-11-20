@@ -1,14 +1,17 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/yldm-ai/neo-switch/internal/daemon"
+	"github.com/yldm-ai/neo-switch/internal/provider"
 )
 
 // isolateBackendEnv clears every input resolveBackend reads, points the state at a temp dir, and makes agy available or not.
@@ -155,5 +158,213 @@ func TestOpenAIBackendRequiresModel(t *testing.T) {
 	}
 	if model != "test-model" || label != backendLabel(backendOpenAI, "") {
 		t.Fatalf("model %q label %q", model, label)
+	}
+}
+
+func TestOnRefusesWithoutBackend(t *testing.T) {
+	state := isolateBackendEnv(t, false)
+	project := t.TempDir()
+	if err := on([]string{project}); !errors.Is(err, errNoBackend) {
+		t.Fatalf("expected errNoBackend, got %v", err)
+	}
+	for _, path := range []string{filepath.Join(project, ".claude", "settings.local.json"), filepath.Join(state, "proxy.json")} {
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("%s was written: %v", path, err)
+		}
+	}
+	if message := errNoBackend.Error(); !strings.Contains(message, "/neoswitch:login") || strings.Contains(message, "export") {
+		t.Fatalf("errNoBackend must name the slash command and no shell step: %q", message)
+	}
+}
+
+func TestOnExcludesSettingsFromGit(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	isolateBackendEnv(t, true)
+	// A global excludes file on the machine running the tests must not decide the outcome.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	repo := t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", repo).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
+	settings := filepath.Join(".claude", "settings.local.json")
+	for _, project := range []string{repo, filepath.Join(repo, "sub", "app")} {
+		if err := os.MkdirAll(project, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := on([]string{project}); err != nil {
+			t.Fatal(err)
+		}
+		if !isGitIgnored(project, settings) {
+			t.Fatalf("%s: settings are not ignored after on", project)
+		}
+		// Running on again must not add the pattern twice.
+		if err := on([]string{project}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(repo, ".git", "info", "exclude"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"/.claude/settings.local.json", "/sub/app/.claude/settings.local.json"} {
+		if n := strings.Count("\n"+string(data), "\n"+want+"\n"); n != 1 {
+			t.Fatalf("exclude has %q %d times:\n%s", want, n, data)
+		}
+	}
+}
+
+func TestStatusAnswersInPlainLines(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		setup   func(t *testing.T, project string)
+		want    []string
+		notWant []string
+	}{
+		{
+			name: "off without a backend",
+			want: []string{"This project uses Claude.", "/neoswitch:login"},
+		},
+		{
+			name:  "off with agy",
+			setup: func(t *testing.T, project string) { installAgy(t) },
+			want:  []string{"This project uses Claude.", "Run /neoswitch:on to switch it to Gemini 4 Neon."},
+		},
+		{
+			name: "on, this session not yet",
+			setup: func(t *testing.T, project string) {
+				installAgy(t)
+				mustOn(t, project)
+			},
+			want: []string{"this session still uses Claude", "Start a new Claude Code session here to use Gemini 4 Neon."},
+		},
+		{
+			name: "on, agy removed afterwards",
+			setup: func(t *testing.T, project string) {
+				installAgy(t)
+				mustOn(t, project)
+				t.Setenv("ANTIGRAVITY_CLI_PATH", filepath.Join(t.TempDir(), "agy"))
+			},
+			want:    []string{"cannot reach a model", "/neoswitch:login", "/neoswitch:off"},
+			notWant: []string{"Gemini 4 Neon"},
+		},
+		{
+			name: "this session routed, service not running",
+			setup: func(t *testing.T, project string) {
+				installAgy(t)
+				mustOn(t, project)
+				state, _, _ := daemon.LoadState(os.Getenv("NEOSWITCH_STATE_DIR"))
+				t.Setenv("ANTHROPIC_BASE_URL", state.BaseURL())
+			},
+			want: []string{"cannot answer", "Start a new Claude Code session here to restart it"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			isolateBackendEnv(t, false)
+			t.Setenv("ANTHROPIC_BASE_URL", "")
+			project := t.TempDir()
+			if tc.setup != nil {
+				tc.setup(t, project)
+			}
+			var out bytes.Buffer
+			if err := printStatus(&out, project, false); err != nil {
+				t.Fatal(err)
+			}
+			text := out.String()
+			if lines := strings.Count(text, "\n"); lines < 2 || lines > 3 {
+				t.Fatalf("want two or three lines, got:\n%s", text)
+			}
+			for _, word := range append([]string{"127.0.0.1", "daemon", "ACP", "-> gemini"}, tc.notWant...) {
+				if strings.Contains(text, word) {
+					t.Fatalf("output contains %q:\n%s", word, text)
+				}
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(text, want) {
+					t.Fatalf("output lacks %q:\n%s", want, text)
+				}
+			}
+			out.Reset()
+			if err := printStatus(&out, project, true); err != nil {
+				t.Fatal(err)
+			}
+			if !strings.Contains(out.String(), "version:  ") {
+				t.Fatalf("verbose output lacks the details:\n%s", out.String())
+			}
+		})
+	}
+}
+
+func installAgy(t *testing.T) {
+	t.Helper()
+	agy := filepath.Join(t.TempDir(), "agy")
+	if err := os.WriteFile(agy, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("ANTIGRAVITY_CLI_PATH", agy)
+}
+
+func mustOn(t *testing.T, project string) {
+	t.Helper()
+	if err := on([]string{project}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAttachNotice(t *testing.T) {
+	agy := backendLabel(backendAntigravity, "")
+	for _, tc := range []struct {
+		name    string
+		notice  string
+		label   string
+		info    daemon.Info
+		running bool
+		want    string
+	}{
+		{"success names the model", "", agy, daemon.Info{Backend: agy, Version: version}, true, "this session uses Gemini 4 Neon through your Google account (Antigravity sign-in). Ignore the Claude model name in the header. The first reply can take a while."},
+		{"api key", "", "Gemini Developer API", daemon.Info{Backend: "Gemini Developer API", Version: version}, true, "through a Gemini API key"},
+		{"earlier backend", "", "Gemini Developer API", daemon.Info{Backend: agy, Version: version}, true, "still share the earlier setup (your Google account (Antigravity sign-in))"},
+		{"earlier version", "", agy, daemon.Info{Backend: agy, Version: "v0.0.1"}, true, "still use the earlier NeoSwitch version"},
+		{"daemon without version", "", agy, daemon.Info{Backend: agy}, true, "Close all Claude Code windows"},
+		{"gateway notice only", "NeoSwitch: gateway.", agy, daemon.Info{Backend: agy, Version: version}, true, "NeoSwitch: gateway."},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := attachNotice(tc.notice, provider.DefaultModel, tc.label, tc.info, tc.running)
+			if !strings.Contains(got, tc.want) {
+				t.Fatalf("got %q, want %q", got, tc.want)
+			}
+			if tc.notice != "" && strings.Contains(got, "this session uses") {
+				t.Fatalf("a notice must not be followed by a success claim: %q", got)
+			}
+		})
+	}
+}
+
+func TestSessionBlockedNamesNeoSwitchOnce(t *testing.T) {
+	for _, problem := range []string{errNoBackend.Error(), "the proxy stopped"} {
+		message := sessionBlocked(problem)
+		if !strings.HasPrefix(message, "NeoSwitch") || strings.Count(message, "NeoSwitch") != 1 {
+			t.Fatalf("sessionBlocked(%q) = %q, want NeoSwitch named once at the start", problem, message)
+		}
+	}
+}
+
+func TestSessionStartProblemsNameTheFix(t *testing.T) {
+	isolateBackendEnv(t, false)
+	t.Setenv(backendEnv, backendAntigravity)
+	_, _, _, err := configuredBackend(context.Background())
+	message := sessionBlocked(err.Error())
+	for _, want := range []string{"Antigravity CLI from Google", "/neoswitch:off"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("%q lacks %q", message, want)
+		}
+	}
+	for _, jargon := range []string{"PATH", "exec", "stat ", "`neoswitch"} {
+		if strings.Contains(message, jargon) {
+			t.Fatalf("%q contains %q", message, jargon)
+		}
 	}
 }

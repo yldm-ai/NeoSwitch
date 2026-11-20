@@ -84,9 +84,9 @@ Fermez puis rouvrez Claude Code dans ce projet. Vérifiez la route avec :
 /neoswitch:status
 ```
 
-L'état doit afficher `NeoSwitch ... -> gemini-4-neon`. Claude Code peut continuer d'afficher le nom de modèle demandé, par exemple `claude-opus-5-5`, dans l'en-tête de session ; la route réellement utilisée vers le service amont est celle qu'affiche `/neoswitch:status`.
+Si tout fonctionne, la nouvelle session s'ouvre avec un message comme `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.`, et `/neoswitch:status` répond `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` Claude Code peut continuer d'afficher le nom de modèle demandé, par exemple `claude-opus-5-5`, dans l'en-tête de session ; le modèle qui répond réellement est celui qu'indiquent le message de NeoSwitch et `/neoswitch:status`.
 
-`/neoswitch:on` et `/neoswitch:off` modifient le routage sans connexion.
+`/neoswitch:on` et `/neoswitch:off` basculent le projet sans nouvelle connexion. `/neoswitch:on` s'arrête avec un message, sans rien modifier, tant qu'aucune clé d'API Gemini ni connexion Antigravity n'est configurée.
 
 ## Autres chemins d'identifiants
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | S'authentifie avec Antigravity OAuth, active la route Neon de ce projet et utilise ACP |
 | `/neoswitch:on` | Active le routage pour les nouvelles sessions Claude Code de ce projet |
-| `/neoswitch:status` | Affiche la route du projet et l'état du daemon |
+| `/neoswitch:status` | Indique si ce projet et cette session utilisent Gemini 4 Neon, et quoi faire ensuite |
 | `/neoswitch:off` | Désactive le routage pour les nouvelles sessions de ce projet |
 
 Après avoir modifié le routage, démarrez une nouvelle session Claude Code. La session en cours conserve sa connexion existante.
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # vérifie la session agy enregistrée sans affich
 neoswitch models              # liste les modèles utilisables avec les identifiants, en marquant celui configuré
 neoswitch on [project]        # active le routage d'un projet
 neoswitch off [project]       # désactive le routage d'un projet
-neoswitch status [project]    # affiche le routage et l'état du daemon
+neoswitch status [-v] [project] # indique si un projet utilise NeoSwitch et quoi faire (-v ajoute des détails)
 neoswitch version             # affiche la version de NeoSwitch
 ```
 

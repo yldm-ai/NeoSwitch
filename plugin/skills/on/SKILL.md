@@ -1,5 +1,5 @@
 ---
-description: Route new Claude Code sessions in this project to Gemini through NeoSwitch
+description: Switch this project to Gemini 4 Neon, once you have signed in or set up a Gemini API key
 disable-model-invocation: true
 allowed-tools: Bash(${CLAUDE_PLUGIN_ROOT}/plugin/neoswitch.sh *)
 ---

@@ -14,7 +14,7 @@ The maintainers follow up in the private advisory, where the fix and its disclos
 
 ## Security model
 
-- **Loopback-only proxy with a random token**: the plugin's shared daemon and `neoswitch claude` listen on `127.0.0.1` on a port picked at startup, and every request must carry a random token. The plugin's token is stored in the user-private state file `proxy.json` (mode `0600`) and in the project's `.claude/settings.local.json`; `neoswitch on` warns when that file is not git-ignored.
+- **Loopback-only proxy with a random token**: the plugin's shared daemon and `neoswitch claude` listen on `127.0.0.1` on a port picked at startup, and every request must carry a random token. The plugin's token is stored in the user-private state file `proxy.json` (mode `0600`) and in the project's `.claude/settings.local.json`; `neoswitch on` adds that file to the repository's local exclude file (the path `git rev-parse --git-path info/exclude` gives) without touching `.gitignore`, and prints a note only if git still does not ignore the file.
 - **No conversation content or credentials in logs**: the daemon log records startup and error messages only. Prompts, responses, API keys and OAuth tokens are not logged; ACP diagnostics that can carry raw message text are dropped.
 - **OAuth tokens stay in `agy`**: with Antigravity OAuth, sign-in runs through the official `agy` CLI's ACP `authenticate` flow, and `agy` keeps the credentials. NeoSwitch does not read, copy, export or relay them, and calls no private Antigravity HTTP API.
 - **Tools run only in Claude Code**: `agy`'s own file, shell and web tools are refused on every request, so tool calls are executed by Claude Code under its permission rules.

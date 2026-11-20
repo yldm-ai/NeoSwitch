@@ -84,9 +84,9 @@ claude plugin update neoswitch@neoswitch
 /neoswitch:status
 ```
 
-Статус должен показывать `NeoSwitch ... -> gemini-4-neon`. В заголовке сессии Claude Code может по-прежнему отображать запрошенную метку, например `claude-opus-5-5`; вышестоящий маршрут — тот, который показывает `/neoswitch:status`.
+Если всё работает, новая сессия начинается с сообщения вроде `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.`, а `/neoswitch:status` отвечает `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` В заголовке сессии Claude Code может по-прежнему отображать запрошенную метку, например `claude-opus-5-5`; на самом деле отвечает модель, которую называют сообщение NeoSwitch и `/neoswitch:status`.
 
-`/neoswitch:on` и `/neoswitch:off` переключают маршрутизацию без входа.
+`/neoswitch:on` и `/neoswitch:off` переключают проект без повторного входа. Пока не настроены ни ключ Gemini API, ни вход через Antigravity, `/neoswitch:on` останавливается с сообщением и ничего не меняет.
 
 ## Другие способы получения учётных данных
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | Аутентифицирует через Antigravity OAuth, включает маршрут Neon для этого проекта и использует ACP |
 | `/neoswitch:on` | Включает маршрутизацию для новых сессий Claude Code в этом проекте |
-| `/neoswitch:status` | Показывает маршрут проекта и состояние демона |
+| `/neoswitch:status` | Сообщает, используют ли этот проект и эта сессия Gemini 4 Neon, и что делать дальше |
 | `/neoswitch:off` | Отключает маршрутизацию для новых сессий в этом проекте |
 
 После изменения маршрутизации запустите новую сессию Claude Code. Текущая сессия сохраняет существующее подключение.
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # проверить сохранённую сес
 neoswitch models              # перечислить модели, доступные с этими учётными данными, отметив настроенную
 neoswitch on [project]        # включить маршрутизацию для проекта
 neoswitch off [project]       # отключить маршрутизацию для проекта
-neoswitch status [project]    # показать маршрутизацию и состояние демона
+neoswitch status [-v] [project] # показать, использует ли проект NeoSwitch и что делать (-v добавляет подробности)
 neoswitch version             # вывести версию NeoSwitch
 ```
 
