@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sen/neoswitch/internal/anthropic"
-	"github.com/sen/neoswitch/internal/gemini"
-	"github.com/sen/neoswitch/internal/translate"
+	"github.com/yldm-ai/NeoSwitch/internal/anthropic"
+	"github.com/yldm-ai/NeoSwitch/internal/gemini"
+	"github.com/yldm-ai/NeoSwitch/internal/translate"
 )
 
 type Generator interface {

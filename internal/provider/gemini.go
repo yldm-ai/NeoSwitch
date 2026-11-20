@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sen/neoswitch/internal/gemini"
+	"github.com/yldm-ai/NeoSwitch/internal/gemini"
 )
 
 type Gemini struct {

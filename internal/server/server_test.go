@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sen/neoswitch/internal/gemini"
+	"github.com/yldm-ai/NeoSwitch/internal/gemini"
 )
 
 type fakeGenerator struct {
