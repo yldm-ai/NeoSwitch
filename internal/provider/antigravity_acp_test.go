@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -45,6 +46,7 @@ const (
 //   - exit: the process dies on session/prompt
 //   - stream, tool: answer with streamEnvelope or a tool call, one character per chunk
 //   - refusal: answers nothing with stopReason refusal
+//   - no-models, grouped-models: sessions offer no model option, or offer fakeModels in groups; every other mode offers them ungrouped
 func runFakeACP(mode string) {
 	in := bufio.NewScanner(os.Stdin)
 	in.Buffer(make([]byte, 64<<10), 32<<20)
@@ -152,11 +154,32 @@ func runFakeACP(mode string) {
 		case "session/new":
 			sessions++
 			result := map[string]any{"sessionId": "s" + strings.Repeat("x", sessions)}
+			var options []any
+			switch mode {
+			case "no-models":
+			case "grouped-models":
+				options = append(options, map[string]any{
+					"type": "select", "id": "model", "name": "Model", "currentValue": fakeModels[0],
+					"options": []any{
+						map[string]any{"group": "pro", "name": "Pro", "options": []any{map[string]string{"value": fakeModels[0], "name": "A"}}},
+						map[string]any{"group": "flash", "name": "Flash", "options": []any{map[string]string{"value": fakeModels[1], "name": "B"}, map[string]string{"value": fakeModels[2], "name": "C"}}},
+					},
+				})
+			default:
+				var choices []any
+				for _, model := range fakeModels {
+					choices = append(choices, map[string]string{"value": model, "name": model})
+				}
+				options = append(options, map[string]any{"type": "select", "id": "model", "name": "Model", "currentValue": fakeModels[0], "options": choices})
+			}
 			if mode == "effort" {
-				result["configOptions"] = []any{map[string]any{
+				options = append(options, map[string]any{
 					"type": "select", "id": "thought_level", "name": "Thinking", "currentValue": "high",
 					"options": []any{map[string]string{"value": "low", "name": "Low"}, map[string]string{"value": "high", "name": "High"}},
-				}}
+				})
+			}
+			if options != nil {
+				result["configOptions"] = options
 			}
 			reply(result)
 		case "session/set_config_option":
@@ -237,6 +260,9 @@ func runFakeACP(mode string) {
 		}
 	}
 }
+
+// fakeModels are the models the fake advertises in a new session's model option, in that order.
+var fakeModels = []string{"gemini-b-pro", DefaultModel, "gemini-a-flash"}
 
 func newFakeACP(t *testing.T, mode string) *AntigravityACP {
 	t.Setenv(fakeACPEnv, mode)
@@ -464,6 +490,39 @@ func TestACPLoginUsesAdvertisedMethod(t *testing.T) {
 	a := newFakeACP(t, "ok")
 	if err := a.Login(context.Background()); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestACPListModelsReadsSessionModelOption(t *testing.T) {
+	for _, mode := range []string{"ok", "grouped-models"} {
+		t.Run(mode, func(t *testing.T) {
+			a := newFakeACP(t, mode)
+			got, err := a.ListModels(context.Background())
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !slices.Equal(got, fakeModels) {
+				t.Fatalf("models %v, want %v in agy's order", got, fakeModels)
+			}
+			// Listing uses its own agy and must not leave a shared connection behind.
+			if a.conn != nil {
+				t.Fatal("ListModels kept an agy connection open")
+			}
+		})
+	}
+}
+
+func TestACPListModelsFailsWithoutModelOption(t *testing.T) {
+	a := newFakeACP(t, "no-models")
+	if _, err := a.ListModels(context.Background()); err == nil || !strings.Contains(err.Error(), "no models") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestACPListModelsReportsStartFailure(t *testing.T) {
+	a := &AntigravityACP{path: t.TempDir() + "/missing-agy", agent: "bare-llm", model: DefaultModel, cwd: t.TempDir()}
+	if _, err := a.ListModels(context.Background()); err == nil || !strings.Contains(err.Error(), "start Antigravity ACP") {
+		t.Fatalf("err = %v", err)
 	}
 }
 
