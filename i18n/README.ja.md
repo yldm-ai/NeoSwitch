@@ -38,7 +38,7 @@ OAuth の認証情報は常に `agy` の中にとどまります。NeoSwitch が
 
 - Claude Code。
 - Antigravity OAuth を使う場合：公式 Antigravity CLI（`agy` として PATH 上にあること）。
-- Go。プラグインは初回使用時に同梱の NeoSwitch バイナリをビルドします。
+- Go（任意）。Go がある場合、プラグインは初回使用時に同梱の NeoSwitch バイナリをソースからビルドします。Go がない場合は、リポジトリの `VERSION` ファイルが示すリリースのバイナリを macOS または Linux（amd64 または arm64）向けにダウンロードし、実行前に SHA-256 チェックサムを検証します。リリースの合間には、そのバイナリがプラグインのソースより古いことがあります。
 
 ### プラグインのインストール
 
@@ -190,7 +190,7 @@ GEMINI_API_KEY='your-key' neoswitch serve
 | `no authorization code was entered` | 最新のプラグインに更新してください。現在のフローは ACP `authenticate` を使い、シェルの stdin を読みません。 |
 | 新しいセッションで `ECONNREFUSED` | `/neoswitch:status` を実行します。ルートが有効ならデーモンのメッセージを確認してセッションを再起動します。Anthropic を使うセッションから `/neoswitch:off` を実行し、認証情報を修正してから再度有効にしてください。 |
 | バックエンドが設定されていないと表示される | `/neoswitch:login` を実行するか、Claude Code の起動前に `GEMINI_API_KEY` または Vertex AI の設定を export します。 |
-| プラグインのビルドに失敗する | Go をインストールして Claude Code を再起動します。 |
+| プラグインのビルドまたはダウンロードに失敗する | Go をインストールして Claude Code を再起動します。Go があればプラグインはソースからビルドし、何もダウンロードしません。Go がない場合は GitHub Releases にアクセスできるか確認します。チェックサムの不一致は、ダウンロードが拒否され何も実行されなかったことを意味します。 |
 
 ## 互換性の範囲
 
@@ -201,7 +201,6 @@ Anthropic は Claude Code を Claude 以外のモデルへルーティングす�
 ## ロードマップ
 
 - OpenAI を皮切りに、より多くのモデルプロバイダーに対応します。すでに Anthropic 互換エンドポイントを提供しているプロバイダーは、`ANTHROPIC_BASE_URL` を直接設定すれば使え、NeoSwitch は必要ありません。
-- プラグイン用のビルド済みバイナリを提供し、Go を不要にします。
 
 ## 開発
 
@@ -210,5 +209,7 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+リリースするには `VERSION` を更新し、対応するタグ（`v` に続けてその内容、例: `v0.1.0`）を push します。一致しないタグはリリースワークフローが拒否します。
 
 MIT License
