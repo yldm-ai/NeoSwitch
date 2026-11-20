@@ -2,7 +2,7 @@
 
 [English](../README.md) | **简体中文** | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md)
 
-[![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/releases) [![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
 
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neon-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neon-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md)
 
@@ -180,6 +180,41 @@ GEMINI_API_KEY='你的 API Key' neoswitch serve
 
 在客户端中同时设置 `ANTHROPIC_BASE_URL` 和 `ANTHROPIC_AUTH_TOKEN`。`neoswitch claude` 会使用临时端口和 token 自动配置这两个变量。
 
+## 升级与卸载
+
+### 升级
+
+插件用 [安装插件](#安装插件) 中的命令更新。独立 CLI 可以从 [Releases](https://github.com/yldm-ai/neon-switch/releases) 页面下载更新的二进制，或用 Go 安装最新版本：
+
+```bash
+go install github.com/yldm-ai/neon-switch/cmd/neoswitch@latest
+```
+
+仓库已从 `yldm-ai/NeoSwitch` 迁移到 `yldm-ai/neon-switch`。如果你是用旧名称添加的 marketplace，请从新地址重新添加：
+
+```bash
+claude plugin marketplace add yldm-ai/neon-switch
+```
+
+### 卸载
+
+1. 卸载前，在每个开启了路由的项目中运行 `/neoswitch:off`（或 `neoswitch off <project>`）。卸载插件不会修改项目文件：跳过这一步的话，该项目 `.claude/settings.local.json` 的 `env` 对象会保留 `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN` 和 `CLAUDE_CODE_USE_GATEWAY`，之后该项目的新会话会去连接一个不再启动的代理。如果插件已经卸载，请手动删除这三项。
+2. 关闭使用 NeoSwitch 的 Claude Code 会话，然后在终端中移除插件及其 marketplace：
+
+```bash
+claude plugin uninstall neoswitch@neoswitch
+claude plugin marketplace remove neoswitch
+```
+
+3. 删除 NeoSwitch 在项目之外保存的文件：
+
+| 内容 | 位置 |
+|---|---|
+| 首次使用时构建的插件二进制 | `$XDG_CACHE_HOME/neoswitch/`；未设置 `XDG_CACHE_HOME` 时为 `~/.cache/neoswitch/` |
+| 状态目录：`proxy.json`（代理地址、token、保存的后端）和 `daemon.log` | 设置了 `NEOSWITCH_STATE_DIR` 时为该目录；否则 macOS 上为 `~/Library/Application Support/neoswitch/`，Linux 上为 `$XDG_CONFIG_HOME/neoswitch/` 或 `~/.config/neoswitch/` |
+
+Antigravity 登录信息由 `agy` 保存，不由 NeoSwitch 保存，卸载后仍然保留。要移除用 `go install` 安装的独立 CLI，请从 `$(go env GOBIN)` 删除 `neoswitch`；未设置 `GOBIN` 时从 `$(go env GOPATH)/bin` 删除。
+
 ## 故障排查
 
 | 现象 | 处理方式 |
@@ -210,5 +245,7 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+贡献流程见 [CONTRIBUTING.md](../CONTRIBUTING.md)，私下报告漏洞见 [SECURITY.md](../SECURITY.md)，行为准则见 [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)。
 
 MIT License

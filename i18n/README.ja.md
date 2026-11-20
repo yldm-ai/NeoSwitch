@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | **日本語** | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md)
 
-[![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/releases) [![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
 
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neon-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neon-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md)
 
@@ -180,6 +180,41 @@ GEMINI_API_KEY='your-key' neoswitch serve
 
 クライアント側で `ANTHROPIC_BASE_URL` と `ANTHROPIC_AUTH_TOKEN` の両方を設定してください。`neoswitch claude` は一時的なポートとトークンでこれらの変数を自動設定します。
 
+## アップグレードとアンインストール
+
+### アップグレード
+
+プラグインは [プラグインのインストール](#プラグインのインストール) のコマンドで更新します。スタンドアロン CLI は [Releases](https://github.com/yldm-ai/neon-switch/releases) ページから新しいバイナリをダウンロードするか、Go で最新版をインストールします。
+
+```bash
+go install github.com/yldm-ai/neon-switch/cmd/neoswitch@latest
+```
+
+リポジトリは `yldm-ai/NeoSwitch` から `yldm-ai/neon-switch` に移転しました。旧名でマーケットプレイスを追加した場合は、新しい場所から追加し直してください。
+
+```bash
+claude plugin marketplace add yldm-ai/neon-switch
+```
+
+### アンインストール
+
+1. アンインストールの前に、ルーティングを有効にしたすべてのプロジェクトで `/neoswitch:off`（または `neoswitch off <project>`）を実行します。プラグインをアンインストールしてもプロジェクトのファイルは変更されません。この手順を省くと、そのプロジェクトの `.claude/settings.local.json` の `env` オブジェクトに `ANTHROPIC_BASE_URL`、`ANTHROPIC_AUTH_TOKEN`、`CLAUDE_CODE_USE_GATEWAY` が残り、新しいセッションはもう起動しないプロキシに接続しようとします。プラグインをすでに削除した場合は、この 3 項目を手動で削除してください。
+2. NeoSwitch を使っている Claude Code セッションを閉じてから、シェルでプラグインとマーケットプレイスを削除します。
+
+```bash
+claude plugin uninstall neoswitch@neoswitch
+claude plugin marketplace remove neoswitch
+```
+
+3. NeoSwitch がプロジェクトの外に保存するファイルを削除します。
+
+| 内容 | 場所 |
+|---|---|
+| 初回使用時にビルドされるプラグインのバイナリ | `$XDG_CACHE_HOME/neoswitch/`。`XDG_CACHE_HOME` が未設定なら `~/.cache/neoswitch/` |
+| 状態ディレクトリ：`proxy.json`（プロキシのアドレス、トークン、保存されたバックエンド）と `daemon.log` | `NEOSWITCH_STATE_DIR` が設定されていればそのディレクトリ。それ以外は macOS で `~/Library/Application Support/neoswitch/`、Linux で `$XDG_CONFIG_HOME/neoswitch/` または `~/.config/neoswitch/` |
+
+Antigravity のサインイン情報は NeoSwitch ではなく `agy` が保存しており、アンインストール後も残ります。`go install` でインストールしたスタンドアロン CLI を削除するには、`$(go env GOBIN)`、`GOBIN` が未設定なら `$(go env GOPATH)/bin` から `neoswitch` を削除します。
+
 ## トラブルシューティング
 
 | 症状 | 対処 |
@@ -210,5 +245,7 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+コントリビューションの手順は [CONTRIBUTING.md](../CONTRIBUTING.md)、脆弱性の非公開報告は [SECURITY.md](../SECURITY.md)、行動規範は [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) を参照してください。
 
 MIT License

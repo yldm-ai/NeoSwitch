@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md) | **Русский**
 
-[![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/releases) [![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
 
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neon-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neon-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md)
 
@@ -180,6 +180,41 @@ GEMINI_API_KEY='your-key' neoswitch serve
 
 Задайте в клиенте обе переменные: `ANTHROPIC_BASE_URL` и `ANTHROPIC_AUTH_TOKEN`. `neoswitch claude` настраивает их автоматически, используя временный порт и токен.
 
+## Обновление и удаление
+
+### Обновление
+
+Плагин обновляется командами из раздела [Установка плагина](#установка-плагина). Для автономного CLI скачайте более новый бинарный файл со страницы [Releases](https://github.com/yldm-ai/neon-switch/releases) или установите последнюю версию через Go:
+
+```bash
+go install github.com/yldm-ai/neon-switch/cmd/neoswitch@latest
+```
+
+Репозиторий переехал из `yldm-ai/NeoSwitch` в `yldm-ai/neon-switch`. Если вы добавляли маркетплейс под старым именем, добавьте его заново из нового расположения:
+
+```bash
+claude plugin marketplace add yldm-ai/neon-switch
+```
+
+### Удаление
+
+1. Перед удалением выполните `/neoswitch:off` (или `neoswitch off <project>`) в каждом проекте, где включена маршрутизация. Удаление плагина не меняет файлы проектов: без этого шага объект `env` в файле проекта `.claude/settings.local.json` сохранит `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` и `CLAUDE_CODE_USE_GATEWAY`, и новые сессии будут пытаться подключиться к прокси, который больше не запускается. Если плагин уже удалён, удалите эти три записи вручную.
+2. Закройте сессии Claude Code, которые используют NeoSwitch, затем удалите плагин и его маркетплейс из терминала:
+
+```bash
+claude plugin uninstall neoswitch@neoswitch
+claude plugin marketplace remove neoswitch
+```
+
+3. Удалите файлы, которые NeoSwitch хранит вне ваших проектов:
+
+| Что | Где |
+|---|---|
+| Бинарный файл плагина, собранный при первом запуске | `$XDG_CACHE_HOME/neoswitch/` или `~/.cache/neoswitch/`, если `XDG_CACHE_HOME` не задана |
+| Каталог состояния: `proxy.json` (адрес прокси, токен, сохранённый бэкенд) и `daemon.log` | `NEOSWITCH_STATE_DIR`, если задана; иначе `~/Library/Application Support/neoswitch/` в macOS и `$XDG_CONFIG_HOME/neoswitch/` или `~/.config/neoswitch/` в Linux |
+
+Вход в Antigravity хранит `agy`, а не NeoSwitch, и он сохраняется. Чтобы удалить автономный CLI, установленный через `go install`, удалите `neoswitch` из `$(go env GOBIN)` или, если `GOBIN` не задана, из `$(go env GOPATH)/bin`.
+
 ## Устранение неполадок
 
 | Симптом | Решение |
@@ -210,5 +245,7 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+Порядок участия описан в [CONTRIBUTING.md](../CONTRIBUTING.md), о том, как сообщить об уязвимости конфиденциально, — в [SECURITY.md](../SECURITY.md), правила поведения — в [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md).
 
 MIT License
