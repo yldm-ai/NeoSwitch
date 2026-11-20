@@ -343,6 +343,15 @@ func TestAttachNotice(t *testing.T) {
 	}
 }
 
+func TestSessionBlockedNamesNeoSwitchOnce(t *testing.T) {
+	for _, problem := range []string{errNoBackend.Error(), "the proxy stopped"} {
+		message := sessionBlocked(problem)
+		if !strings.HasPrefix(message, "NeoSwitch") || strings.Count(message, "NeoSwitch") != 1 {
+			t.Fatalf("sessionBlocked(%q) = %q, want NeoSwitch named once at the start", problem, message)
+		}
+	}
+}
+
 func TestSessionStartProblemsNameTheFix(t *testing.T) {
 	isolateBackendEnv(t, false)
 	t.Setenv(backendEnv, backendAntigravity)

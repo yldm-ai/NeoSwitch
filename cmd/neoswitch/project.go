@@ -267,7 +267,15 @@ func attach(args []string) error {
 
 // sessionBlocked reports a setup problem found at session start, followed by the way back to Claude, because the session cannot answer until it is fixed.
 func sessionBlocked(problem string) string {
-	return "NeoSwitch: " + strings.TrimSuffix(sentence(problem), ".") + ". Until then this session cannot answer; run /neoswitch:off and start a new session to go back to Claude."
+	return withPrefix(strings.TrimSuffix(sentence(problem), ".") + ". Until then this session cannot answer; run /neoswitch:off and start a new session to go back to Claude.")
+}
+
+// withPrefix names NeoSwitch at the start of a hook message unless the message already starts with it.
+func withPrefix(message string) string {
+	if strings.HasPrefix(message, "NeoSwitch") {
+		return message
+	}
+	return "NeoSwitch: " + message
 }
 
 // attachNotice is the message a session sees after it attached. Without a problem to report it confirms the model, because Claude Code's header keeps showing the Claude model the session asks for.
