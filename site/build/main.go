@@ -15,7 +15,7 @@ import (
 	"path/filepath"
 )
 
-const origin = "https://neon-switch.yldm.ai"
+const origin = "https://neo-switch.yldm.ai"
 
 // Lang describes one published language of the landing page.
 type Lang struct {
@@ -147,9 +147,9 @@ func render(tpl *template.Template, l Lang, s map[string]string) ([]byte, error)
 		"image":               origin + "/og.png",
 		"applicationCategory": "DeveloperApplication",
 		"operatingSystem":     "macOS, Linux, Windows",
-		"license":             "https://github.com/yldm-ai/neon-switch/blob/main/LICENSE",
-		"downloadUrl":         "https://github.com/yldm-ai/neon-switch/releases",
-		"sameAs":              []string{"https://github.com/yldm-ai/neon-switch"},
+		"license":             "https://github.com/yldm-ai/neo-switch/blob/main/LICENSE",
+		"downloadUrl":         "https://github.com/yldm-ai/neo-switch/releases",
+		"sameAs":              []string{"https://github.com/yldm-ai/neo-switch"},
 		"offers":              map[string]string{"@type": "Offer", "price": "0", "priceCurrency": "USD"},
 	})
 	if err != nil {

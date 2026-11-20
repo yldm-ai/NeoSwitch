@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/neon-switch/internal/anthropic"
+	"github.com/yldm-ai/neo-switch/internal/anthropic"
 )
 
 // UpstreamError is a Gemini response that completed at the HTTP level but cannot be presented to Claude Code as a successful turn.

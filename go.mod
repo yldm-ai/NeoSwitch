@@ -1,4 +1,4 @@
-module github.com/yldm-ai/neon-switch
+module github.com/yldm-ai/neo-switch
 
 go 1.27
 

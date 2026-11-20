@@ -41,7 +41,7 @@ if [ ! -x "$release" ]; then
 		exit 1
 	fi
 	asset="neoswitch_${version}_${os}_$arch"
-	base="https://github.com/yldm-ai/neon-switch/releases/download/$version"
+	base="https://github.com/yldm-ai/neo-switch/releases/download/$version"
 	mkdir -p "$cache"
 	tmp=$(mktemp -d "$cache/.download.XXXXXX")
 	trap 'rm -rf "$tmp"' EXIT
