@@ -69,8 +69,12 @@ Set the Gemini API key in the plugin's configuration (`/plugin`, then neoswitch)
 | `/neoswitch:on` | Route new sessions in this project to Gemini |
 | `/neoswitch:status` | Show routing and whether the proxy is running |
 | `/neoswitch:off` | Route new sessions in this project back to Anthropic |
+| `/neoswitch:login` | Sign in to the official Antigravity CLI with Google OAuth |
+| `/neoswitch:antigravity-login` | Sign in to the official Antigravity CLI with Google OAuth |
 
 After `/neoswitch:on` or `/neoswitch:off`, start a new session in the project; the running session keeps its connection.
+
+Run `/neoswitch:login` in Claude Code to start the official `agy` headless OAuth flow. It opens the browser when needed, stores the login in the platform keyring, and returns to Claude Code without opening the `agy` interactive UI. `/neoswitch:antigravity-login` remains an alias. This authenticates the Antigravity CLI and does not switch NeoSwitch's Gemini backend to Antigravity.
 
 How it works:
 

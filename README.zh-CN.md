@@ -81,8 +81,12 @@ Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOS
 | `/neoswitch:on` | 让这个项目之后的新会话走 Gemini |
 | `/neoswitch:status` | 查看路由状态和代理是否在运行 |
 | `/neoswitch:off` | 让这个项目之后的新会话改回 Anthropic |
+| `/neoswitch:login` | 调用官方 Antigravity CLI 完成 Google OAuth 登录 |
+| `/neoswitch:antigravity-login` | 调用官方 Antigravity CLI 完成 Google OAuth 登录 |
 
 执行 `/neoswitch:on` 或 `/neoswitch:off` 之后，要在项目里开一个新会话才生效，正在运行的会话保持原来的连接。
+
+在 Claude Code 中运行 `/neoswitch:login`，即可启动官方 `agy` 的无界面 OAuth 流程。需要时它会打开浏览器，登录凭证由 `agy` 保存到系统钥匙串，完成后返回 Claude Code，不打开 `agy` 交互界面。`/neoswitch:antigravity-login` 仍可作为别名使用。这个命令只登录 Antigravity CLI，不会把 NeoSwitch 的 Gemini 后端切换到 Antigravity。
 
 工作方式：
 

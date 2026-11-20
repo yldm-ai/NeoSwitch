@@ -105,10 +105,16 @@ func antigravityCLIPath() string {
 	return "agy"
 }
 
-// antigravityLogin delegates authentication to the official CLI. agy owns the
-// browser OAuth flow and stores its resulting profile in the platform keyring.
+// antigravityLogin delegates authentication to the official CLI's headless
+// mode. agy owns the browser OAuth flow and stores its resulting profile in the
+// platform keyring without opening its interactive TUI.
 func antigravityLogin(path string) error {
-	command := exec.Command(path)
+	command := exec.Command(path,
+		"-p", "Reply with exactly: neoswitch-oauth-ok",
+		"--output-format", "json",
+		"--disable-slash-commands",
+		"--print-timeout", "30s",
+	)
 	command.Stdin = os.Stdin
 	command.Stdout = os.Stdout
 	command.Stderr = os.Stderr
@@ -118,7 +124,7 @@ func antigravityLogin(path string) error {
 		}
 		return fmt.Errorf("start Antigravity CLI %q for OAuth login: %w", path, err)
 	}
-	fmt.Println("ok: Antigravity OAuth login completed")
+	fmt.Println("ok: Antigravity OAuth login completed through agy headless mode")
 	return nil
 }
 
