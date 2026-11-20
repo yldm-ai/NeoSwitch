@@ -2,7 +2,7 @@
 
 [English](../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | **Français** | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md)
 
-[![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/releases) [![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
 
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neon-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neon-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md)
 
@@ -141,7 +141,7 @@ Le contrat complet du endpoint se trouve dans [docs/protocol-contract.md](../doc
 
 ## Fonctionnement du plugin
 
-`/neoswitch:on` écrit uniquement `ANTHROPIC_BASE_URL` et `ANTHROPIC_AUTH_TOKEN` dans le fichier `.claude/settings.local.json` du projet. Le jeton autorise le proxy de bouclage et n'est pas un identifiant Antigravity.
+`/neoswitch:on` écrit uniquement trois clés dans le fichier `.claude/settings.local.json` du projet : `ANTHROPIC_BASE_URL` et `ANTHROPIC_AUTH_TOKEN` pour le proxy, ainsi que `CLAUDE_CODE_USE_GATEWAY=0`, car en mode gateway, que les lanceurs de gateway activent, Claude Code prendrait l'URL de base dans son environnement et ignorerait le proxy sans le signaler. Le jeton autorise le proxy de bouclage et n'est pas un identifiant Antigravity.
 
 Le hook SessionStart démarre un daemon local et enregistre le processus Claude Code avant sa première requête au modèle. Le daemon s'arrête lorsque tous les processus Claude Code enregistrés se sont terminés.
 
@@ -180,6 +180,41 @@ GEMINI_API_KEY='your-key' neoswitch serve
 
 Définissez à la fois `ANTHROPIC_BASE_URL` et `ANTHROPIC_AUTH_TOKEN` dans le client. `neoswitch claude` configure automatiquement ces variables avec un port et un jeton éphémères.
 
+## Mise à jour et désinstallation
+
+### Mise à jour
+
+Mettez à jour le plugin avec les commandes de [Installer le plugin](#installer-le-plugin). Pour la CLI autonome, téléchargez un binaire plus récent sur la page [Releases](https://github.com/yldm-ai/neon-switch/releases), ou installez la dernière version avec Go :
+
+```bash
+go install github.com/yldm-ai/neon-switch/cmd/neoswitch@latest
+```
+
+Le dépôt a été déplacé de `yldm-ai/NeoSwitch` vers `yldm-ai/neon-switch`. Si vous avez ajouté la marketplace sous l'ancien nom, ajoutez-la à nouveau depuis le nouvel emplacement :
+
+```bash
+claude plugin marketplace add yldm-ai/neon-switch
+```
+
+### Désinstallation
+
+1. Avant de désinstaller, exécutez `/neoswitch:off` (ou `neoswitch off <project>`) dans chaque projet où le routage est activé. La désinstallation du plugin ne modifie pas les fichiers des projets : sans cette étape, l'objet `env` du fichier `.claude/settings.local.json` du projet garde `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` et `CLAUDE_CODE_USE_GATEWAY`, et les nouvelles sessions tentent de joindre un proxy qui ne démarre plus. Si le plugin est déjà supprimé, retirez ces trois entrées à la main.
+2. Fermez les sessions Claude Code qui utilisent NeoSwitch, puis supprimez le plugin et sa marketplace depuis un terminal :
+
+```bash
+claude plugin uninstall neoswitch@neoswitch
+claude plugin marketplace remove neoswitch
+```
+
+3. Supprimez les fichiers que NeoSwitch conserve en dehors de vos projets :
+
+| Quoi | Emplacement |
+|---|---|
+| Binaire du plugin compilé à la première utilisation | `$XDG_CACHE_HOME/neoswitch/`, ou `~/.cache/neoswitch/` si `XDG_CACHE_HOME` n'est pas défini |
+| Répertoire d'état : `proxy.json` (adresse du proxy, jeton, backend enregistré) et `daemon.log` | `NEOSWITCH_STATE_DIR` s'il est défini ; sinon `~/Library/Application Support/neoswitch/` sur macOS et `$XDG_CONFIG_HOME/neoswitch/` ou `~/.config/neoswitch/` sur Linux |
+
+La connexion Antigravity est conservée par `agy`, pas par NeoSwitch, et reste en place. Pour retirer une CLI autonome installée avec `go install`, supprimez `neoswitch` de `$(go env GOBIN)`, ou de `$(go env GOPATH)/bin` si `GOBIN` n'est pas défini.
+
 ## Dépannage
 
 | Symptôme | Solution |
@@ -211,5 +246,7 @@ go vet ./...
 ```
 
 Pour publier une release, mettez à jour `VERSION` et poussez le tag correspondant (`v` suivi de son contenu, par exemple `v0.1.0`) ; le workflow de release refuse un tag qui ne correspond pas.
+
+Consultez [CONTRIBUTING.md](../CONTRIBUTING.md) pour le processus de contribution, [SECURITY.md](../SECURITY.md) pour signaler une vulnérabilité en privé et [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) pour le code de conduite.
 
 MIT License
