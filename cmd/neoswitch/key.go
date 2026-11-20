@@ -163,8 +163,8 @@ func (p *keyPage) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	header := w.Header()
 	header.Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'")
-	// The page address is its secret; the link to Google AI Studio must not send it along.
-	header.Set("Referrer-Policy", "no-referrer")
+	// The page address is its secret, so the link to Google AI Studio must not send it along. same-origin rather than no-referrer: under no-referrer browsers send "Origin: null" with the form's POST, which post() rejects.
+	header.Set("Referrer-Policy", "same-origin")
 	header.Set("Cache-Control", "no-store")
 	header.Set("Content-Type", "text/html; charset=utf-8")
 	switch r.Method {

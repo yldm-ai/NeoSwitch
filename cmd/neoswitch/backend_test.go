@@ -619,7 +619,7 @@ func TestKeyPage(t *testing.T) {
 	}
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `type="password"`) || !strings.Contains(string(body), geminiKeyURL) || resp.Header.Get("Referrer-Policy") != "no-referrer" {
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `type="password"`) || !strings.Contains(string(body), geminiKeyURL) || resp.Header.Get("Referrer-Policy") != "same-origin" {
 		t.Fatalf("form = %d %v\n%s", resp.StatusCode, resp.Header, body)
 	}
 	for _, tc := range []struct {
