@@ -31,7 +31,7 @@ NeoSwitch를 쓰면 Claude Code는 그대로 두고, Claude 대신 Google의 Gem
 Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`agy`)](https://antigravity.google/download)를 통해 브라우저에서 Google 로그인을 열고, 마지막으로 이 프로젝트를 전환합니다. 이 컴퓨터에 `agy`가 설치되어 있어야 합니다. 터미널에 익숙하다면 Gemini API 키도 쓸 수 있습니다. [docs/cli.md](../docs/cli.md#gemini-api-key)(영어)를 보세요.
 
 > [!WARNING]
-> [Google Antigravity 서비스 약관](https://antigravity.google/terms)(제6조)은 다른 도구를 통해 Antigravity를 쓰는 것을 금지하며, NeoSwitch는 그런 도구에 해당합니다. Google은 그렇게 쓰는 사람의 Antigravity 및 Gemini CLI 계정을 정지하거나 해지할 수 있습니다. `/neoswitch:login`은 매번 이 경고를 다시 보여 줍니다. 이 위험을 받아들일 수 없다면 로그인하지 마세요.
+> [Google Antigravity 서비스 약관](https://antigravity.google/terms)(제6조)은 다른 도구를 통해 Antigravity를 쓰는 것을 금지하며, NeoSwitch는 그런 도구에 해당합니다. Google은 그렇게 쓰는 사람의 Antigravity 계정을 정지하거나 해지할 수 있습니다. `/neoswitch:login`은 매번 이 경고를 다시 보여 줍니다. 이 위험을 받아들일 수 없다면 로그인하지 마세요.
 
 **3. 다음 메시지를 보냅니다.** 명령을 실행한 창은 다음 메시지부터 Gemini 4 Neon을 쓰고, 이 프로젝트의 새 세션도 마찬가지입니다. 명령의 답변이 대신 다시 시작하라고 하면(Claude Code를 게이트웨이로 시작했거나 다른 Claude Code 창이 아직 NeoSwitch의 이전 설정을 쓰는 경우), 안내된 창을 닫은 뒤 같은 프로젝트에서 `claude`를 다시 실행하세요.
 

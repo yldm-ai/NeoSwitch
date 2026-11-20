@@ -31,7 +31,7 @@ NeoSwitch を使うと、Claude Code はそのままに、Claude の代わりに
 Google の利用規約に関する警告を表示したあと、Google の [Antigravity コマンドラインツール（`agy`）](https://antigravity.google/download)を通じてブラウザで Google のログインを開き、最後にこのプロジェクトを切り替えます。`agy` はこのコンピューターにあらかじめインストールしておく必要があります。ターミナルに慣れている方は Gemini API キーも使えます。[docs/cli.md](../docs/cli.md#gemini-api-key)（英語）を参照してください。
 
 > [!WARNING]
-> [Google Antigravity 利用規約](https://antigravity.google/terms)（第 6 条）は、ほかのツールを通じて Antigravity を使うことを禁じており、NeoSwitch はそうしたツールにあたります。Google はそうした利用者の Antigravity と Gemini CLI のアカウントを停止または解約することがあります。`/neoswitch:login` は毎回この警告を表示します。このリスクを受け入れられない場合は、ログインしないでください。
+> [Google Antigravity 利用規約](https://antigravity.google/terms)（第 6 条）は、ほかのツールを通じて Antigravity を使うことを禁じており、NeoSwitch はそうしたツールにあたります。Google はそうした利用者の Antigravity のアカウントを停止または解約することがあります。`/neoswitch:login` は毎回この警告を表示します。このリスクを受け入れられない場合は、ログインしないでください。
 
 **3. 次のメッセージを送る。** コマンドを実行したウィンドウは次のメッセージから Gemini 4 Neon を使い、このプロジェクトの新しいセッションも同じです。コマンドの返信で再起動を求められた場合（Claude Code をゲートウェイ経由で起動した場合や、ほかの Claude Code ウィンドウが NeoSwitch の以前の設定を使っている場合）は、示されたウィンドウを閉じてから、同じプロジェクトでもう一度 `claude` を起動してください。
 

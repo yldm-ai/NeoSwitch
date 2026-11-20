@@ -31,7 +31,7 @@ Você troca um projeto por vez; seus outros projetos continuam usando o Claude. 
 Ele mostra o aviso sobre os termos do Google, abre o login do Google no navegador por meio da [ferramenta de linha de comando Antigravity do Google (`agy`)](https://antigravity.google/download), que precisa estar instalada neste computador, e depois troca o projeto. Se você está à vontade com o terminal, uma chave de API do Gemini também funciona: veja [docs/cli.md](../docs/cli.md#gemini-api-key) (em inglês).
 
 > [!WARNING]
-> Os [Termos de Serviço do Google Antigravity](https://antigravity.google/terms) (seção 6) proíbem usar o Antigravity por meio de outras ferramentas, e o NeoSwitch é uma delas. O Google pode suspender ou encerrar as contas do Antigravity e da Gemini CLI de quem fizer isso. `/neoswitch:login` repete este aviso toda vez. Não entre se você não aceita esse risco.
+> Os [Termos de Serviço do Google Antigravity](https://antigravity.google/terms) (seção 6) proíbem usar o Antigravity por meio de outras ferramentas, e o NeoSwitch é uma delas. O Google pode suspender ou encerrar as contas do Antigravity de quem fizer isso. `/neoswitch:login` repete este aviso toda vez. Não entre se você não aceita esse risco.
 
 **3. Envie sua próxima mensagem.** A janela em que você executou o comando usa o Gemini 4 Neon a partir da próxima mensagem, assim como as sessões novas deste projeto. Se a resposta do comando pedir que você reinicie, porque o Claude Code foi iniciado por um gateway ou porque outras janelas do Claude Code ainda usam uma configuração anterior do NeoSwitch, feche as janelas indicadas e inicie `claude` de novo no mesmo projeto.
 

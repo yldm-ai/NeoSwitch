@@ -31,7 +31,7 @@ You switch one project at a time; your other projects keep using Claude. The plu
 It shows Google's terms warning, opens Google sign-in in your browser through Google's [Antigravity command-line tool (`agy`)](https://antigravity.google/download), which must be installed on this computer, and then switches the project on. If you are comfortable with a terminal, a Gemini API key also works: see [docs/cli.md](docs/cli.md#gemini-api-key).
 
 > [!WARNING]
-> The [Google Antigravity Terms of Service](https://antigravity.google/terms) (section 6) forbid using Antigravity through other tools, and NeoSwitch is such a tool. Google may suspend or close the Antigravity and Gemini CLI accounts of people who do. `/neoswitch:login` repeats this warning every time. Do not sign in unless you accept that risk.
+> The [Google Antigravity Terms of Service](https://antigravity.google/terms) (section 6) forbid using Antigravity through other tools, and NeoSwitch is such a tool. Google may suspend or close the Antigravity accounts of people who do. `/neoswitch:login` repeats this warning every time. Do not sign in unless you accept that risk.
 
 **3. Send your next message.** The window where you ran the command uses Gemini 4 Neon from its next message, and so do new sessions in this project. If the command's reply asks you to restart instead, because Claude Code was started through a gateway or other Claude Code windows still use an earlier NeoSwitch setup, close the windows it names, then start `claude` again in the same project.
 

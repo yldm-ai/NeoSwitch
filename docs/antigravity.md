@@ -1,7 +1,7 @@
 # Antigravity account sessions
 
 > [!WARNING]
-> The [Google Antigravity Terms of Service](https://antigravity.google/terms) (section 6) treat accessing Antigravity through third-party software, tools or services as a breach and say Google may suspend or terminate the Antigravity and Gemini CLI accounts involved. Routing Claude Code through Antigravity OAuth falls under that rule. Use this route only if you accept that risk; otherwise use a Gemini API key or Vertex AI.
+> The [Google Antigravity Terms of Service](https://antigravity.google/terms) (section 6) treat accessing Antigravity through third-party software, tools or services as a breach and say Google may suspend or terminate the Antigravity accounts involved. Routing Claude Code through Antigravity OAuth falls under that rule. Use this route only if you accept that risk; otherwise use a Gemini API key or Vertex AI.
 
 NeoSwitch does not read, export, or replay the OAuth/token profile used by Antigravity. The profile belongs to the official `agy` client and is stored through the platform's secure credential layer.
 

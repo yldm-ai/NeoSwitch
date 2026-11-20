@@ -48,7 +48,7 @@
   "cred_vertex_signin": "Google Cloud Application Default Credentials",
   "cred_vertex_notes": "Access depends on your project and region.",
   "warn_title": "Antigravity terms.",
-  "warn_body": "The <a href=\"https://antigravity.google/terms\">Google Antigravity Terms of Service</a> (section 6) treat accessing Antigravity through third-party software as a breach, and Google may suspend or terminate the Antigravity and Gemini CLI accounts involved. Routing Claude Code through Antigravity OAuth falls under that rule. Use it only if you accept that risk for the account you sign in with; otherwise use a Gemini API key or Vertex AI.",
+  "warn_body": "The <a href=\"https://antigravity.google/terms\">Google Antigravity Terms of Service</a> (section 6) treat accessing Antigravity through third-party software as a breach, and Google may suspend or terminate the Antigravity accounts involved. Routing Claude Code through Antigravity OAuth falls under that rule. Use it only if you accept that risk for the account you sign in with; otherwise use a Gemini API key or Vertex AI.",
   "compat_sub": "How well Claude Code's features work depends on how well the model follows its tool protocol. This has been exercised in everyday coding use, not by an automated end-to-end suite.",
   "compat_th_capability": "Capability",
   "row_streaming": "Streaming text",
