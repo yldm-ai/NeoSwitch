@@ -104,6 +104,13 @@
   .term pre { margin: 0; padding: 16px 18px; font-size: 14px; line-height: 1.75; overflow-x: auto; }
   .term .p { color: var(--accent); user-select: none; }
   .term .c { color: #66707f; }
+
+  /* ---- syntax highlighting: slash command, subcommand, argument, result ---- */
+  .term .hl-cmd { color: var(--accent-2); font-weight: 600; }
+  .term .hl-sub { color: #c4a7ff; }
+  .term .hl-arg { color: var(--warn); }
+  .term .hl-ok { color: var(--accent); }
+  .cmd code .hl-ns { color: var(--muted); }
   .copy { font: 12px var(--mono); color: var(--muted); background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 3px 10px; cursor: pointer; }
   .copy:hover { color: var(--text); border-color: #36405a; }
 
@@ -177,7 +184,33 @@
     .grid, .cmds { grid-template-columns: 1fr; }
     .step { grid-template-columns: 1fr; gap: 8px; }
   }
+
+  /* ---- motion: only when the head script enabled it, so no-JS and reduced-motion readers see a static page ---- */
+  .hero { position: relative; }
+  .hero > .wrap { position: relative; }
+  .motion .hero { background: none; overflow: hidden; }
+  .motion .hero::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(900px 420px at 50% -10%, rgba(124, 242, 200, .14), transparent 70%), radial-gradient(600px 300px at 85% 10%, rgba(138, 180, 255, .08), transparent 70%); animation: breathe 9s ease-in-out infinite alternate; }
+  .motion .hero h1 span { background: linear-gradient(90deg, var(--accent), var(--accent-2), var(--accent)); background-size: 200% 100%; -webkit-background-clip: text; background-clip: text; color: transparent; animation: shimmer 8s linear infinite; }
+  .motion .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s cubic-bezier(.2, .7, .2, 1), transform .7s cubic-bezier(.2, .7, .2, 1); transition-delay: var(--d, 0s); }
+  .motion .reveal.in { opacity: 1; transform: none; }
+  .motion .caret { display: inline-block; width: .55em; height: 1.15em; margin-left: 1px; vertical-align: -.22em; background: var(--accent); animation: blink 1.05s steps(1) infinite; }
+  .motion .flow-line { stroke-dasharray: 3 5; animation: flow 1.1s linear infinite; }
+  .motion .node.mid { animation: pulse 3.2s ease-in-out infinite; }
+  .motion .card, .motion .cmd { transition: transform .7s cubic-bezier(.2, .7, .2, 1) var(--d, 0s), opacity .7s cubic-bezier(.2, .7, .2, 1) var(--d, 0s), border-color .25s ease; }
+  .motion .card.in:hover, .motion .cmd.in:hover { transform: translateY(-3px); border-color: #36405a; transition: transform .25s ease, border-color .25s ease; }
+  .motion .btn { transition: transform .2s ease, filter .2s ease, border-color .2s ease; }
+  .motion .btn:hover { transform: translateY(-1px); }
+  .motion .lang ul { animation: drop .16s ease-out; transform-origin: top right; }
+  @keyframes breathe { from { opacity: .75; transform: scale(1); } to { opacity: 1; transform: scale(1.06); } }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  @keyframes blink { 50% { opacity: 0; } }
+  @keyframes flow { to { stroke-dashoffset: -8; } }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 1px rgba(124, 242, 200, .22), 0 10px 50px -14px rgba(124, 242, 200, .7); } }
+  @keyframes drop { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
 </style>
+<script>
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches && 'IntersectionObserver' in window) document.documentElement.classList.add('motion');
+</script>
 </head>
 <body data-copy="{{index .T "copy"}}" data-copied="{{index .T "copied"}}">
 
@@ -211,42 +244,42 @@
 
 <header class="hero" id="top">
   <div class="wrap">
-    <h1 lang="en">Keep Claude Code.<br><span>Switch your models.</span></h1>
-    <p class="lede">{{index .T "hero_lede"}}</p>
-    <div class="cta">
+    <h1 class="reveal" lang="en">Keep Claude Code.<br><span>Switch your models.</span></h1>
+    <p class="lede reveal">{{index .T "hero_lede"}}</p>
+    <div class="cta reveal">
       <a class="btn primary" href="#start">{{index .T "nav_start"}}</a>
       <a class="btn" href="https://github.com/yldm-ai/neo-switch">
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
         {{index .T "cta_github"}}
       </a>
     </div>
-    <div class="term">
+    <div class="term reveal">
       <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/plugin marketplace add yldm-ai/neo-switch&#10;/plugin install neoswitch@neoswitch&#10;/neoswitch:login">{{index .T "copy"}}</button></div>
-<pre><span class="p">&gt; </span>/plugin marketplace add yldm-ai/neo-switch
-<span class="p">&gt; </span>/plugin install neoswitch@neoswitch
-<span class="p">&gt; </span>/neoswitch:login</pre>
+<pre data-type><span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">marketplace add</span> <span class="hl-arg">yldm-ai/neo-switch</span>
+<span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">install</span> <span class="hl-arg">neoswitch@neoswitch</span>
+<span class="p">&gt; </span><span class="hl-cmd">/neoswitch:login</span></pre>
     </div>
   </div>
 </header>
 
 <section id="how">
   <div class="wrap">
-    <h2>{{index .T "how_title"}}</h2>
-    <p class="sub">{{index .T "how_sub"}}</p>
+    <h2 class="reveal">{{index .T "how_title"}}</h2>
+    <p class="sub reveal">{{index .T "how_sub"}}</p>
     <div class="flow">
-      <div class="node">
+      <div class="node reveal">
         <span class="tag">{{index .T "node_client_tag"}}</span>
         <h3>Claude Code</h3>
         <p>{{index .T "node_client_desc"}}</p>
       </div>
-      <div class="arrow"><svg viewBox="0 0 36 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h32M27 2l6 6-6 6"/></svg></div>
-      <div class="node mid">
+      <div class="arrow reveal"><svg viewBox="0 0 36 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="flow-line" d="M1 8h32"/><path d="M27 2l6 6-6 6"/></svg></div>
+      <div class="node mid reveal">
         <span class="tag">127.0.0.1</span>
         <h3>{{index .T "node_proxy_title"}}</h3>
         <p>{{index .T "node_proxy_desc"}}</p>
       </div>
-      <div class="arrow"><svg viewBox="0 0 36 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h32M27 2l6 6-6 6"/></svg></div>
-      <div class="node">
+      <div class="arrow reveal"><svg viewBox="0 0 36 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path class="flow-line" d="M1 8h32"/><path d="M27 2l6 6-6 6"/></svg></div>
+      <div class="node reveal">
         <span class="tag">{{index .T "node_upstream_tag"}}</span>
         <h3>Gemini 4 Neon</h3>
         <p>{{index .T "node_upstream_desc"}}</p>
@@ -257,25 +290,25 @@
 
 <section>
   <div class="wrap">
-    <h2>{{index .T "why_title"}}</h2>
-    <p class="sub">{{index .T "why_sub"}}</p>
+    <h2 class="reveal">{{index .T "why_title"}}</h2>
+    <p class="sub reveal">{{index .T "why_sub"}}</p>
     <div class="grid">
-      <div class="card">
+      <div class="card reveal">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
         <h3>{{index .T "why_workflow_title"}}</h3>
         <p>{{index .T "why_workflow_desc"}}</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg>
         <h3>{{index .T "why_project_title"}}</h3>
         <p>{{index .T "why_project_desc"}}</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
         <h3>{{index .T "why_local_title"}}</h3>
         <p>{{index .T "why_local_desc"}}</p>
       </div>
-      <div class="card">
+      <div class="card reveal">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/></svg>
         <h3>{{index .T "why_honest_title"}}</h3>
         <p>{{index .T "why_honest_desc"}}</p>
@@ -286,38 +319,38 @@
 
 <section id="start">
   <div class="wrap">
-    <h2>{{index .T "nav_start"}}</h2>
-    <p class="sub">{{index .T "start_sub"}}</p>
+    <h2 class="reveal">{{index .T "nav_start"}}</h2>
+    <p class="sub reveal">{{index .T "start_sub"}}</p>
     <div class="steps">
-      <div class="step">
+      <div class="step reveal">
         <div>
           <h3>{{index .T "step1_title"}}</h3>
           <p>{{index .T "step1_desc"}}</p>
           <div class="term">
             <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/plugin marketplace add yldm-ai/neo-switch&#10;/plugin install neoswitch@neoswitch">{{index .T "copy"}}</button></div>
-<pre><span class="p">&gt; </span>/plugin marketplace add yldm-ai/neo-switch
-<span class="p">&gt; </span>/plugin install neoswitch@neoswitch</pre>
+<pre><span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">marketplace add</span> <span class="hl-arg">yldm-ai/neo-switch</span>
+<span class="p">&gt; </span><span class="hl-cmd">/plugin</span> <span class="hl-sub">install</span> <span class="hl-arg">neoswitch@neoswitch</span></pre>
           </div>
         </div>
       </div>
-      <div class="step">
+      <div class="step reveal">
         <div>
           <h3>{{index .T "step2_title"}}</h3>
           <p>{{index .T "step2_desc"}}</p>
           <div class="term">
             <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/neoswitch:login">{{index .T "copy"}}</button></div>
-<pre><span class="p">&gt; </span>/neoswitch:login</pre>
+<pre><span class="p">&gt; </span><span class="hl-cmd">/neoswitch:login</span></pre>
           </div>
         </div>
       </div>
-      <div class="step">
+      <div class="step reveal">
         <div>
           <h3>{{index .T "step3_title"}}</h3>
           <p>{{index .T "step3_desc"}}</p>
           <div class="term">
             <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/neoswitch:status">{{index .T "copy"}}</button></div>
-<pre><span class="p">&gt; </span>/neoswitch:status
-<span class="c">  NeoSwitch ... -&gt; gemini-4-neon</span></pre>
+<pre><span class="p">&gt; </span><span class="hl-cmd">/neoswitch:status</span>
+<span class="c">  NeoSwitch ... -&gt; </span><span class="hl-ok">gemini-4-neon</span></pre>
           </div>
         </div>
       </div>
@@ -327,9 +360,9 @@
 
 <section id="credentials">
   <div class="wrap">
-    <h2>{{index .T "cred_title"}}</h2>
-    <p class="sub">{{index .T "cred_sub"}}</p>
-    <div class="table-wrap">
+    <h2 class="reveal">{{index .T "cred_title"}}</h2>
+    <p class="sub reveal">{{index .T "cred_sub"}}</p>
+    <div class="table-wrap reveal">
       <table>
         <thead><tr><th>{{index .T "cred_th_path"}}</th><th>{{index .T "cred_th_signin"}}</th><th>{{index .T "cred_th_notes"}}</th></tr></thead>
         <tbody>
@@ -339,7 +372,7 @@
         </tbody>
       </table>
     </div>
-    <div class="warn" role="note">
+    <div class="warn reveal" role="note">
       <strong>{{index .T "warn_title"}}</strong> {{index .T "warn_body"}}
     </div>
   </div>
@@ -347,9 +380,9 @@
 
 <section id="compat">
   <div class="wrap">
-    <h2>{{index .T "nav_compat"}}</h2>
-    <p class="sub">{{index .T "compat_sub"}}</p>
-    <div class="table-wrap">
+    <h2 class="reveal">{{index .T "nav_compat"}}</h2>
+    <p class="sub reveal">{{index .T "compat_sub"}}</p>
+    <div class="table-wrap reveal">
       <table>
         <thead><tr><th>{{index .T "compat_th_capability"}}</th><th>Gemini API / Vertex AI</th><th>Antigravity OAuth (ACP)</th></tr></thead>
         <tbody>
@@ -363,21 +396,21 @@
         </tbody>
       </table>
     </div>
-    <p class="note">{{index .T "compat_note"}}</p>
+    <p class="note reveal">{{index .T "compat_note"}}</p>
   </div>
 </section>
 
 <section id="commands">
   <div class="wrap">
-    <h2>{{index .T "cmds_title"}}</h2>
-    <p class="sub">{{index .T "cmds_sub"}}</p>
+    <h2 class="reveal">{{index .T "cmds_title"}}</h2>
+    <p class="sub reveal">{{index .T "cmds_sub"}}</p>
     <div class="cmds">
-      <div class="cmd"><code>/neoswitch:login</code><span>{{index .T "cmd_login"}}</span></div>
-      <div class="cmd"><code>/neoswitch:on</code><span>{{index .T "cmd_on"}}</span></div>
-      <div class="cmd"><code>/neoswitch:status</code><span>{{index .T "cmd_status"}}</span></div>
-      <div class="cmd"><code>/neoswitch:off</code><span>{{index .T "cmd_off"}}</span></div>
+      <div class="cmd reveal"><code><span class="hl-ns">/neoswitch:</span>login</code><span>{{index .T "cmd_login"}}</span></div>
+      <div class="cmd reveal"><code><span class="hl-ns">/neoswitch:</span>on</code><span>{{index .T "cmd_on"}}</span></div>
+      <div class="cmd reveal"><code><span class="hl-ns">/neoswitch:</span>status</code><span>{{index .T "cmd_status"}}</span></div>
+      <div class="cmd reveal"><code><span class="hl-ns">/neoswitch:</span>off</code><span>{{index .T "cmd_off"}}</span></div>
     </div>
-    <p class="note">{{index .T "cmds_note"}}</p>
+    <p class="note reveal">{{index .T "cmds_note"}}</p>
   </div>
 </section>
 
@@ -406,6 +439,51 @@
       if (!d.contains(e.target)) d.removeAttribute('open');
     });
   });
+
+  if (document.documentElement.classList.contains('motion')) {
+    // Stagger siblings that reveal together, then reveal each element the first time it scrolls into view.
+    var groups = new Map();
+    document.querySelectorAll('.reveal').forEach(function (el) {
+      var i = groups.get(el.parentNode) || 0;
+      groups.set(el.parentNode, i + 1);
+      el.style.setProperty('--d', Math.min(i, 6) * 0.08 + 's');
+    });
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        e.target.classList.add('in');
+        io.unobserve(e.target);
+        var pre = e.target.querySelector('pre[data-type]');
+        if (pre) typeOut(pre);
+      });
+    }, { rootMargin: '0px 0px -8% 0px' });
+    document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+  }
+
+  // typeOut retypes a highlighted terminal block character by character, keeping its spans: prompts appear at once, the rest is typed with a short pause at each line break. The block keeps its height so nothing below it shifts.
+  function typeOut(pre) {
+    var walker = document.createTreeWalker(pre, NodeFilter.SHOW_TEXT), parts = [], n;
+    while ((n = walker.nextNode())) parts.push({ node: n, text: n.data, instant: n.parentNode.classList.contains('p') });
+    pre.style.minHeight = pre.getBoundingClientRect().height + 'px';
+    parts.forEach(function (p) { p.node.data = ''; });
+    var caret = document.createElement('span');
+    caret.className = 'caret';
+    caret.setAttribute('aria-hidden', 'true');
+    pre.appendChild(caret);
+    var i = 0, j = 0;
+    function step() {
+      while (i < parts.length && (parts[i].instant || j >= parts[i].text.length)) {
+        if (parts[i].instant) parts[i].node.data = parts[i].text;
+        i++;
+        j = 0;
+      }
+      if (i >= parts.length) return;
+      var ch = parts[i].text.charAt(j++);
+      parts[i].node.data = parts[i].text.slice(0, j);
+      setTimeout(step, ch === '\n' ? 450 : 22 + Math.random() * 38);
+    }
+    setTimeout(step, 550);
+  }
 </script>
 </body>
 </html>
