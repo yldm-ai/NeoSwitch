@@ -4,7 +4,9 @@
 
 [![CI](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/NeoSwitch.svg)](https://pkg.go.dev/github.com/yldm-ai/NeoSwitch) [![License](https://img.shields.io/github/license/yldm-ai/NeoSwitch)](https://github.com/yldm-ai/NeoSwitch/blob/main/LICENSE)
 
-NeoSwitch lets Claude Code use Gemini 4 Neon through a local Anthropic-compatible proxy. It supports two upstream credential paths:
+NeoSwitch is a Claude Code plugin that routes projects to Gemini 4 Neon through a local Anthropic-compatible proxy. Choose Antigravity OAuth, the Gemini Developer API, or Vertex AI while keeping the Claude Code workflow, streaming, and tool use.
+
+It supports two upstream credential paths:
 
 - Antigravity OAuth through the official local `agy acp` process.
 - Gemini Developer API or Vertex AI credentials through the official `google.golang.org/genai` SDK.
