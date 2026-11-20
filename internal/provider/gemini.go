@@ -14,7 +14,7 @@ import (
 
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/neon-switch/internal/translate"
+	"github.com/yldm-ai/neo-switch/internal/translate"
 )
 
 const DefaultModel = "gemini-4-neon"

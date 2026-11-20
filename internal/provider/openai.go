@@ -19,7 +19,7 @@ import (
 	"github.com/openai/openai-go/v3/responses"
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/neon-switch/internal/translate"
+	"github.com/yldm-ai/neo-switch/internal/translate"
 )
 
 // OpenAI is the experimental OpenAI backend. It converts the genai request that internal/translate builds into an OpenAI Responses API request and converts the result back into genai responses, so the Anthropic <-> genai translation and the server are shared with the Gemini backend unchanged. It is opt-in (NEOSWITCH_BACKEND=openai or `neoswitch backend openai`) and has only been exercised against a scripted upstream.

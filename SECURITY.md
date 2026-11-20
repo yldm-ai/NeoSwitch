@@ -2,11 +2,11 @@
 
 ## Supported versions
 
-Security fixes go into the latest release on the [Releases](https://github.com/yldm-ai/neon-switch/releases) page and the current `main` branch. Older releases are not patched; upgrade to the latest release to get fixes.
+Security fixes go into the latest release on the [Releases](https://github.com/yldm-ai/neo-switch/releases) page and the current `main` branch. Older releases are not patched; upgrade to the latest release to get fixes.
 
 ## Reporting a vulnerability
 
-Report vulnerabilities privately through GitHub's private vulnerability reporting: <https://github.com/yldm-ai/neon-switch/security/advisories/new>. Only the repository maintainers can read the report.
+Report vulnerabilities privately through GitHub's private vulnerability reporting: <https://github.com/yldm-ai/neo-switch/security/advisories/new>. Only the repository maintainers can read the report.
 
 Do not open a public issue, pull request or discussion for a suspected vulnerability. Include the NeoSwitch version (`neoswitch version`), your platform, the backend in use (Antigravity OAuth, Gemini API or Vertex AI), steps to reproduce, and the impact you expect. Remove API keys, tokens, prompts and other private data from logs before attaching them.
 

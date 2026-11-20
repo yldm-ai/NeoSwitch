@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/neon-switch/internal/anthropic"
+	"github.com/yldm-ai/neo-switch/internal/anthropic"
 )
 
 func mustDecode(t *testing.T, body string) anthropic.MessagesRequest {

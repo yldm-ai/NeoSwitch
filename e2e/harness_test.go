@@ -21,8 +21,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/yldm-ai/neon-switch/internal/provider"
-	"github.com/yldm-ai/neon-switch/internal/server"
+	"github.com/yldm-ai/neo-switch/internal/provider"
+	"github.com/yldm-ai/neo-switch/internal/server"
 )
 
 // claudeTimeout bounds every Claude Code run. A scripted turn takes a few seconds; the limit only catches a hang.

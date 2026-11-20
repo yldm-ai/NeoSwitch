@@ -2,9 +2,9 @@
 
 [English](../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | **Français** | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md)
 
-[![Latest release](https://img.shields.io/github/v/release/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/releases) [![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
+[![Latest release](https://img.shields.io/github/v/release/yldm-ai/neo-switch)](https://github.com/yldm-ai/neo-switch/releases) [![CI](https://github.com/yldm-ai/neo-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neo-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neo-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neo-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neo-switch)](https://github.com/yldm-ai/neo-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neo-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neo-switch)](https://github.com/yldm-ai/neo-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neo-switch)](https://github.com/yldm-ai/neo-switch/stargazers)
 
-[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neon-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neon-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neo-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neo-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neo-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neo-switch/blob/main/docs/protocol-contract.md)
 
 **Keep Claude Code. Switch your models.**
 
@@ -45,7 +45,7 @@ Les identifiants OAuth restent toujours dans `agy`. NeoSwitch ne lit, ne copie n
 Exécutez ces commandes dans Claude Code :
 
 ```text
-/plugin marketplace add yldm-ai/neon-switch
+/plugin marketplace add yldm-ai/neo-switch
 /plugin install neoswitch@neoswitch
 ```
 
@@ -163,7 +163,7 @@ Avec la route OAuth, le daemon lance le sous-processus officiel `agy acp`. NeoSw
 
 ## CLI autonome
 
-Chaque version étiquetée publie des binaires pour macOS (Apple Silicon et Intel), Linux (amd64 et arm64) et Windows (amd64), avec des sommes de contrôle SHA-256, sur la page [Releases](https://github.com/yldm-ai/neon-switch/releases). La version Windows est compilée mais pas encore testée. Vous pouvez aussi compiler depuis les sources :
+Chaque version étiquetée publie des binaires pour macOS (Apple Silicon et Intel), Linux (amd64 et arm64) et Windows (amd64), avec des sommes de contrôle SHA-256, sur la page [Releases](https://github.com/yldm-ai/neo-switch/releases). La version Windows est compilée mais pas encore testée. Vous pouvez aussi compiler depuis les sources :
 
 ```bash
 go build -o neoswitch ./cmd/neoswitch
@@ -196,16 +196,16 @@ Définissez à la fois `ANTHROPIC_BASE_URL` et `ANTHROPIC_AUTH_TOKEN` dans le cl
 
 ### Mise à jour
 
-Mettez à jour le plugin avec les commandes de [Installer le plugin](#installer-le-plugin). Pour la CLI autonome, téléchargez un binaire plus récent sur la page [Releases](https://github.com/yldm-ai/neon-switch/releases), ou installez la dernière version avec Go :
+Mettez à jour le plugin avec les commandes de [Installer le plugin](#installer-le-plugin). Pour la CLI autonome, téléchargez un binaire plus récent sur la page [Releases](https://github.com/yldm-ai/neo-switch/releases), ou installez la dernière version avec Go :
 
 ```bash
-go install github.com/yldm-ai/neon-switch/cmd/neoswitch@latest
+go install github.com/yldm-ai/neo-switch/cmd/neoswitch@latest
 ```
 
-Le dépôt a été déplacé de `yldm-ai/NeoSwitch` vers `yldm-ai/neon-switch`. Si vous avez ajouté la marketplace sous l'ancien nom, ajoutez-la à nouveau depuis le nouvel emplacement :
+Le dépôt a été déplacé de `yldm-ai/NeoSwitch` / `yldm-ai/neon-switch` vers `yldm-ai/neo-switch`. Si vous avez ajouté la marketplace sous l'ancien nom, ajoutez-la à nouveau depuis le nouvel emplacement :
 
 ```bash
-claude plugin marketplace add yldm-ai/neon-switch
+claude plugin marketplace add yldm-ai/neo-switch
 ```
 
 ### Désinstallation

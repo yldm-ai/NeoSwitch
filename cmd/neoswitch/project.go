@@ -12,9 +12,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/yldm-ai/neon-switch/internal/daemon"
-	"github.com/yldm-ai/neon-switch/internal/provider"
-	"github.com/yldm-ai/neon-switch/internal/server"
+	"github.com/yldm-ai/neo-switch/internal/daemon"
+	"github.com/yldm-ai/neo-switch/internal/provider"
+	"github.com/yldm-ai/neo-switch/internal/server"
 )
 
 func projectDir(args []string) (string, error) {
