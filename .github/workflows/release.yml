@@ -1,0 +1,40 @@
+name: release
+
+# Pushing a tag such as v0.1.0 tests the tree, builds the neoswitch CLI for each platform and publishes a GitHub Release with the binaries and their SHA-256 checksums.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: go test -race ./...
+      - run: go vet ./...
+      - name: Build
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -eu
+          mkdir dist
+          for target in darwin/arm64 darwin/amd64 linux/amd64 linux/arm64 windows/amd64; do
+            goos=${target%/*}
+            goarch=${target#*/}
+            ext=
+            [ "$goos" = windows ] && ext=.exe
+            CGO_ENABLED=0 GOOS=$goos GOARCH=$goarch go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o "dist/neoswitch_${VERSION}_${goos}_${goarch}${ext}" ./cmd/neoswitch
+          done
+          cd dist
+          sha256sum neoswitch_* > checksums.txt
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --generate-notes --title "$GITHUB_REF_NAME"
