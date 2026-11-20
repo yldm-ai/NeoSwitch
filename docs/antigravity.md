@@ -14,7 +14,7 @@ To start or switch the account session, run:
 neoswitch antigravity login
 ```
 
-This delegates the ACP authentication flow to the official `agy` CLI and keeps its credentials in the platform keyring. The command does not read or print the resulting token or open the interactive `agy` TUI. In an SSH session, `agy` prints a URL and an authorization code for completing the same flow in a local browser. `neoswitch antigravity oauth` is accepted as an alias.
+This delegates ACP's protocol-driven authentication flow to the official `agy` CLI and keeps its credentials in the platform keyring. The command does not read or print the resulting token, wait for stdin, or open the interactive `agy` TUI. `agy` owns the browser callback. `neoswitch antigravity oauth` is accepted as an alias.
 
 To use the authenticated Neon account from the Claude Code plugin, run `/neoswitch:login`. The plugin signs in through `agy acp`, enables the current project's route, and starts using the `gemini-4-neon` session model after the next Claude Code session. OAuth credentials remain inside `agy` and are never read by NeoSwitch. The **Use Antigravity OAuth via ACP** option can force this route when another Gemini credential is present.
 

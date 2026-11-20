@@ -86,7 +86,7 @@ Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOS
 
 执行 `/neoswitch:on` 或 `/neoswitch:off` 之后，要在项目里开一个新会话才生效，正在运行的会话保持原来的连接。
 
-在 Claude Code 中运行 `/neoswitch:login`，即可启动官方 `agy acp --login` OAuth 流程。需要时它会打开浏览器，登录凭证由 `agy` 保存到系统钥匙串，完成后返回 Claude Code，不打开 `agy` 交互界面。`/neoswitch:antigravity-login` 仍可作为别名使用。
+在 Claude Code 中运行 `/neoswitch:login`，即可启动 ACP 的协议认证流程。需要时 `agy` 会打开浏览器并自行处理回调，登录凭证由 `agy` 保存到系统钥匙串，完成后返回 Claude Code，不需要在 Claude 的 shell 中粘贴验证码，也不打开 `agy` 交互界面。`/neoswitch:antigravity-login` 仍可作为别名使用。
 
 `/neoswitch:login` 会启动 `agy acp`，通过 ACP 的 session 配置选择 `gemini-4-neon`。
 
