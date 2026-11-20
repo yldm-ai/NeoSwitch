@@ -28,7 +28,7 @@ const (
 	pluginAntigravityEnv = "CLAUDE_PLUGIN_OPTION_ANTIGRAVITY_OAUTH"
 )
 
-var errNoBackend = errors.New("no backend is configured: run /neoswitch:login to sign in with Antigravity OAuth (needs the official agy CLI), or export GEMINI_API_KEY before starting Claude Code")
+var errNoBackend = errors.New("NeoSwitch is not set up yet: run /neoswitch:login to sign in with your Google account, or set up a Gemini API key first")
 
 // resolveBackend decides which upstream to use and why. An explicit choice wins: NEOSWITCH_BACKEND, then the choice saved by /neoswitch:login or `neoswitch backend`. Without one, Gemini credentials in the environment select the Gemini API, and otherwise an installed agy selects Antigravity OAuth. OpenAI is only used when chosen explicitly, even if OPENAI_API_KEY is set.
 func resolveBackend() (kind, reason string, err error) {
@@ -73,8 +73,11 @@ func configuredBackend(ctx context.Context) (server.Backend, string, string, err
 	}
 	if kind == backendAntigravity {
 		backend, err := provider.NewAntigravityACPFromEnv(ctx)
+		if errors.Is(err, provider.ErrAntigravityCLIMissing) {
+			return nil, "", "", fmt.Errorf("%w: install the Antigravity CLI from Google, then start a new Claude Code session", err)
+		}
 		if err != nil {
-			return nil, "", "", fmt.Errorf("%w; install it, or run `neoswitch backend gemini` to use a Gemini API key instead", err)
+			return nil, "", "", err
 		}
 		return backend, backend.Model(), backendLabel(kind, ""), nil
 	}
@@ -88,11 +91,15 @@ func configuredBackend(ctx context.Context) (server.Backend, string, string, err
 	if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GOOGLE_API_KEY") == "" && os.Getenv(pluginKeyEnv) != "" {
 		_ = os.Setenv("GEMINI_API_KEY", os.Getenv(pluginKeyEnv))
 	}
+	if !geminiCredentialConfigured() {
+		err := errors.New("NeoSwitch is set to use a Gemini API key, but no key is set up (GEMINI_API_KEY)")
+		if antigravityCLIAvailable() {
+			return nil, "", "", fmt.Errorf("%w; set one up, or run /neoswitch:login to sign in with your Google account instead", err)
+		}
+		return nil, "", "", err
+	}
 	backend, err := provider.NewGeminiFromEnv(ctx)
 	if err != nil {
-		if antigravityCLIAvailable() {
-			return nil, "", "", fmt.Errorf("%w; or run /neoswitch:login to use Antigravity OAuth", err)
-		}
 		return nil, "", "", err
 	}
 	return backend, backend.Model, backendLabel(kind, backend.BackendName()), nil

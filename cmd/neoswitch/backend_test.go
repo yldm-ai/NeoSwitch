@@ -157,3 +157,19 @@ func TestOpenAIBackendRequiresModel(t *testing.T) {
 		t.Fatalf("model %q label %q", model, label)
 	}
 }
+
+func TestOnRefusesWithoutBackend(t *testing.T) {
+	state := isolateBackendEnv(t, false)
+	project := t.TempDir()
+	if err := on([]string{project}); !errors.Is(err, errNoBackend) {
+		t.Fatalf("expected errNoBackend, got %v", err)
+	}
+	for _, path := range []string{filepath.Join(project, ".claude", "settings.local.json"), filepath.Join(state, "proxy.json")} {
+		if _, err := os.Stat(path); !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("%s was written: %v", path, err)
+		}
+	}
+	if message := errNoBackend.Error(); !strings.Contains(message, "/neoswitch:login") || strings.Contains(message, "export") {
+		t.Fatalf("errNoBackend must name the slash command and no shell step: %q", message)
+	}
+}

@@ -39,6 +39,10 @@ func on(args []string) error {
 	if err != nil {
 		return err
 	}
+	// Turning a project on with no way to reach a model would only make every message of its next session fail. The check is local: it starts no agy and makes no network call, so an installed but signed-out agy still passes.
+	if _, _, err := resolveBackend(); err != nil {
+		return err
+	}
 	dir, err := daemon.Dir()
 	if err != nil {
 		return err
