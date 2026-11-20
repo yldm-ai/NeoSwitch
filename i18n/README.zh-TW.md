@@ -31,7 +31,7 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 它會先顯示 Google 的條款警告，再透過 Google 的 [Antigravity 命令列工具（`agy`）](https://antigravity.google/download)在瀏覽器裡開啟 Google 登入，最後為這個專案開啟 NeoSwitch。這台電腦上需要先裝好 `agy`。如果你習慣用終端機，也可以改用 Gemini API key：見 [docs/cli.md](../docs/cli.md#gemini-api-key)（英文）。
 
 > [!WARNING]
-> [Google Antigravity 服務條款](https://antigravity.google/terms)（第 6 條）禁止透過其他工具使用 Antigravity，NeoSwitch 就屬於這類工具。Google 可能暫停或關閉這樣做的人的 Antigravity 和 Gemini CLI 帳號。`/neoswitch:login` 每次都會重複這則警告。不接受這個風險，就不要登入。
+> [Google Antigravity 服務條款](https://antigravity.google/terms)（第 6 條）禁止透過其他工具使用 Antigravity，NeoSwitch 就屬於這類工具。Google 可能暫停或關閉這樣做的人的 Antigravity 帳號。`/neoswitch:login` 每次都會重複這則警告。不接受這個風險，就不要登入。
 
 **3. 傳送下一則訊息。** 執行指令的那個視窗從下一則訊息起就使用 Gemini 4 Neon，這個專案裡的新工作階段也一樣。如果指令的回覆要你重新啟動（Claude Code 是透過閘道啟動的，或是別的 Claude Code 視窗還在用 NeoSwitch 先前的設定），就關掉它提到的視窗，然後在同一個專案裡重新執行 `claude`。
 

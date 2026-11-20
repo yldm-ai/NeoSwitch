@@ -48,7 +48,7 @@
   "cred_vertex_signin": "Google Cloud Application Default Credentials",
   "cred_vertex_notes": "能否存取取決於你的專案與區域。",
   "warn_title": "Antigravity 服務條款。",
-  "warn_body": "<a href=\"https://antigravity.google/terms\">Google Antigravity 服務條款</a>（第 6 條）將透過第三方軟體存取 Antigravity 視為違約，Google 可以停權或終止相關的 Antigravity 與 Gemini CLI 帳號。透過 Antigravity OAuth 路由 Claude Code 屬於這種情況。只有在你願意讓登入的帳號承擔這項風險時才使用；否則請使用 Gemini API key 或 Vertex AI。",
+  "warn_body": "<a href=\"https://antigravity.google/terms\">Google Antigravity 服務條款</a>（第 6 條）將透過第三方軟體存取 Antigravity 視為違約，Google 可以停權或終止相關的 Antigravity 帳號。透過 Antigravity OAuth 路由 Claude Code 屬於這種情況。只有在你願意讓登入的帳號承擔這項風險時才使用；否則請使用 Gemini API key 或 Vertex AI。",
   "compat_sub": "Claude Code 各項功能的效果取決於模型遵循其工具協定的程度。這一點在日常寫程式中經過實際使用，但沒有自動化的端對端測試涵蓋。",
   "compat_th_capability": "功能",
   "row_streaming": "串流文字",
