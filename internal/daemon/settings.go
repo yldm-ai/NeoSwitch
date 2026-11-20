@@ -69,9 +69,20 @@ func readSettings(project string) (map[string]any, error) {
 		return settings, nil
 	}
 	if err := json.Unmarshal(data, &settings); err != nil {
-		return nil, fmt.Errorf("%s is not valid JSON, refusing to rewrite it: %w", settingsPath(project), err)
+		return nil, invalidSettings(settingsPath(project), data, err)
 	}
 	return settings, nil
+}
+
+// invalidSettings explains a settings file NeoSwitch cannot parse, pointing at the line of a syntax error, so the user can fix it without knowing JSON error messages. The file is never rewritten in that state.
+func invalidSettings(path string, data []byte, err error) error {
+	var syntax *json.SyntaxError
+	if errors.As(err, &syntax) {
+		offset := min(int(syntax.Offset), len(data))
+		line := 1 + bytes.Count(data[:offset], []byte("\n"))
+		return fmt.Errorf("NeoSwitch cannot read %s: line %d has a formatting mistake, such as a missing or extra comma. Fix that line and try again", path, line)
+	}
+	return fmt.Errorf("NeoSwitch cannot read %s: it must hold a single JSON object ({ ... }). Fix the file and try again", path)
 }
 
 func editSettings(project string, edit func(env map[string]any)) error {
@@ -82,7 +93,7 @@ func editSettings(project string, edit func(env map[string]any)) error {
 	env, ok := settings["env"].(map[string]any)
 	if !ok {
 		if _, present := settings["env"]; present {
-			return fmt.Errorf("%s has a non-object env field, refusing to rewrite it", settingsPath(project))
+			return fmt.Errorf("NeoSwitch cannot change %s: its \"env\" entry is not a JSON object ({ ... }). Fix the file and try again", settingsPath(project))
 		}
 		env = map[string]any{}
 	}

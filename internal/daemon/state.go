@@ -47,7 +47,7 @@ func LoadState(dir string) (State, bool, error) {
 	}
 	var s State
 	if err := json.Unmarshal(data, &s); err != nil || s.Listen == "" || s.Token == "" {
-		return State{}, false, fmt.Errorf("%s is corrupt; delete it and run `neoswitch on` again", statePath(dir))
+		return State{}, false, fmt.Errorf("NeoSwitch's settings file %s is damaged. Delete it, then run /neoswitch:on again in every project where NeoSwitch was on", statePath(dir))
 	}
 	return s, true, nil
 }
