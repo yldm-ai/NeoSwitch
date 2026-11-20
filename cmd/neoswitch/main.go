@@ -17,6 +17,9 @@ import (
 	"github.com/yldm-ai/NeoSwitch/internal/server"
 )
 
+// version is set by the release build with -ldflags "-X main.version=<tag>".
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		usage()
@@ -44,6 +47,9 @@ func main() {
 		err = attach(os.Args[2:])
 	case "daemon":
 		err = runDaemon()
+	case "version", "--version":
+		fmt.Println("neoswitch", version)
+		return
 	case "help", "--help", "-h":
 		usage()
 		return
@@ -252,6 +258,7 @@ Usage:
   neoswitch status [project]                  show routing and daemon state
   neoswitch doctor                            check local prerequisites
   neoswitch models                            print the configured Gemini model
+  neoswitch version                           print the NeoSwitch version
 
 Environment:
   GEMINI_API_KEY       Gemini Developer API key
