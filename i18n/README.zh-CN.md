@@ -1,6 +1,6 @@
 # NeoSwitch
 
-[English](README.md)
+[English](../README.md) | **简体中文** | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md)
 
 [![CI](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/NeoSwitch.svg)](https://pkg.go.dev/github.com/yldm-ai/NeoSwitch) [![License](https://img.shields.io/github/license/yldm-ai/NeoSwitch)](https://github.com/yldm-ai/NeoSwitch/blob/main/LICENSE)
 
@@ -156,7 +156,7 @@ NeoSwitch 默认使用官方 Gemini SDK，也可以使用本机未修改的 `agy
 
 Claude Code 仍负责会话、权限、MCP 和工具循环。Anthropic 没有文档化把 Claude Code 路由到非 Claude 模型的用法，因此 Claude Code 更新可能改变 NeoSwitch 依赖的行为。
 
-详见[协议合同和兼容矩阵](docs/protocol-contract.md)与 [Antigravity ACP 说明](docs/antigravity.md)。
+详见[协议合同和兼容矩阵](../docs/protocol-contract.md)与 [Antigravity ACP 说明](../docs/antigravity.md)。
 
 ## 开发与验证
 
