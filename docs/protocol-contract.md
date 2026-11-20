@@ -99,6 +99,6 @@ On Vertex AI the system instruction and tools are counted natively. The Gemini D
 | Upstream errors | Supported | Status mapping table test |
 | `count_tokens` | Supported, estimated on the Developer API | `provider` and `server` tests |
 | Session resume | Supported | Stateless tool IDs |
-| Antigravity OAuth via ACP | Supported as an opt-in local adapter | Uses the official `agy acp` process and never reads OAuth tokens; `provider` tests drive a scripted ACP server for chunked answers, images, agent exit and request timeout. Images are sent when `agy` advertises them; PDFs are marked as omitted |
+| Antigravity OAuth via ACP | Supported as an opt-in local adapter | Uses the official `agy acp` process through `github.com/coder/acp-go-sdk` and never reads OAuth tokens. Concurrent sessions, streamed text, usage and stop reasons are passed through. `provider` tests drive a scripted ACP server for concurrency, streaming with split escapes, tool calls, images, cancellation, agent exit and a stuck agent. Images are sent when `agy` advertises them; PDFs are marked as omitted |
 
 End-to-end check without a Gemini key: run `neoswitch claude -- -p ...` with `GEMINI_BASE_URL` pointing at a scripted server that returns a function call with a thought signature and returns 400 if the next request does not replay it.
