@@ -115,6 +115,27 @@ func backendLabel(kind, geminiName string) string {
 	return geminiName
 }
 
+// plainLabel names a backend label from backendLabel the way the user set it up, for messages shown in Claude Code.
+func plainLabel(label string) string {
+	switch label {
+	case backendLabel(backendAntigravity, ""):
+		return "your Google account (Antigravity sign-in)"
+	case backendLabel(backendOpenAI, ""):
+		return "an OpenAI API key (experimental)"
+	case "Vertex AI":
+		return "Vertex AI"
+	}
+	return "a Gemini API key"
+}
+
+// modelName names a model in messages: Gemini 4 Neon by its product name, any other model by its ID.
+func modelName(model string) string {
+	if model == provider.DefaultModel {
+		return "Gemini 4 Neon"
+	}
+	return model
+}
+
 // backendCommand shows or changes the saved backend choice.
 func backendCommand(args []string) error {
 	if len(args) > 1 {
