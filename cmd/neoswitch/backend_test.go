@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -171,5 +172,45 @@ func TestOnRefusesWithoutBackend(t *testing.T) {
 	}
 	if message := errNoBackend.Error(); !strings.Contains(message, "/neoswitch:login") || strings.Contains(message, "export") {
 		t.Fatalf("errNoBackend must name the slash command and no shell step: %q", message)
+	}
+}
+
+func TestOnExcludesSettingsFromGit(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git is not installed")
+	}
+	isolateBackendEnv(t, true)
+	// A global excludes file on the machine running the tests must not decide the outcome.
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	t.Setenv("GIT_CONFIG_NOSYSTEM", "1")
+	repo := t.TempDir()
+	if out, err := exec.Command("git", "init", "-q", repo).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v %s", err, out)
+	}
+	settings := filepath.Join(".claude", "settings.local.json")
+	for _, project := range []string{repo, filepath.Join(repo, "sub", "app")} {
+		if err := os.MkdirAll(project, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := on([]string{project}); err != nil {
+			t.Fatal(err)
+		}
+		if !isGitIgnored(project, settings) {
+			t.Fatalf("%s: settings are not ignored after on", project)
+		}
+		// Running on again must not add the pattern twice.
+		if err := on([]string{project}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join(repo, ".git", "info", "exclude"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"/.claude/settings.local.json", "/sub/app/.claude/settings.local.json"} {
+		if n := strings.Count("\n"+string(data), "\n"+want+"\n"); n != 1 {
+			t.Fatalf("exclude has %q %d times:\n%s", want, n, data)
+		}
 	}
 }

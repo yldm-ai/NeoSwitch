@@ -56,8 +56,12 @@ func on(args []string) error {
 	}
 	fmt.Printf("NeoSwitch is on for %s.\n", project)
 	fmt.Println("Start a new Claude Code session in this project to use Gemini; the current session keeps its connection.")
-	if ignored, known := gitIgnored(project, filepath.Join(".claude", "settings.local.json")); known && !ignored {
-		fmt.Println("Warning: .claude/settings.local.json is not git-ignored. It holds the local proxy token; add it to .gitignore.")
+	// The settings file holds the proxy token. Excluding it in the clone's own exclude file keeps it out of commits without touching the shared .gitignore; the note is only for when that does not work.
+	settings := filepath.Join(".claude", "settings.local.json")
+	if ignored, known := gitIgnored(project, settings); known && !ignored {
+		if err := gitExclude(project, settings); err != nil || !isGitIgnored(project, settings) {
+			fmt.Println("Note: Git may include .claude/settings.local.json in commits. It holds NeoSwitch's local access key, so add it to .gitignore.")
+		}
 	}
 	return nil
 }
@@ -266,6 +270,57 @@ func runDaemon() error {
 	}
 	fmt.Fprintln(os.Stderr, "NeoSwitch daemon stopped: no Claude Code session attached")
 	return nil
+}
+
+// isGitIgnored reports whether path is known to be ignored in project's git repository.
+func isGitIgnored(project, path string) bool {
+	ignored, _ := gitIgnored(project, path)
+	return ignored
+}
+
+// gitExclude adds path, relative to project, to the repository's local exclude file (normally .git/info/exclude), which only affects this clone. git resolves the file, because in a worktree .git is a file rather than a directory.
+func gitExclude(project, path string) error {
+	revParse := func(args ...string) (string, error) {
+		out, err := exec.Command("git", append([]string{"-C", project, "rev-parse"}, args...)...).Output()
+		return strings.TrimSpace(string(out)), err
+	}
+	exclude, err := revParse("--git-path", "info/exclude")
+	if err != nil {
+		return err
+	}
+	if !filepath.IsAbs(exclude) {
+		exclude = filepath.Join(project, exclude)
+	}
+	// The project can be a subdirectory of the repository; exclude patterns are relative to its top level.
+	prefix, err := revParse("--show-prefix")
+	if err != nil {
+		return err
+	}
+	pattern := "/" + filepath.ToSlash(filepath.Join(prefix, path))
+	data, err := os.ReadFile(exclude)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.TrimSpace(line) == pattern {
+			return nil
+		}
+	}
+	if len(data) > 0 && data[len(data)-1] != '\n' {
+		pattern = "\n" + pattern
+	}
+	if err := os.MkdirAll(filepath.Dir(exclude), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(exclude, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	if _, err := file.WriteString(pattern + "\n"); err != nil {
+		_ = file.Close()
+		return err
+	}
+	return file.Close()
 }
 
 // gitIgnored reports whether path is ignored in project's git repository; known is false outside a repository or without git.
