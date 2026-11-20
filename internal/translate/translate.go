@@ -16,6 +16,17 @@ import (
 type Request struct {
 	Contents []*genai.Content
 	Config   *genai.GenerateContentConfig
+	// ThinkingLevel is the request's effort mapped onto Gemini's thinking levels, empty when the request names none or an effort NeoSwitch does not know. It is kept out of Config so each backend decides whether to apply it: the Antigravity ACP route selects agy's thought level from it, while the Gemini API route does not send it yet because per-model support for each level is unverified.
+	ThinkingLevel genai.ThinkingLevel
+}
+
+// thinkingLevels maps Claude Code's effort onto Gemini's thinking levels. Gemini has no level above XHIGH, so max shares it.
+var thinkingLevels = map[string]genai.ThinkingLevel{
+	"low":    genai.ThinkingLevelLow,
+	"medium": genai.ThinkingLevelMedium,
+	"high":   genai.ThinkingLevelHigh,
+	"xhigh":  genai.ThinkingLevelXhigh,
+	"max":    genai.ThinkingLevelXhigh,
 }
 
 type toolCall struct {
@@ -92,7 +103,12 @@ func ToGemini(in anthropic.MessagesRequest) (Request, error) {
 	if len(contents) == 0 {
 		return Request{}, fmt.Errorf("messages contain no content Gemini can accept")
 	}
-	return Request{Contents: contents, Config: config}, nil
+	out := Request{Contents: contents, Config: config}
+	if in.OutputConfig != nil {
+		// An unknown effort is a hint NeoSwitch cannot map, not an invalid request: newer Claude Code versions may add levels.
+		out.ThinkingLevel = thinkingLevels[strings.ToLower(strings.TrimSpace(in.OutputConfig.Effort))]
+	}
+	return out, nil
 }
 
 func systemInstruction(raw json.RawMessage) (*genai.Content, error) {

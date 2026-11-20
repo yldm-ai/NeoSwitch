@@ -39,7 +39,8 @@ genai resolves credentials from the standard environment: `GEMINI_API_KEY` (or `
 
 - Tools are sent as one Gemini tool with every function declaration. `input_schema` is passed unmodified as `parametersJsonSchema` (full JSON Schema), not the OpenAPI-subset `parameters` field, which rejects keywords Claude Code schemas use (`$schema`, `additionalProperties`, `allOf`, `exclusiveMinimum`, ...). Server tools (typed `web_search_*`, `code_execution_*`, ...) are rejected.
 - `tool_choice` `auto` / `any` / `none` / `tool` map to function calling modes `AUTO` / `ANY` / `NONE` / `ANY` restricted to the named function.
-- `max_tokens`, `temperature`, `top_p`, `top_k` and `stop_sequences` map to the generation config. `thinking`, `metadata`, `context_management`, `output_config` and `cache_control` are ignored.
+- `max_tokens`, `temperature`, `top_p`, `top_k` and `stop_sequences` map to the generation config. `thinking`, `metadata`, `context_management` and `cache_control` are ignored.
+- `output_config.effort` (`low`, `medium`, `high`, `xhigh`, `max`; Claude Code sends `medium` by default) maps to Gemini thinking levels `LOW` / `MEDIUM` / `HIGH` / `XHIGH` / `XHIGH`. The Antigravity ACP route applies it as `agy`'s `thought_level` when the session offers that level. The Gemini API route does not send a thinking level yet, because per-model support for each level has not been verified. Unknown effort values are ignored.
 
 ## Tool call IDs and thought signatures
 

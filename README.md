@@ -105,7 +105,7 @@ The SessionStart hook starts one local daemon and registers the Claude Code proc
 
 With the OAuth route, the daemon starts the official `agy acp` subprocess. NeoSwitch sends the translated request through an ACP session and translates the returned answer or Claude-compatible tool-call JSON back to the local Anthropic-compatible endpoint. OAuth credentials and browser callbacks remain owned by `agy`.
 
-One `agy` process serves all sessions, and requests run concurrently in separate ACP sessions. Text streams as it is generated, and token usage is reported back to Claude Code.
+One `agy` process serves all sessions, and requests run concurrently in separate ACP sessions. Text streams as it is generated, token usage is reported back to Claude Code, and Claude Code's `/effort` setting selects how long Neon thinks.
 
 The optional plugin setting **Use Antigravity OAuth via ACP** forces the ACP route when another Gemini credential is also present. A normal `/neoswitch:login` automatically uses ACP when no Gemini credential is configured.
 
