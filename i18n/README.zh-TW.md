@@ -46,6 +46,9 @@ OAuth 憑證始終留在 `agy` 內部。NeoSwitch 不會讀取、複製或匯出
 
 ```text
 /plugin marketplace add yldm-ai/neo-switch
+```
+
+```text
 /plugin install neoswitch@neoswitch
 ```
 

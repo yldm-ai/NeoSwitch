@@ -46,6 +46,9 @@ NeoSwitch позволяет использовать Gemini в Claude Code, н�
 
 ```text
 /plugin marketplace add yldm-ai/neo-switch
+```
+
+```text
 /plugin install neoswitch@neoswitch
 ```
 
