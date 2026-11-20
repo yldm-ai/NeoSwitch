@@ -12,6 +12,9 @@ import (
 const (
 	envBaseURL   = "ANTHROPIC_BASE_URL"
 	envAuthToken = "ANTHROPIC_AUTH_TOKEN"
+	// EnvUseGateway is Claude Code's gateway mode switch, set by gateway launchers such as `everyapi use claude`. In gateway mode a session takes ANTHROPIC_BASE_URL from its process environment over project settings, so the proxy entries alone would be ignored silently while the SessionStart hook, which does see the project settings, still attaches. Enable therefore turns gateway mode off for the project.
+	EnvUseGateway = "CLAUDE_CODE_USE_GATEWAY"
+	gatewayOff    = "0"
 )
 
 // settingsPath is the per-user, per-project Claude Code settings file. It is the narrowest scope that can set ANTHROPIC_BASE_URL: other projects and other people's checkouts keep talking to Anthropic.
@@ -19,11 +22,12 @@ func settingsPath(project string) string {
 	return filepath.Join(project, ".claude", "settings.local.json")
 }
 
-// Enable points Claude Code sessions in project at the shared proxy by adding the two env entries to settings.local.json. Every other key in the file is preserved.
+// Enable points Claude Code sessions in project at the shared proxy by adding its env entries to settings.local.json. Every other key in the file is preserved.
 func Enable(project string, s State) error {
 	return editSettings(project, func(env map[string]any) {
 		env[envBaseURL] = s.BaseURL()
 		env[envAuthToken] = s.Token
+		env[EnvUseGateway] = gatewayOff
 	})
 }
 
@@ -34,6 +38,9 @@ func Disable(project string, s State) error {
 			delete(env, envBaseURL)
 			if env[envAuthToken] == s.Token {
 				delete(env, envAuthToken)
+			}
+			if env[EnvUseGateway] == gatewayOff {
+				delete(env, EnvUseGateway)
 			}
 		}
 	})

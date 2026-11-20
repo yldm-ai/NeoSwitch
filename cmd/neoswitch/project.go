@@ -136,12 +136,24 @@ func attach(args []string) error {
 	if err != nil {
 		return hookMessage(err.Error())
 	}
-	// The hook inherits the session's settings env, so this is exactly the base URL the session is about to use.
+	// The hook inherits the session's settings env, so a matching base URL means this project is routed through NeoSwitch. It is the URL the session uses unless gateway mode overrides it, which is handled below.
 	if !ok || os.Getenv("ANTHROPIC_BASE_URL") != state.BaseURL() {
 		return nil
 	}
 	if *pid <= 1 {
 		return hookMessage("NeoSwitch: the SessionStart hook did not pass the Claude Code process ID")
+	}
+	// Projects enabled before `neoswitch on` turned gateway mode off still let a gateway launcher's ANTHROPIC_BASE_URL win. The running session cannot be changed any more, so fix the project for the next one and say so instead of letting status claim a route the session may not use.
+	var notice string
+	if gatewayModeOn() {
+		project, err := projectDir(nil)
+		if err == nil {
+			err = daemon.Enable(project, state)
+		}
+		if err != nil {
+			return hookMessage("NeoSwitch: Claude Code was started in gateway mode (" + daemon.EnvUseGateway + "), which can send this session's requests to the gateway instead of NeoSwitch, and turning it off for this project failed: " + err.Error())
+		}
+		notice = "NeoSwitch: Claude Code was started in gateway mode (" + daemon.EnvUseGateway + "), which can send this session's requests to the gateway instead of Gemini. This project's .claude/settings.local.json now turns gateway mode off; start a new session to use NeoSwitch."
 	}
 	if pluginAntigravityEnabled() {
 		_ = os.Setenv("NEOSWITCH_ANTIGRAVITY_ACP", "true")
@@ -162,7 +174,19 @@ func attach(args []string) error {
 	if err := daemon.Attach(state, *pid, func() error { return spawnDaemon(dir) }); err != nil {
 		return hookMessage("NeoSwitch: " + err.Error() + "; see " + filepath.Join(dir, "daemon.log"))
 	}
+	if notice != "" {
+		return hookMessage(notice)
+	}
 	return nil
+}
+
+// gatewayModeOn reports whether the session runs in Claude Code's gateway mode. Project settings that turn it off are already applied to the hook's environment.
+func gatewayModeOn() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(daemon.EnvUseGateway))) {
+	case "", "0", "false", "no", "off":
+		return false
+	}
+	return true
 }
 
 func pluginAntigravityEnabled() bool {
