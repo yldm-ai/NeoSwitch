@@ -1,5 +1,7 @@
 # NeoSwitch
 
+[English](README.md) | [简体中文](README.zh-CN.md)
+
 NeoSwitch is a local, compatibility-first bridge that runs Claude Code against Gemini 4 Neon through an official Gemini API endpoint.
 
 The first release deliberately keeps the surface small: Claude Code remains the agent runtime, while NeoSwitch owns only the Anthropic Messages to Gemini translation boundary. It listens on loopback, keeps credentials in the process environment, and does not write prompts or responses to disk.
