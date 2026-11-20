@@ -97,6 +97,34 @@ func TestEnableRefusesInvalidSettings(t *testing.T) {
 	}
 }
 
+func TestInvalidSettingsNameTheLine(t *testing.T) {
+	for name, tc := range map[string]struct{ content, want string }{
+		"trailing comma": {"{\n  \"env\": {\n    \"A\": \"1\",\n  }\n}\n", "line 4 has a formatting mistake"},
+		"truncated":      {"{\n  \"env\": ", "line 2 has a formatting mistake"},
+		"not an object":  {"[1, 2]", "must hold a single JSON object"},
+		"env not object": {`{"env": "x"}`, `"env" entry is not a JSON object`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			project := t.TempDir()
+			path := settingsPath(project)
+			_ = os.MkdirAll(filepath.Dir(path), 0o755)
+			_ = os.WriteFile(path, []byte(tc.content), 0o644)
+			err := Enable(project, State{Listen: "127.0.0.1:1", Token: "t"})
+			if err == nil || !strings.Contains(err.Error(), tc.want) || strings.Contains(err.Error(), "invalid character") {
+				t.Fatalf("got %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestCorruptStateNamesTheSlashCommand(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.WriteFile(filepath.Join(dir, "proxy.json"), []byte("{"), 0o600)
+	if _, _, err := LoadState(dir); err == nil || !strings.Contains(err.Error(), "/neoswitch:on") || strings.Contains(err.Error(), "`neoswitch") {
+		t.Fatalf("got %v", err)
+	}
+}
+
 type fakeProcs struct {
 	mu    sync.Mutex
 	alive map[int]bool
