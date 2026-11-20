@@ -84,9 +84,9 @@ Schließen Sie Claude Code in diesem Projekt und öffnen Sie es erneut. Prüfen 
 /neoswitch:status
 ```
 
-Der Status sollte `NeoSwitch ... -> gemini-4-neon` anzeigen. Claude Code kann im Sitzungskopf weiterhin die angeforderte Bezeichnung anzeigen, etwa `claude-opus-5-5`; maßgeblich ist die Upstream-Route, die `/neoswitch:status` anzeigt.
+Wenn alles funktioniert, beginnt die neue Sitzung mit einem Hinweis wie `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.`, und `/neoswitch:status` antwortet `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` Claude Code kann im Sitzungskopf weiterhin die angeforderte Bezeichnung anzeigen, etwa `claude-opus-5-5`; maßgeblich ist das Modell, das der Hinweis von NeoSwitch und `/neoswitch:status` nennen.
 
-`/neoswitch:antigravity-login` ist ein Alias für `/neoswitch:login`. `/neoswitch:on` und `/neoswitch:off` schalten das Routing ohne Anmeldung um.
+`/neoswitch:on` und `/neoswitch:off` schalten das Projekt ohne erneute Anmeldung um. `/neoswitch:on` bricht mit einer Meldung ab und ändert nichts, solange weder ein Gemini-API-Schlüssel noch die Antigravity-Anmeldung eingerichtet ist.
 
 ## Weitere Zugangsdaten-Wege
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | Authentifiziert mit Antigravity OAuth, aktiviert die Neon-Route für dieses Projekt und verwendet ACP |
 | `/neoswitch:on` | Aktiviert das Routing für neue Claude-Code-Sitzungen in diesem Projekt |
-| `/neoswitch:status` | Zeigt die Projektroute und den Daemon-Status |
+| `/neoswitch:status` | Zeigt, ob dieses Projekt und diese Sitzung Gemini 4 Neon nutzen, und was als Nächstes zu tun ist |
 | `/neoswitch:off` | Deaktiviert das Routing für neue Sitzungen in diesem Projekt |
 
 Starten Sie nach einer Routing-Änderung eine neue Claude-Code-Sitzung. Die laufende Sitzung behält ihre bestehende Verbindung.
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # gespeicherte agy-Sitzung prüfen, ohne Zugangsda
 neoswitch models              # mit den Zugangsdaten nutzbare Modelle auflisten, das konfigurierte markiert
 neoswitch on [project]        # Routing für ein Projekt aktivieren
 neoswitch off [project]       # Routing für ein Projekt deaktivieren
-neoswitch status [project]    # Routing und Daemon-Status anzeigen
+neoswitch status [-v] [project] # zeigen, ob ein Projekt NeoSwitch nutzt und was zu tun ist (-v zeigt Details)
 neoswitch version             # NeoSwitch-Version ausgeben
 ```
 

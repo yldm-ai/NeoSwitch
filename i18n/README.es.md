@@ -84,9 +84,9 @@ Cierra y vuelve a abrir Claude Code en ese proyecto. Comprueba la ruta con:
 /neoswitch:status
 ```
 
-El estado debería mostrar `NeoSwitch ... -> gemini-4-neon`. Claude Code puede seguir mostrando la etiqueta solicitada, como `claude-opus-5-5`, en el encabezado de la sesión; la ruta real hacia el servicio de origen es la que muestra `/neoswitch:status`.
+Si todo funciona, la nueva sesión empieza con un aviso como `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.`, y `/neoswitch:status` responde `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` Claude Code puede seguir mostrando la etiqueta solicitada, como `claude-opus-5-5`, en el encabezado de la sesión; el modelo que responde de verdad es el que indican el aviso de NeoSwitch y `/neoswitch:status`.
 
-`/neoswitch:antigravity-login` es un alias de `/neoswitch:login`. `/neoswitch:on` y `/neoswitch:off` cambian el enrutamiento sin iniciar sesión.
+`/neoswitch:on` y `/neoswitch:off` cambian el proyecto sin volver a iniciar sesión. `/neoswitch:on` se detiene con un mensaje, sin cambiar nada, mientras no haya una clave de la API de Gemini ni el inicio de sesión de Antigravity.
 
 ## Otras vías de credenciales
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | Se autentica con Antigravity OAuth, activa la ruta Neon de este proyecto y usa ACP |
 | `/neoswitch:on` | Activa el enrutamiento para las nuevas sesiones de Claude Code en este proyecto |
-| `/neoswitch:status` | Muestra la ruta del proyecto y el estado del daemon |
+| `/neoswitch:status` | Indica si este proyecto y esta sesión usan Gemini 4 Neon, y qué hacer a continuación |
 | `/neoswitch:off` | Desactiva el enrutamiento para las nuevas sesiones en este proyecto |
 
 Después de cambiar el enrutamiento, inicia una nueva sesión de Claude Code. La sesión actual mantiene su conexión existente.
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # verifica la sesión de agy guardada sin mostrar 
 neoswitch models              # lista los modelos que pueden usar las credenciales y marca el configurado
 neoswitch on [project]        # activa el enrutamiento de un proyecto
 neoswitch off [project]       # desactiva el enrutamiento de un proyecto
-neoswitch status [project]    # muestra el enrutamiento y el estado del daemon
+neoswitch status [-v] [project] # indica si un proyecto usa NeoSwitch y qué hacer (-v añade detalles)
 neoswitch version             # muestra la versión de NeoSwitch
 ```
 

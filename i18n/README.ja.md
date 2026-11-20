@@ -84,9 +84,9 @@ Neon を使いたいプロジェクトで次を実行します。
 /neoswitch:status
 ```
 
-`NeoSwitch ... -> gemini-4-neon` と表示されるはずです。Claude Code のセッションヘッダーには、`claude-opus-5-5` のようにリクエストしたラベルが表示されることがありますが、上流のルートは `/neoswitch:status` に表示されるものです。
+うまくいくと、新しいセッションの最初に `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.` のようなメッセージが表示され、`/neoswitch:status` は `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` と答えます。Claude Code のセッションヘッダーには、`claude-opus-5-5` のようにリクエストしたラベルが表示されることがありますが、実際に応答するモデルは NeoSwitch のメッセージと `/neoswitch:status` に表示されるものです。
 
-`/neoswitch:antigravity-login` は `/neoswitch:login` のエイリアスです。`/neoswitch:on` と `/neoswitch:off` はサインインせずにルーティングだけを切り替えます。
+`/neoswitch:on` と `/neoswitch:off` は、サインインし直さずにプロジェクトを切り替えます。Gemini API キーも Antigravity のサインインも設定されていない間は、`/neoswitch:on` はメッセージを表示して止まり、何も変更しません。
 
 ## その他の認証方法
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | Antigravity OAuth で認証し、このプロジェクトの Neon ルートを有効にして ACP を使う |
 | `/neoswitch:on` | このプロジェクトの新しい Claude Code セッションでルーティングを有効にする |
-| `/neoswitch:status` | プロジェクトのルートとデーモンの状態を表示する |
+| `/neoswitch:status` | このプロジェクトとセッションが Gemini 4 Neon を使っているか、次に何をすればよいかを表示する |
 | `/neoswitch:off` | このプロジェクトの新しいセッションでルーティングを無効にする |
 
 ルーティングを変更したら、新しい Claude Code セッションを開始してください。現在のセッションは既存の接続を維持します。
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # 保存済みの agy セッションを確認（�
 neoswitch models              # 認証情報で使えるモデルを一覧表示し、設定中のモデルに印を付ける
 neoswitch on [project]        # プロジェクトのルーティングを有効化
 neoswitch off [project]       # プロジェクトのルーティングを無効化
-neoswitch status [project]    # ルーティングとデーモンの状態を表示
+neoswitch status [-v] [project] # プロジェクトが NeoSwitch を使っているかと次の手順を表示（-v で詳細）
 neoswitch version             # NeoSwitch のバージョンを表示
 ```
 

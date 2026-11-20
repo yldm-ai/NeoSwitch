@@ -84,9 +84,9 @@ Feche e reabra o Claude Code nesse projeto. Verifique a rota com:
 /neoswitch:status
 ```
 
-O status deve mostrar `NeoSwitch ... -> gemini-4-neon`. O Claude Code ainda pode exibir o rótulo solicitado, como `claude-opus-5-5`, no cabeçalho da sessão; a rota de origem é a que `/neoswitch:status` mostra.
+Quando funciona, a nova sessão começa com um aviso como `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.`, e `/neoswitch:status` responde `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` O Claude Code ainda pode exibir o rótulo solicitado, como `claude-opus-5-5`, no cabeçalho da sessão; o modelo que responde de fato é o que o aviso do NeoSwitch e `/neoswitch:status` mostram.
 
-`/neoswitch:antigravity-login` é um alias de `/neoswitch:login`. `/neoswitch:on` e `/neoswitch:off` alteram o roteamento sem fazer login.
+`/neoswitch:on` e `/neoswitch:off` alternam o projeto sem fazer login de novo. `/neoswitch:on` para com uma mensagem, sem alterar nada, enquanto não houver uma chave da API do Gemini nem o login do Antigravity.
 
 ## Outros caminhos de credenciais
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | Autentica com Antigravity OAuth, ativa a rota do Neon neste projeto e usa ACP |
 | `/neoswitch:on` | Ativa o roteamento para novas sessões do Claude Code neste projeto |
-| `/neoswitch:status` | Mostra a rota do projeto e o estado do daemon |
+| `/neoswitch:status` | Diz se este projeto e esta sessão usam o Gemini 4 Neon e o que fazer em seguida |
 | `/neoswitch:off` | Desativa o roteamento para novas sessões neste projeto |
 
 Depois de alterar o roteamento, inicie uma nova sessão do Claude Code. A sessão atual mantém a conexão existente.
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # verifica a sessão salva do agy sem exibir crede
 neoswitch models              # lista os modelos que as credenciais podem usar e marca o configurado
 neoswitch on [project]        # ativa o roteamento de um projeto
 neoswitch off [project]       # desativa o roteamento de um projeto
-neoswitch status [project]    # mostra o roteamento e o estado do daemon
+neoswitch status [-v] [project] # diz se um projeto usa o NeoSwitch e o que fazer (-v adiciona detalhes)
 neoswitch version             # exibe a versão do NeoSwitch
 ```
 

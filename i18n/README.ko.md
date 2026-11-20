@@ -84,9 +84,9 @@ Neon을 사용하려는 프로젝트에서 다음을 실행합니다.
 /neoswitch:status
 ```
 
-상태에는 `NeoSwitch ... -> gemini-4-neon`이 표시되어야 합니다. Claude Code는 세션 헤더에 `claude-opus-5-5`처럼 요청한 모델 이름을 계속 표시할 수 있습니다. 실제 업스트림 라우트는 `/neoswitch:status`에 표시되는 것입니다.
+제대로 동작하면 새 세션이 `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.` 같은 메시지로 시작하고, `/neoswitch:status`는 `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.`라고 답합니다. Claude Code는 세션 헤더에 `claude-opus-5-5`처럼 요청한 모델 이름을 계속 표시할 수 있습니다. 실제로 응답하는 모델은 NeoSwitch 메시지와 `/neoswitch:status`에 표시되는 것입니다.
 
-`/neoswitch:antigravity-login`은 `/neoswitch:login`의 별칭입니다. `/neoswitch:on`과 `/neoswitch:off`는 로그인 없이 라우팅만 변경합니다.
+`/neoswitch:on`과 `/neoswitch:off`는 다시 로그인하지 않고 프로젝트를 전환합니다. Gemini API 키도 Antigravity 로그인도 설정되지 않은 동안 `/neoswitch:on`은 메시지를 보여 주고 아무것도 바꾸지 않은 채 멈춥니다.
 
 ## 기타 자격 증명 방식
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | Antigravity OAuth로 인증하고, 이 프로젝트의 Neon 라우트를 활성화하며, ACP를 사용 |
 | `/neoswitch:on` | 이 프로젝트의 새 Claude Code 세션에 라우팅 활성화 |
-| `/neoswitch:status` | 프로젝트 라우트와 데몬 상태 표시 |
+| `/neoswitch:status` | 이 프로젝트와 세션이 Gemini 4 Neon을 쓰는지, 다음에 무엇을 하면 되는지 표시 |
 | `/neoswitch:off` | 이 프로젝트의 새 세션에 라우팅 비활성화 |
 
 라우팅을 변경한 뒤에는 새 Claude Code 세션을 시작하세요. 현재 세션은 기존 연결을 유지합니다.
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # 자격 증명을 출력하지 않고 저장된 a
 neoswitch models              # 자격 증명으로 사용할 수 있는 모델을 나열하고 설정된 모델을 표시
 neoswitch on [project]        # 프로젝트 라우팅 활성화
 neoswitch off [project]       # 프로젝트 라우팅 비활성화
-neoswitch status [project]    # 라우팅과 데몬 상태 표시
+neoswitch status [-v] [project] # 프로젝트가 NeoSwitch를 쓰는지와 다음 할 일 표시 (-v는 세부 정보 추가)
 neoswitch version             # NeoSwitch 버전 출력
 ```
 
