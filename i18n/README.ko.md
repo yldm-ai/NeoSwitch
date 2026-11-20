@@ -2,47 +2,17 @@
 
 [English](../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | **한국어** | [Español](README.es.md) | [Français](README.fr.md) | [Deutsch](README.de.md) | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md)
 
-[![Latest release](https://img.shields.io/github/v/release/yldm-ai/neo-switch)](https://github.com/yldm-ai/neo-switch/releases) [![CI](https://github.com/yldm-ai/neo-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neo-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neo-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neo-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neo-switch)](https://github.com/yldm-ai/neo-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neo-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neo-switch)](https://github.com/yldm-ai/neo-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neo-switch)](https://github.com/yldm-ai/neo-switch/stargazers)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neo-switch/blob/main/.claude-plugin/plugin.json) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neo-switch/blob/main/LICENSE)
 
-[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neo-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neo-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neo-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neo-switch/blob/main/docs/protocol-contract.md)
+NeoSwitch를 쓰면 Claude Code는 그대로 두고, Claude 대신 Google의 Gemini 4 Neon 모델이 답합니다.
 
-**Keep Claude Code. Switch your models.**
+[![세 단계로 NeoSwitch 설정하기](../docs/media/neoswitch-demo.gif)](../docs/media/neoswitch-demo.mp4)
 
-NeoSwitch를 사용하면 익숙한 워크플로를 바꾸지 않고 Claude Code에서 Gemini를 쓸 수 있습니다. Claude Code의 CLI, 명령, 권한, 도구, 스킬, MCP 서버, 훅은 그대로 유지되며, NeoSwitch는 작은 로컬 프록시를 실행해 Claude Code의 요청을 뒤에 있는 모델에 맞게 변환합니다.
+프로젝트마다 따로 전환하며, 다른 프로젝트는 계속 Claude를 씁니다. 플러그인은 macOS와 Linux에서 동작합니다. Windows는 아직 지원하지 않습니다.
 
-현재 NeoSwitch는 Claude Code를 Gemini 4 Neon으로 라우팅합니다. OpenAI는 실험적 백엔드로 사용할 수 있습니다. 직접 선택해야 하며, 스크립트로 만든 업스트림에서만 테스트했습니다.
+## 시작하기
 
-## NeoSwitch를 쓰는 이유
-
-- **워크플로 유지**: 여전히 Claude Code를 실행합니다. 바뀌는 것은 모델뿐입니다.
-- **프로젝트 단위**: 한 프로젝트에서만 라우팅을 켜고 나머지 프로젝트는 Anthropic을 그대로 사용할 수 있습니다.
-- **로컬 우선**: 프록시는 루프백에서만 수신하고, 무작위 접근 토큰을 사용하며, 프롬프트·응답·자격 증명을 로그에 남기지 않습니다. 원격 중계 서버는 거치지 않습니다.
-- **솔직한 호환성 정보**: 동작하는 기능, 부분적으로 동작하는 기능, 지원하지 않는 기능을 [아래](#호환성)에 정리했습니다.
-
-## 자격 증명 방식 선택
-
-| 방식 | 로그인 방법 | 비고 |
-|---|---|---|
-| Antigravity OAuth | 공식 `agy` CLI를 통한 Google 계정 | 플러그인의 기본 흐름입니다. 먼저 아래 경고를 읽으세요. |
-| Gemini Developer API | `GEMINI_API_KEY` | Gemini 4 Neon 접근 가능 여부는 키에 따라 다릅니다. `neoswitch doctor`로 확인하세요. |
-| Vertex AI | Google Cloud Application Default Credentials | 접근 가능 여부는 프로젝트와 리전에 따라 다릅니다. `neoswitch doctor`로 확인하세요. |
-
-> [!WARNING]
-> [Google Antigravity 서비스 약관](https://antigravity.google/terms)(제6조)은 서드파티 소프트웨어, 도구 또는 서비스를 통해 Antigravity에 접근하는 것을 위반으로 보며, Google이 관련된 Antigravity 및 Gemini CLI 계정을 정지하거나 해지할 수 있다고 명시합니다. Antigravity OAuth를 통해 Claude Code를 라우팅하는 것은 이 규정에 해당합니다. 로그인하는 계정에 대해 이 위험을 감수할 수 있을 때만 사용하고, 그렇지 않다면 Gemini API 키나 Vertex AI를 사용하세요. `neoswitch doctor`와 `neoswitch antigravity login`도 같은 경고를 출력합니다.
-
-OAuth 자격 증명은 항상 `agy` 안에만 머무릅니다. NeoSwitch는 토큰을 읽거나 복사하거나 내보내지 않습니다.
-
-## Claude Code에서 Neon 사용하기
-
-### 사전 요구 사항
-
-- Claude Code.
-- Antigravity OAuth를 쓰는 경우: 공식 Antigravity CLI (`agy` 명령이 PATH에 있어야 함).
-- Go(선택 사항). Go가 있으면 플러그인은 처음 사용할 때 내장된 NeoSwitch 바이너리를 소스에서 빌드합니다. Go가 없으면 저장소의 `VERSION` 파일이 가리키는 릴리스 바이너리를 macOS 또는 Linux(amd64 또는 arm64)용으로 내려받고, 실행하기 전에 SHA-256 체크섬을 검증합니다. 릴리스 사이에는 이 바이너리가 플러그인 소스보다 오래되었을 수 있습니다.
-
-### 플러그인 설치
-
-Claude Code 안에서 다음 명령을 실행합니다.
+**1. 플러그인을 설치합니다.** Claude Code에서 아래 두 줄을 한 줄씩 실행하세요. 각 줄은 통째로 복사하세요. 첫 줄은 `neo-switch`, 둘째 줄은 `neoswitch`입니다.
 
 ```text
 /plugin marketplace add yldm-ai/neo-switch
@@ -52,216 +22,86 @@ Claude Code 안에서 다음 명령을 실행합니다.
 /plugin install neoswitch@neoswitch
 ```
 
-이미 설치되어 있다면 새 릴리스가 나온 뒤 셸에서 업데이트합니다.
+**2. Google 계정으로 로그인합니다.** 전환할 프로젝트에서 Claude Code를 열고 다음을 실행하세요.
+
+```text
+/neoswitch:login
+```
+
+Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`agy`)](https://antigravity.google/download)를 통해 브라우저에서 Google 로그인을 열고, 마지막으로 이 프로젝트를 전환합니다. 이 컴퓨터에 `agy`가 설치되어 있어야 합니다. 터미널에 익숙하다면 Gemini API 키도 쓸 수 있습니다. [docs/cli.md](../docs/cli.md#gemini-api-key)(영어)를 보세요.
+
+> [!WARNING]
+> [Google Antigravity 서비스 약관](https://antigravity.google/terms)(제6조)은 다른 도구를 통해 Antigravity를 쓰는 것을 금지하며, NeoSwitch는 그런 도구에 해당합니다. Google은 그렇게 쓰는 사람의 Antigravity 및 Gemini CLI 계정을 정지하거나 해지할 수 있습니다. `/neoswitch:login`은 매번 이 경고를 다시 보여 줍니다. 이 위험을 받아들일 수 없다면 로그인하지 마세요.
+
+**3. Claude Code를 다시 시작합니다.** `/exit`를 입력한 뒤 같은 프로젝트에서 `claude`를 다시 실행하세요. 다른 Claude Code 창이 이미 NeoSwitch를 쓰고 있다면 먼저 모두 닫으세요. 그중 하나라도 열려 있는 동안 NeoSwitch는 이전 설정을 유지합니다.
+
+## 전환 후 보이는 것
+
+- 새 세션이 시작될 때 `NeoSwitch: this session uses Gemini 4 Neon through your Google account (Antigravity sign-in). Ignore the Claude model name in the header. The first reply can take a while.` 같은 안내가 나옵니다.
+- 헤더에는 `claude-opus-5-5` 같은 Claude 모델 이름이 그대로 보이지만 표시일 뿐이고, 실제로 답하는 것은 Gemini 4 Neon입니다. `/model`로 다른 모델을 골라도 바뀌지 않습니다.
+- 답의 첫 글자가 나오기까지 5~40초가 걸릴 수 있으며 정상입니다. `/neoswitch:login`으로 로그인했다면 `/effort low`로 답이 더 빨리 시작됩니다.
+- 설치나 업데이트 후 첫 NeoSwitch 명령은 준비 때문에 최대 1분쯤 걸릴 수 있습니다.
+- `/neoswitch:status`를 실행하면 이 세션이 Claude와 Gemini 4 Neon 중 무엇을 쓰는지, 다음에 무엇을 하면 되는지 언제든 알려 줍니다.
+
+## 문제가 생기면
+
+| 보이는 내용 | 해결 방법 |
+|---|---|
+| 세션 시작 안내에 NeoSwitch가 아직 설정되지 않았다고 나옴 | `/neoswitch:login`을 실행한 뒤 `/exit`를 입력하고 `claude`를 다시 시작하세요. |
+| `agy`가 설치되어 있지 않다는 메시지가 나옴 | Google의 [Antigravity 명령줄 도구(`agy`)](https://antigravity.google/download)를 설치한 뒤 `/neoswitch:login`을 다시 실행하세요. |
+| 모든 메시지가 연결 오류로 실패하거나, 세션 시작 안내에 이 세션은 답할 수 없다고 나옴 | 같은 프로젝트에서 `/neoswitch:off`를 실행하세요. 그 응답에도 연결 오류가 보이더라도 프로젝트는 이미 되돌려졌습니다. `/exit`를 입력하고 `claude`를 다시 시작하면 Claude로 돌아오며, `/neoswitch:status`가 무엇을 고쳐야 하는지 알려 줍니다. |
+| 다른 Claude Code 창이 이전 설정을 함께 쓰고 있다고 나옴 | Claude Code 창을 모두 닫은 뒤 다시 여세요. |
+| NeoSwitch에 필요한 포트를 다른 프로그램이 쓰고 있다고 나옴 | 그 프로그램을 닫고 Claude Code를 다시 시작하거나 `/neoswitch:off`를 실행하세요. |
+| NeoSwitch가 프로그램을 내려받지 못했다고 나옴 | 인터넷 연결을 확인하고 Claude Code를 다시 시작하세요. |
+| `/neoswitch:login`이 알 수 없는 명령으로 나옴 | 플러그인을 업데이트하고(아래 참고) Claude Code를 다시 시작한 뒤 `/reload-plugins`를 실행하세요. |
+
+## 끄기, 업데이트, 제거
+
+- `/neoswitch:off`는 이 프로젝트를 Claude로 되돌립니다. `/neoswitch:on`은 다시 설정하지 않고 Gemini 4 Neon으로 다시 전환합니다. 어느 쪽이든 그다음에 새 세션을 시작하세요.
+
+플러그인을 업데이트하려면 터미널에서 다음을 실행한 뒤 Claude Code를 다시 시작하세요.
 
 ```bash
 claude plugin marketplace update neoswitch
 claude plugin update neoswitch@neoswitch
 ```
 
-업데이트 후 Claude Code를 다시 시작하세요.
+마켓플레이스를 예전 이름 `yldm-ai/NeoSwitch` / `yldm-ai/neon-switch`로 추가했다면 먼저 `claude plugin marketplace add yldm-ai/neo-switch`로 다시 추가하세요.
 
-### 로그인하고 Neon 활성화하기
+NeoSwitch를 제거하려면:
 
-Neon을 사용하려는 프로젝트에서 다음을 실행합니다.
-
-```text
-/neoswitch:login
-```
-
-이 명령은 다음 단계를 수행합니다.
-
-1. `agy`가 관리하는 ACP 인증 흐름을 시작합니다.
-2. Google OAuth가 필요하면 브라우저를 엽니다.
-3. 현재 프로젝트에 NeoSwitch 라우팅을 활성화합니다.
-4. ACP 세션에 `gemini-4-neon`을 선택합니다.
-
-대신 Gemini API 키를 사용하려면 Claude Code를 시작하기 전에 `GEMINI_API_KEY`를 export하고 `/neoswitch:on`을 실행하세요. 플러그인에는 입력할 설정이 없습니다. 이전에 `/neoswitch:login`으로 로그인했다면 `NEOSWITCH_BACKEND=gemini`도 export하세요. 그렇지 않으면 로그인 때 저장된 선택이 우선합니다.
-
-해당 프로젝트에서 Claude Code를 닫았다가 다시 엽니다. 다음 명령으로 라우트를 확인합니다.
-
-```text
-/neoswitch:status
-```
-
-제대로 동작하면 새 세션이 `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.` 같은 메시지로 시작하고, `/neoswitch:status`는 `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.`라고 답합니다. Claude Code는 세션 헤더에 `claude-opus-5-5`처럼 요청한 모델 이름을 계속 표시할 수 있습니다. 실제로 응답하는 모델은 NeoSwitch 메시지와 `/neoswitch:status`에 표시되는 것입니다.
-
-`/neoswitch:on`과 `/neoswitch:off`는 다시 로그인하지 않고 프로젝트를 전환합니다. Gemini API 키도 Antigravity 로그인도 설정되지 않은 동안 `/neoswitch:on`은 메시지를 보여 주고 아무것도 바꾸지 않은 채 멈춥니다.
-
-## 기타 자격 증명 방식
-
-### Gemini API 키
-
-```bash
-export GEMINI_API_KEY='your-key'
-neoswitch doctor
-go run ./cmd/neoswitch claude
-```
-
-### Vertex AI
-
-```bash
-export GOOGLE_GENAI_USE_VERTEXAI=true
-export GOOGLE_CLOUD_PROJECT=my-project
-export GOOGLE_CLOUD_LOCATION=global
-neoswitch doctor
-go run ./cmd/neoswitch claude
-```
-
-프로세스가 Google Cloud SDK의 Application Default Credentials를 미리 사용할 수 있어야 합니다.
-
-`neoswitch doctor`는 모델을 조회하고 한 줄짜리 생성을 실행한 뒤, 자격 증명이 동작하는지 또는 동작하지 않는 이유를 보고합니다. 이유로는 거부된 자격 증명, 권한 부족, 리전 제한, 알 수 없는 모델, 할당량, 서비스 사용 불가가 있습니다.
-
-### OpenAI(실험적)
-
-OpenAI 백엔드는 공식 `openai-go` SDK를 통해 OpenAI Responses API로 요청을 보냅니다. 자동 선택은 이 백엔드를 고르지 않으므로 `NEOSWITCH_BACKEND=openai`를 설정하거나 `neoswitch backend openai`를 실행하세요. `OPENAI_MODEL`은 필수이며 NeoSwitch가 모델을 대신 고르지 않습니다. `OPENAI_BASE_URL`은 선택 사항이며 `/v1`을 포함해야 합니다. 스크립트로 만든 업스트림에서만 테스트했고 실제 OpenAI 계정으로는 검증하지 않았습니다. 매핑되는 항목과 매핑되지 않는 항목은 [docs/protocol-contract.md](../docs/protocol-contract.md#openai-backend-experimental)에 있습니다.
-
-```bash
-export NEOSWITCH_BACKEND=openai
-export OPENAI_API_KEY='your-key'
-export OPENAI_MODEL='model-name'
-neoswitch doctor
-go run ./cmd/neoswitch claude
-```
-
-## 플러그인 명령
-
-| 명령 | 효과 |
-|---|---|
-| `/neoswitch:login` | Antigravity OAuth로 인증하고, 이 프로젝트의 Neon 라우트를 활성화하며, ACP를 사용 |
-| `/neoswitch:on` | 이 프로젝트의 새 Claude Code 세션에 라우팅 활성화 |
-| `/neoswitch:status` | 이 프로젝트와 세션이 Gemini 4 Neon을 쓰는지, 다음에 무엇을 하면 되는지 표시 |
-| `/neoswitch:off` | 이 프로젝트의 새 세션에 라우팅 비활성화 |
-
-라우팅을 변경한 뒤에는 새 Claude Code 세션을 시작하세요. 현재 세션은 기존 연결을 유지합니다.
-
-## 호환성
-
-세션, 권한, 도구 실행, MCP 서버, 스킬, 훅, `CLAUDE.md`, `/resume`은 여전히 Claude Code가 실행합니다. NeoSwitch는 그 뒤의 모델만 교체합니다. 이 기능들이 얼마나 잘 동작하는지는 모델이 Claude Code의 도구 프로토콜을 얼마나 잘 따르는지에 달려 있으며, 이는 일상적인 코딩 작업에서 사용해 봤습니다. 자동화된 엔드투엔드 테스트가 변경될 때마다 실제 Claude Code CLI를 NeoSwitch를 거쳐 스크립트로 작성한 Gemini 서버에 대해 실행하고, 도구 호출과 결과, 파일 편집, Bash, 병렬 호출, 권한 거부, 훅, 스킬, `/resume`, 서브에이전트, MCP 도구가 Gemini API 경로를 그대로 통과하는지 확인합니다. 실제 모델이 이를 얼마나 잘 사용하는지는 측정하지 않습니다.
-
-| 기능 | Gemini API / Vertex AI | Antigravity OAuth (ACP) |
-|---|---|---|
-| 텍스트 스트리밍 | 지원 | 지원 |
-| 병렬 호출을 포함한 도구 호출 | Gemini 네이티브 함수 호출 | 부분 지원: 모델이 Claude tool-call JSON을 작성하며, 스트리밍되지 않고 한 번에 전달됨 |
-| 멀티턴 도구 사용과 `/resume` | 지원. thought signature는 도구 ID에 담아 전달 | 지원 |
-| 이미지 | 지원 | `agy`가 이미지 입력을 제공할 때 지원 |
-| PDF | 지원 | 미지원. 파일이 생략되었다는 사실을 모델에 알림 |
-| `/effort` | Gemini의 사고 수준으로 전송; 실제 API에서 검증되지 않았으며, 모델이 거부하면 제외 | `agy`의 사고 수준에 매핑 |
-| 토큰 사용량과 `count_tokens` | 보고됨. Developer API에서는 `count_tokens`가 추정값 | 보고됨. 모든 프롬프트에 추가되는 약 14k 토큰의 `agy` 지시문 포함 |
-| Gemini 4 Neon 접근 | 키나 프로젝트에 따라 다름. `neoswitch doctor`로 확인 | 로그인된 `agy`로 검증됨 |
-
-두 방식 모두 지원하지 않는 기능: 웹 검색이나 코드 실행 같은 서버 도구, URL 이미지 및 문서 소스, Claude thinking 블록. `cache_control`과 `context_management`는 무시됩니다. NeoSwitch는 다른 모델로 몰래 대체하지 않습니다.
-
-전체 엔드포인트 계약은 [docs/protocol-contract.md](../docs/protocol-contract.md)에, ACP 세부 사항은 [docs/antigravity.md](../docs/antigravity.md)에 있습니다.
-
-## 플러그인 동작 방식
-
-`/neoswitch:on`은 프로젝트의 `.claude/settings.local.json`에 키 세 개만 기록합니다. 프록시용 `ANTHROPIC_BASE_URL`과 `ANTHROPIC_AUTH_TOKEN`, 그리고 `CLAUDE_CODE_USE_GATEWAY=0`입니다. 게이트웨이 런처가 켜는 게이트웨이 모드에서는 Claude Code가 환경 변수의 기본 URL을 사용해 프록시를 조용히 무시하기 때문입니다. 이 토큰은 루프백 프록시를 인가하는 용도이며 Antigravity 자격 증명이 아닙니다.
-
-SessionStart 훅은 첫 모델 요청 전에 로컬 데몬 하나를 시작하고 Claude Code 프로세스를 등록합니다. 등록된 모든 Claude Code 프로세스가 종료되면 데몬도 종료됩니다.
-
-OAuth 라우트에서는 데몬이 공식 `agy acp` 하위 프로세스를 시작합니다. NeoSwitch는 변환된 요청을 ACP 세션으로 보내고, 반환된 응답이나 tool-call JSON을 로컬 Anthropic 호환 엔드포인트 형식으로 다시 변환합니다. 하나의 `agy` 프로세스가 모든 세션을 처리하며, 요청은 각자의 ACP 세션에서 동시에 실행됩니다. `agy` 자체의 파일, 셸, 웹 도구는 모든 요청에서 거부되므로, 도구는 Claude Code 안에서 Claude Code의 권한 규칙에 따라서만 실행됩니다.
-
-`/neoswitch:login`은 Antigravity OAuth를 백엔드로 저장하므로, 다른 도구용으로 export한 Gemini 키가 이를 대체하지 않습니다. 저장된 선택이 없으면 환경에 Gemini 자격 증명이 있을 때 Gemini API를, 없으면 Antigravity OAuth를 사용합니다. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto`로 둘 다 재정의할 수 있으며, `/neoswitch:status`에서 사용 중인 백엔드와 그 이유를 확인할 수 있습니다.
-
-## 독립 실행형 CLI
-
-태그가 붙은 각 버전은 macOS(Apple Silicon 및 Intel), Linux(amd64 및 arm64), Windows(amd64)용 바이너리를 SHA-256 체크섬과 함께 [Releases](https://github.com/yldm-ai/neo-switch/releases) 페이지에 게시합니다. Windows 빌드는 컴파일은 되지만 아직 테스트되지 않았습니다. 소스에서 직접 빌드할 수도 있습니다.
-
-```bash
-go build -o neoswitch ./cmd/neoswitch
-go install ./cmd/neoswitch
-```
-
-자주 쓰는 명령:
-
-```bash
-neoswitch doctor              # Claude CLI와 자격 증명으로 모델을 사용할 수 있는지 확인
-neoswitch antigravity login   # 공식 agy 클라이언트를 통한 ACP OAuth 로그인
-neoswitch antigravity probe   # 자격 증명을 출력하지 않고 저장된 agy 세션 확인
-neoswitch models              # 자격 증명으로 사용할 수 있는 모델을 나열하고 설정된 모델을 표시
-neoswitch on [project]        # 프로젝트 라우팅 활성화
-neoswitch off [project]       # 프로젝트 라우팅 비활성화
-neoswitch status [-v] [project] # 프로젝트가 NeoSwitch를 쓰는지와 다음 할 일 표시 (-v는 세부 정보 추가)
-neoswitch version             # NeoSwitch 버전 출력
-```
-
-다른 Anthropic 호환 클라이언트용으로 로컬 프록시를 실행하려면:
-
-```bash
-export NEOSWITCH_AUTH_TOKEN="$(openssl rand -hex 24)"
-GEMINI_API_KEY='your-key' neoswitch serve
-```
-
-클라이언트에 `ANTHROPIC_BASE_URL`과 `ANTHROPIC_AUTH_TOKEN`을 모두 설정합니다. `neoswitch claude`는 임시 포트와 토큰으로 이 변수들을 자동으로 설정합니다.
-
-## 업그레이드와 제거
-
-### 업그레이드
-
-플러그인은 [플러그인 설치](#플러그인-설치)에 있는 명령으로 업데이트합니다. 독립 실행형 CLI는 [Releases](https://github.com/yldm-ai/neo-switch/releases) 페이지에서 새 바이너리를 내려받거나 Go로 최신 버전을 설치합니다.
-
-```bash
-go install github.com/yldm-ai/neo-switch/cmd/neoswitch@latest
-```
-
-저장소가 `yldm-ai/NeoSwitch` / `yldm-ai/neon-switch`에서 `yldm-ai/neo-switch`로 이전되었습니다. 이전 이름으로 마켓플레이스를 추가했다면 새 위치에서 다시 추가하세요.
-
-```bash
-claude plugin marketplace add yldm-ai/neo-switch
-```
-
-### 제거
-
-1. 제거하기 전에 라우팅을 켠 모든 프로젝트에서 `/neoswitch:off`(또는 `neoswitch off <project>`)를 실행합니다. 플러그인을 제거해도 프로젝트 파일은 수정되지 않습니다. 이 단계를 건너뛰면 해당 프로젝트 `.claude/settings.local.json`의 `env` 객체에 `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_GATEWAY`가 남고, 새 세션은 더 이상 시작되지 않는 프록시에 연결하려고 합니다. 플러그인을 이미 제거했다면 이 세 항목을 직접 삭제하세요.
-2. NeoSwitch를 사용하는 Claude Code 세션을 닫은 뒤, 셸에서 플러그인과 마켓플레이스를 제거합니다.
+1. 전환한 각 프로젝트에서 먼저 `/neoswitch:off`를 실행하세요. 켜진 채로 남은 프로젝트는 계속 NeoSwitch를 가리키므로 NeoSwitch가 사라지면 답하지 못합니다. 플러그인을 이미 제거했다면 해당 프로젝트마다 `.claude/settings.local.json`을 열고 `env` 객체에서 `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_USE_GATEWAY`를 지우세요.
+2. NeoSwitch를 쓰는 Claude Code 창을 닫고 터미널에서 다음을 실행하세요.
 
 ```bash
 claude plugin uninstall neoswitch@neoswitch
 claude plugin marketplace remove neoswitch
 ```
 
-3. NeoSwitch가 프로젝트 밖에 보관하는 파일을 삭제합니다.
+3. NeoSwitch가 프로젝트 밖에 보관하는 파일을 지우세요.
 
-| 항목 | 위치 |
+| 내용 | 위치 |
 |---|---|
-| 처음 사용할 때 빌드되는 플러그인 바이너리 | `$XDG_CACHE_HOME/neoswitch/`, `XDG_CACHE_HOME`이 없으면 `~/.cache/neoswitch/` |
-| 상태 디렉터리: `proxy.json`(프록시 주소, 토큰, 저장된 백엔드)과 `daemon.log` | `NEOSWITCH_STATE_DIR`가 설정되어 있으면 그 디렉터리, 아니면 macOS에서는 `~/Library/Application Support/neoswitch/`, Linux에서는 `$XDG_CONFIG_HOME/neoswitch/` 또는 `~/.config/neoswitch/` |
+| 플러그인이 내려받거나 빌드한 NeoSwitch 프로그램 | `$XDG_CACHE_HOME/neoswitch/`, `XDG_CACHE_HOME`이 없으면 `~/.cache/neoswitch/` |
+| 설정과 로그: `proxy.json`(주소, 접근 키, 고른 방법), `daemon.log` | `NEOSWITCH_STATE_DIR`가 설정되어 있으면 그곳, 아니면 macOS는 `~/Library/Application Support/neoswitch/`, Linux는 `$XDG_CONFIG_HOME/neoswitch/` 또는 `~/.config/neoswitch/` |
 
-Antigravity 로그인 정보는 NeoSwitch가 아니라 `agy`가 보관하며 제거 후에도 남아 있습니다. `go install`로 설치한 독립 실행형 CLI를 제거하려면 `$(go env GOBIN)`에서, `GOBIN`이 설정되지 않았다면 `$(go env GOPATH)/bin`에서 `neoswitch`를 삭제합니다.
+Google 로그인 정보는 NeoSwitch가 아니라 `agy`가 보관하며 그대로 남습니다.
 
-## 문제 해결
+## NeoSwitch가 바꾸는 것
 
-| 증상 | 해결 방법 |
-|---|---|
-| 자격 증명이 동작하는지 확실하지 않음 | `neoswitch doctor`를 실행합니다. 실패한 단계와 원인을 알려 줍니다. |
-| `/neoswitch:login`을 찾을 수 없음 | 플러그인을 업데이트하고 Claude Code를 다시 시작한 뒤 `/reload-plugins`를 실행합니다. |
-| `agy: command not found` | 공식 Antigravity CLI를 설치하거나 `ANTIGRAVITY_CLI_PATH`를 설정합니다. |
-| `no authorization code was entered` | 최신 플러그인으로 업데이트하세요. 현재 흐름은 ACP `authenticate`를 사용하며 셸 stdin을 읽지 않습니다. |
-| 새 세션에서 `ECONNREFUSED` | `/neoswitch:status`를 실행합니다. 라우트가 활성화되어 있다면 데몬 메시지를 확인하고 세션을 다시 시작합니다. Anthropic을 사용하는 세션에서 `/neoswitch:off`를 실행한 뒤, 자격 증명을 고치고 다시 활성화하세요. |
-| 백엔드가 설정되지 않았다는 메시지가 표시됨 | `/neoswitch:login`을 실행하거나, Claude Code를 시작하기 전에 `GEMINI_API_KEY` 또는 Vertex AI 설정을 export하세요. |
-| 플러그인 빌드 또는 다운로드 실패 | Go를 설치하고 Claude Code를 다시 시작합니다. Go가 있으면 플러그인은 소스에서 빌드하며 아무것도 내려받지 않습니다. Go가 없다면 GitHub Releases에 접속할 수 있는지 확인합니다. 체크섬 불일치는 다운로드가 거부되어 아무것도 실행되지 않았다는 뜻입니다. |
+켠 프로젝트마다 NeoSwitch는 `.claude/settings.local.json`의 `env` 객체에 세 항목을 추가하고, `/neoswitch:off`가 다시 지웁니다.
 
-## 호환성 범위
+- `ANTHROPIC_BASE_URL`과 `ANTHROPIC_AUTH_TOKEN`: 그 프로젝트의 새 Claude Code 세션을 이 컴퓨터의 NeoSwitch로 보냅니다. 이 토큰은 이 컴퓨터의 NeoSwitch에만 쓸 수 있으며 Google이나 Anthropic 자격 증명이 아닙니다.
+- `CLAUDE_CODE_USE_GATEWAY=0`: 그 세션이 NeoSwitch에 직접 연결되게 합니다. 다른 게이트웨이를 통해 Claude Code를 실행하는 일부 도구는 게이트웨이 모드를 켜는데, 그러면 Claude Code가 NeoSwitch를 무시합니다.
 
-NeoSwitch는 공식 Gemini SDK 또는 수정되지 않은 로컬 `agy acp` 프로세스를 사용합니다. OAuth 토큰을 추출하거나, Antigravity 비공개 HTTP API를 호출하거나, 자격 증명을 원격 프록시로 전달하거나, hosts 파일을 수정하지 않습니다.
+Git 프로젝트에서는 NeoSwitch가 `.claude/settings.local.json`을 해당 클론 전용 제외 목록(`.git/info/exclude`)에도 추가해 토큰이 커밋에 들어가지 않게 합니다. `.gitignore`는 건드리지 않습니다.
 
-Anthropic은 Claude Code를 Claude가 아닌 모델로 라우팅하는 방법을 문서화하지 않았으므로, Claude Code 업데이트로 NeoSwitch가 의존하는 동작이 바뀔 수 있습니다.
+NeoSwitch는 이 컴퓨터에서만 실행되고 이 컴퓨터에서 오는 연결만 받습니다. 프롬프트, 답변, 키, 로그인 정보를 기록하지 않으며 저희 서버를 거치지 않습니다. Google 로그인 정보는 `agy` 안에 있으며 NeoSwitch는 읽지 않습니다.
 
-## 로드맵
+## 더 알아보기
 
-- 더 많은 모델 제공자 지원. OpenAI는 실험적 백엔드로 제공되며 실제 API에서의 검증이 남아 있습니다. 이미 Anthropic 호환 엔드포인트를 제공하는 제공자는 `ANTHROPIC_BASE_URL`을 직접 설정해 사용할 수 있으며 NeoSwitch가 필요하지 않습니다.
+되는 기능과 안 되는 기능, NeoSwitch의 동작 방식, 독립 실행형 명령줄 도구, 환경 변수, 로드맵, 개발은 [docs/cli.md](../docs/cli.md)(영어)를 보세요. [Antigravity 로그인 자세히](../docs/antigravity.md)와 [프로토콜 계약](../docs/protocol-contract.md)도 있습니다.
 
-## 개발
-
-```bash
-go test ./...
-go test -race ./...
-go vet ./...
-```
-
-릴리스하려면 `VERSION`을 올리고 일치하는 태그(`v` 뒤에 그 내용, 예: `v0.1.0`)를 push합니다. 일치하지 않는 태그는 릴리스 워크플로가 거부합니다.
-
-기여 절차는 [CONTRIBUTING.md](../CONTRIBUTING.md), 취약점 비공개 신고는 [SECURITY.md](../SECURITY.md), 행동 강령은 [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)를 참고하세요.
+기여 방법은 [CONTRIBUTING.md](../CONTRIBUTING.md), 취약점 비공개 신고는 [SECURITY.md](../SECURITY.md), 행동 강령은 [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md)를 보세요.
 
 MIT License

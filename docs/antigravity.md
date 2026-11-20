@@ -19,7 +19,7 @@ neoswitch antigravity login
 
 This delegates ACP's protocol-driven authentication flow to the official `agy` CLI and keeps its credentials in the platform keyring. The command does not read or print the resulting token, wait for stdin, or open the interactive `agy` TUI. `agy` owns the browser callback. `neoswitch antigravity oauth` is accepted as an alias.
 
-To use the authenticated Neon account from the Claude Code plugin, run `/neoswitch:login`. The plugin signs in through `agy acp`, enables the current project's route, and starts using the `gemini-4-neon` session model after the next Claude Code session. OAuth credentials remain inside `agy` and are never read by NeoSwitch. Signing in also saves Antigravity OAuth as NeoSwitch's backend, so a Gemini key in the environment does not override it. `NEOSWITCH_BACKEND=gemini` or `neoswitch backend gemini` switches back.
+To use the authenticated Neon account from the Claude Code plugin, run `/neoswitch:login`. The plugin signs in through `agy acp`, enables the current project's route, and starts using the `gemini-4-neon` session model after the next Claude Code session. OAuth credentials remain inside `agy` and are never read by NeoSwitch. Signing in also saves Antigravity OAuth as NeoSwitch's backend, so a Gemini key in the environment does not override it. To use a Gemini API key afterwards, export `NEOSWITCH_BACKEND=gemini` along with `GEMINI_API_KEY`, or run `neoswitch backend gemini` with the standalone CLI; see [cli.md](cli.md#gemini-api-key).
 
 The probe launches the official CLI in headless JSON mode with a fixed, non-sensitive prompt. It captures the result in memory, checks for an exact success response, and prints only whether the session is usable. It never prints `stdout`, `stderr`, an account email, a token, or usage details.
 
@@ -39,10 +39,10 @@ Each request is bounded by the proxy's 10-minute upstream timeout. When the time
 
 If the probe fails, run `neoswitch antigravity login` and retry the probe. Do not copy the token into `GEMINI_API_KEY`.
 
-The stable NeoSwitch path remains:
+The Gemini API key route ([cli.md](cli.md#gemini-api-key)) does not carry the account risk above:
 
 ```text
 Claude Code → NeoSwitch Anthropic-compatible proxy → Gemini API/Vertex API → Gemini 4 Neon
 ```
 
-The ACP route is opt-in through the plugin setting because ACP is an agent protocol and does not expose the raw Gemini HTTP contract. The adapter asks the Neon agent to return Claude-compatible text or tool-call JSON, while Claude Code continues to receive Anthropic-compatible responses from NeoSwitch.
+The ACP route is the one you choose by running `/neoswitch:login`, which saves it as the backend until `NEOSWITCH_BACKEND` or `neoswitch backend` chooses another. It works differently because ACP is an agent protocol and does not expose the raw Gemini HTTP contract. The adapter asks the Neon agent to return Claude-compatible text or tool-call JSON, while Claude Code continues to receive Anthropic-compatible responses from NeoSwitch.
