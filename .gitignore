@@ -6,3 +6,6 @@ coverage.out
 .env
 .env.*
 !.env.example
+/_site/
+# The global build/ ignore pattern would otherwise hide the site generator.
+!/site/build/

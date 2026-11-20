@@ -1,43 +1,36 @@
 <!doctype html>
-<html lang="en">
+<html lang="{{.Lang.Code}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NeoSwitch — Keep Claude Code. Switch your models.</title>
-<meta name="description" content="NeoSwitch runs a small local proxy so Claude Code can use Gemini 4 Neon while keeping its commands, permissions, tools, MCP servers and hooks.">
-<meta property="og:title" content="NeoSwitch — Keep Claude Code. Switch your models.">
-<meta property="og:description" content="Use Gemini 4 Neon in Claude Code through a local Anthropic-compatible proxy. Per project, loopback only, open source.">
+<title>{{index .T "title"}}</title>
+<meta name="description" content="{{index .T "description"}}">
+<link rel="canonical" href="{{.Lang.URL}}">
+{{- range .Langs}}
+<link rel="alternate" hreflang="{{.Code}}" href="{{.URL}}">
+{{- end}}
+<link rel="alternate" hreflang="x-default" href="{{.Default.URL}}">
+<meta property="og:title" content="{{index .T "title"}}">
+<meta property="og:description" content="{{index .T "og_description"}}">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://neon-switch.yldm.ai/">
+<meta property="og:url" content="{{.Lang.URL}}">
 <meta property="og:site_name" content="NeoSwitch">
-<meta property="og:image" content="https://neon-switch.yldm.ai/og.png">
+<meta property="og:locale" content="{{.Lang.OGLocale}}">
+{{- range .Langs}}{{if ne .Code $.Lang.Code}}
+<meta property="og:locale:alternate" content="{{.OGLocale}}">
+{{- end}}{{end}}
+<meta property="og:image" content="{{.Origin}}/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:image:alt" content="NeoSwitch: Keep Claude Code. Switch your models. Claude Code to a 127.0.0.1 proxy to Gemini 4 Neon.">
+<meta property="og:image:alt" content="{{index .T "og_image_alt"}}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="NeoSwitch — Keep Claude Code. Switch your models.">
-<meta name="twitter:description" content="Use Gemini 4 Neon in Claude Code through a local Anthropic-compatible proxy. Per project, loopback only, open source.">
-<meta name="twitter:image" content="https://neon-switch.yldm.ai/og.png">
-<link rel="canonical" href="https://neon-switch.yldm.ai/">
+<meta name="twitter:title" content="{{index .T "title"}}">
+<meta name="twitter:description" content="{{index .T "og_description"}}">
+<meta name="twitter:image" content="{{.Origin}}/og.png">
 <meta name="theme-color" content="#0b0d12">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<script type="application/ld+json">
-{
-  "@context": "https://schema.org",
-  "@type": "SoftwareApplication",
-  "name": "NeoSwitch",
-  "description": "A Claude Code plugin and local Anthropic-compatible proxy that lets Claude Code use Gemini 4 Neon while keeping its commands, permissions, tools, MCP servers and hooks.",
-  "url": "https://neon-switch.yldm.ai/",
-  "image": "https://neon-switch.yldm.ai/og.png",
-  "applicationCategory": "DeveloperApplication",
-  "operatingSystem": "macOS, Linux, Windows",
-  "license": "https://github.com/yldm-ai/neon-switch/blob/main/LICENSE",
-  "downloadUrl": "https://github.com/yldm-ai/neon-switch/releases",
-  "sameAs": ["https://github.com/yldm-ai/neon-switch"],
-  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
-}
-</script>
+<script type="application/ld+json">{{.JSONLD}}</script>
 <style>
   :root {
     --bg: #0b0d12;
@@ -68,9 +61,28 @@
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; color: var(--text); letter-spacing: -.01em; }
   .brand:hover { text-decoration: none; }
   .brand svg { width: 26px; height: 26px; }
-  nav ul { display: flex; gap: 24px; list-style: none; margin: 0; padding: 0; font-size: 14px; }
+  .nav-right { display: flex; align-items: center; gap: 24px; }
+  .nav-right > ul { display: flex; gap: 24px; list-style: none; margin: 0; padding: 0; font-size: 14px; }
   nav ul a { color: var(--muted); }
   nav ul a:hover { color: var(--text); text-decoration: none; }
+
+  /* ---- language switcher ---- */
+  .lang { position: relative; font-size: 14px; }
+  .lang summary { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); cursor: pointer; list-style: none; user-select: none; }
+  .lang summary::-webkit-details-marker { display: none; }
+  .lang summary:hover, .lang[open] summary { color: var(--text); border-color: #36405a; }
+  .lang summary svg { width: 16px; height: 16px; }
+  .lang ul { position: absolute; right: 0; top: 40px; min-width: 180px; margin: 0; padding: 6px; list-style: none; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 16px 40px -12px rgba(0, 0, 0, .6); }
+  .lang li a { display: block; padding: 7px 12px; border-radius: 6px; }
+  .lang li a:hover { background: var(--bg-2); }
+  .lang li a[aria-current="page"] { color: var(--accent); }
+
+  /* ---- CJK fonts: pick the regional glyph set for each language ---- */
+  :lang(zh-CN) body { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", "Segoe UI", sans-serif; }
+  :lang(zh-TW) body { font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Microsoft JhengHei", "Noto Sans CJK TC", "Segoe UI", sans-serif; }
+  :lang(ja) body { font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, "Noto Sans CJK JP", "Segoe UI", sans-serif; }
+  :lang(ko) body { font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans CJK KR", "Segoe UI", sans-serif; }
+  :lang(zh-CN) h2, :lang(zh-TW) h2, :lang(ja) h2, :lang(ko) h2 { letter-spacing: 0; }
 
   /* ---- hero ---- */
   .hero { padding: 96px 0 72px; background: radial-gradient(900px 420px at 50% -10%, rgba(124, 242, 200, .12), transparent 70%); }
@@ -159,7 +171,7 @@
     .arrow svg { transform: rotate(90deg); }
   }
   @media (max-width: 640px) {
-    nav ul li:not(:last-child) { display: none; }
+    .nav-right > ul { display: none; }
     .hero { padding: 64px 0 56px; }
     section { padding: 60px 0; }
     .grid, .cmds { grid-template-columns: 1fr; }
@@ -167,36 +179,49 @@
   }
 </style>
 </head>
-<body>
+<body data-copy="{{index .T "copy"}}" data-copied="{{index .T "copied"}}">
 
 <nav>
   <div class="wrap">
-    <a class="brand" href="#top" aria-label="NeoSwitch home">
+    <a class="brand" href="#top" aria-label="NeoSwitch">
       <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="#151923"/><path d="M9 22V10l14 12V10" stroke="#7cf2c8" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
       NeoSwitch
     </a>
-    <ul>
-      <li><a href="#how">How it works</a></li>
-      <li><a href="#start">Get started</a></li>
-      <li><a href="#compat">Compatibility</a></li>
-      <li><a href="https://github.com/yldm-ai/neon-switch">GitHub</a></li>
-    </ul>
+    <div class="nav-right">
+      <ul>
+        <li><a href="#how">{{index .T "nav_how"}}</a></li>
+        <li><a href="#start">{{index .T "nav_start"}}</a></li>
+        <li><a href="#compat">{{index .T "nav_compat"}}</a></li>
+        <li><a href="https://github.com/yldm-ai/neon-switch">GitHub</a></li>
+      </ul>
+      <details class="lang">
+        <summary aria-label="{{index .T "nav_language"}}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18"/></svg>
+          <span>{{.Lang.Name}}</span>
+        </summary>
+        <ul>
+          {{- range .Langs}}
+          <li><a href="{{.Path}}" hreflang="{{.Code}}" lang="{{.Code}}"{{if eq .Code $.Lang.Code}} aria-current="page"{{end}}>{{.Name}}</a></li>
+          {{- end}}
+        </ul>
+      </details>
+    </div>
   </div>
 </nav>
 
 <header class="hero" id="top">
   <div class="wrap">
-    <h1>Keep Claude Code.<br><span>Switch your models.</span></h1>
-    <p class="lede">NeoSwitch lets Claude Code run on Gemini 4 Neon. Your commands, permissions, tools, skills, MCP servers and hooks stay exactly as they are; a small local proxy translates requests for the model behind them.</p>
+    <h1 lang="en">Keep Claude Code.<br><span>Switch your models.</span></h1>
+    <p class="lede">{{index .T "hero_lede"}}</p>
     <div class="cta">
-      <a class="btn primary" href="#start">Get started</a>
+      <a class="btn primary" href="#start">{{index .T "nav_start"}}</a>
       <a class="btn" href="https://github.com/yldm-ai/neon-switch">
         <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
-        View on GitHub
+        {{index .T "cta_github"}}
       </a>
     </div>
     <div class="term">
-      <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/plugin marketplace add yldm-ai/neon-switch&#10;/plugin install neoswitch@neoswitch&#10;/neoswitch:login">Copy</button></div>
+      <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/plugin marketplace add yldm-ai/neon-switch&#10;/plugin install neoswitch@neoswitch&#10;/neoswitch:login">{{index .T "copy"}}</button></div>
 <pre><span class="p">&gt; </span>/plugin marketplace add yldm-ai/neon-switch
 <span class="p">&gt; </span>/plugin install neoswitch@neoswitch
 <span class="p">&gt; </span>/neoswitch:login</pre>
@@ -206,25 +231,25 @@
 
 <section id="how">
   <div class="wrap">
-    <h2>Only the model changes</h2>
-    <p class="sub">Claude Code still owns the session, permissions, tool execution and <code>CLAUDE.md</code>. NeoSwitch sits on loopback and speaks the Anthropic Messages API on one side and Gemini on the other.</p>
+    <h2>{{index .T "how_title"}}</h2>
+    <p class="sub">{{index .T "how_sub"}}</p>
     <div class="flow">
       <div class="node">
-        <span class="tag">client</span>
+        <span class="tag">{{index .T "node_client_tag"}}</span>
         <h3>Claude Code</h3>
-        <p>Same CLI, slash commands, skills, MCP servers, hooks and <code>/resume</code>.</p>
+        <p>{{index .T "node_client_desc"}}</p>
       </div>
       <div class="arrow"><svg viewBox="0 0 36 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h32M27 2l6 6-6 6"/></svg></div>
       <div class="node mid">
         <span class="tag">127.0.0.1</span>
-        <h3>NeoSwitch proxy</h3>
-        <p>Anthropic-compatible endpoint. Random access token, no prompt or credential logging, no remote relay.</p>
+        <h3>{{index .T "node_proxy_title"}}</h3>
+        <p>{{index .T "node_proxy_desc"}}</p>
       </div>
       <div class="arrow"><svg viewBox="0 0 36 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 8h32M27 2l6 6-6 6"/></svg></div>
       <div class="node">
-        <span class="tag">upstream</span>
+        <span class="tag">{{index .T "node_upstream_tag"}}</span>
         <h3>Gemini 4 Neon</h3>
-        <p>Through the official <code>genai</code> SDK, or the unmodified local <code>agy acp</code> process.</p>
+        <p>{{index .T "node_upstream_desc"}}</p>
       </div>
     </div>
   </div>
@@ -232,28 +257,28 @@
 
 <section>
   <div class="wrap">
-    <h2>Why NeoSwitch</h2>
-    <p class="sub">A model switch for people who already like how Claude Code works.</p>
+    <h2>{{index .T "why_title"}}</h2>
+    <p class="sub">{{index .T "why_sub"}}</p>
     <div class="grid">
       <div class="card">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 17l6-6-6-6M12 19h8"/></svg>
-        <h3>Keep your workflow</h3>
-        <p>You still run Claude Code. Nothing to relearn, nothing to migrate.</p>
+        <h3>{{index .T "why_workflow_title"}}</h3>
+        <p>{{index .T "why_workflow_desc"}}</p>
       </div>
       <div class="card">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h6l2 2h10v10H3z"/></svg>
-        <h3>Per project</h3>
-        <p>Route one project to Gemini and leave the rest on Anthropic.</p>
+        <h3>{{index .T "why_project_title"}}</h3>
+        <p>{{index .T "why_project_desc"}}</p>
       </div>
       <div class="card">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>
-        <h3>Local first</h3>
-        <p>Loopback only. OAuth tokens stay inside <code>agy</code>; NeoSwitch never reads them.</p>
+        <h3>{{index .T "why_local_title"}}</h3>
+        <p>{{index .T "why_local_desc"}}</p>
       </div>
       <div class="card">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 01-2 2H6a2 2 0 01-2-2V5a2 2 0 012-2h9"/></svg>
-        <h3>Honest compatibility</h3>
-        <p>What works, what is partial and what is missing is listed below. No silent fallback.</p>
+        <h3>{{index .T "why_honest_title"}}</h3>
+        <p>{{index .T "why_honest_desc"}}</p>
       </div>
     </div>
   </div>
@@ -261,15 +286,15 @@
 
 <section id="start">
   <div class="wrap">
-    <h2>Get started</h2>
-    <p class="sub">Requires Claude Code. Go is optional: with it the plugin builds its binary from source on first use, without it the plugin downloads the matching release binary and verifies its checksum. For Antigravity OAuth you also need the official <code>agy</code> CLI on your PATH.</p>
+    <h2>{{index .T "nav_start"}}</h2>
+    <p class="sub">{{index .T "start_sub"}}</p>
     <div class="steps">
       <div class="step">
         <div>
-          <h3>Install the plugin</h3>
-          <p>Inside Claude Code:</p>
+          <h3>{{index .T "step1_title"}}</h3>
+          <p>{{index .T "step1_desc"}}</p>
           <div class="term">
-            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/plugin marketplace add yldm-ai/neon-switch&#10;/plugin install neoswitch@neoswitch">Copy</button></div>
+            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/plugin marketplace add yldm-ai/neon-switch&#10;/plugin install neoswitch@neoswitch">{{index .T "copy"}}</button></div>
 <pre><span class="p">&gt; </span>/plugin marketplace add yldm-ai/neon-switch
 <span class="p">&gt; </span>/plugin install neoswitch@neoswitch</pre>
           </div>
@@ -277,20 +302,20 @@
       </div>
       <div class="step">
         <div>
-          <h3>Sign in and enable routing</h3>
-          <p>In the project that should use Neon. To use a Gemini API key instead, set it under <code>/plugin</code> → <code>neoswitch</code> → Gemini API key and run <code>/neoswitch:on</code>.</p>
+          <h3>{{index .T "step2_title"}}</h3>
+          <p>{{index .T "step2_desc"}}</p>
           <div class="term">
-            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/neoswitch:login">Copy</button></div>
+            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/neoswitch:login">{{index .T "copy"}}</button></div>
 <pre><span class="p">&gt; </span>/neoswitch:login</pre>
           </div>
         </div>
       </div>
       <div class="step">
         <div>
-          <h3>Restart and check the route</h3>
-          <p>Reopen Claude Code in that project. The session header may still show a Claude model label; the status command shows the real upstream.</p>
+          <h3>{{index .T "step3_title"}}</h3>
+          <p>{{index .T "step3_desc"}}</p>
           <div class="term">
-            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/neoswitch:status">Copy</button></div>
+            <div class="term-bar"><div class="dots"><i></i><i></i><i></i></div><span>claude</span><button class="copy" data-copy="/neoswitch:status">{{index .T "copy"}}</button></div>
 <pre><span class="p">&gt; </span>/neoswitch:status
 <span class="c">  NeoSwitch ... -&gt; gemini-4-neon</span></pre>
           </div>
@@ -302,67 +327,67 @@
 
 <section id="credentials">
   <div class="wrap">
-    <h2>Choose a credential path</h2>
-    <p class="sub">Run <code>neoswitch doctor</code> on any path. It looks the model up, runs a one-line generation and names the failing step if something is wrong.</p>
+    <h2>{{index .T "cred_title"}}</h2>
+    <p class="sub">{{index .T "cred_sub"}}</p>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Path</th><th>How it signs in</th><th>Notes</th></tr></thead>
+        <thead><tr><th>{{index .T "cred_th_path"}}</th><th>{{index .T "cred_th_signin"}}</th><th>{{index .T "cred_th_notes"}}</th></tr></thead>
         <tbody>
-          <tr><td>Antigravity OAuth</td><td>Google account through the official <code>agy</code> CLI</td><td>The plugin's default flow. Read the warning below first.</td></tr>
-          <tr><td>Gemini Developer API</td><td><code>GEMINI_API_KEY</code></td><td>Access to Gemini 4 Neon depends on your key.</td></tr>
-          <tr><td>Vertex AI</td><td>Google Cloud Application Default Credentials</td><td>Access depends on your project and region.</td></tr>
+          <tr><td>Antigravity OAuth</td><td>{{index .T "cred_oauth_signin"}}</td><td>{{index .T "cred_oauth_notes"}}</td></tr>
+          <tr><td>Gemini Developer API</td><td><code>GEMINI_API_KEY</code></td><td>{{index .T "cred_api_notes"}}</td></tr>
+          <tr><td>Vertex AI</td><td>{{index .T "cred_vertex_signin"}}</td><td>{{index .T "cred_vertex_notes"}}</td></tr>
         </tbody>
       </table>
     </div>
     <div class="warn" role="note">
-      <strong>Antigravity terms.</strong> The <a href="https://antigravity.google/terms">Google Antigravity Terms of Service</a> (section 6) treat accessing Antigravity through third-party software as a breach, and Google may suspend or terminate the Antigravity and Gemini CLI accounts involved. Routing Claude Code through Antigravity OAuth falls under that rule. Use it only if you accept that risk for the account you sign in with; otherwise use a Gemini API key or Vertex AI.
+      <strong>{{index .T "warn_title"}}</strong> {{index .T "warn_body"}}
     </div>
   </div>
 </section>
 
 <section id="compat">
   <div class="wrap">
-    <h2>Compatibility</h2>
-    <p class="sub">How well Claude Code's features work depends on how well the model follows its tool protocol. This has been exercised in everyday coding use, not by an automated end-to-end suite.</p>
+    <h2>{{index .T "nav_compat"}}</h2>
+    <p class="sub">{{index .T "compat_sub"}}</p>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Capability</th><th>Gemini API / Vertex AI</th><th>Antigravity OAuth (ACP)</th></tr></thead>
+        <thead><tr><th>{{index .T "compat_th_capability"}}</th><th>Gemini API / Vertex AI</th><th>Antigravity OAuth (ACP)</th></tr></thead>
         <tbody>
-          <tr><td>Streaming text</td><td class="ok">Supported</td><td class="ok">Supported</td></tr>
-          <tr><td>Tool calls, incl. parallel</td><td class="ok">Native Gemini function calling</td><td class="part">Partial: tool-call JSON arrives whole, not streamed</td></tr>
-          <tr><td>Multi-turn tools, <code>/resume</code></td><td class="ok">Supported</td><td class="ok">Supported</td></tr>
-          <tr><td>Images</td><td class="ok">Supported</td><td class="part">When <code>agy</code> offers image input</td></tr>
-          <tr><td>PDFs</td><td class="ok">Supported</td><td class="no">Not supported</td></tr>
-          <tr><td><code>/effort</code></td><td class="no">Not applied yet</td><td class="ok">Mapped to <code>agy</code>'s thought level</td></tr>
-          <tr><td>Token usage, <code>count_tokens</code></td><td class="ok">Reported; estimated on the Developer API</td><td class="part">Reported, incl. ~14k tokens of <code>agy</code> instructions</td></tr>
+          <tr><td>{{index .T "row_streaming"}}</td><td class="ok">{{index .T "supported"}}</td><td class="ok">{{index .T "supported"}}</td></tr>
+          <tr><td>{{index .T "row_tools"}}</td><td class="ok">{{index .T "tools_api"}}</td><td class="part">{{index .T "tools_acp"}}</td></tr>
+          <tr><td>{{index .T "row_multiturn"}}</td><td class="ok">{{index .T "supported"}}</td><td class="ok">{{index .T "supported"}}</td></tr>
+          <tr><td>{{index .T "row_images"}}</td><td class="ok">{{index .T "supported"}}</td><td class="part">{{index .T "images_acp"}}</td></tr>
+          <tr><td>PDF</td><td class="ok">{{index .T "supported"}}</td><td class="no">{{index .T "not_supported"}}</td></tr>
+          <tr><td><code>/effort</code></td><td class="no">{{index .T "effort_api"}}</td><td class="ok">{{index .T "effort_acp"}}</td></tr>
+          <tr><td>{{index .T "row_tokens"}}</td><td class="ok">{{index .T "tokens_api"}}</td><td class="part">{{index .T "tokens_acp"}}</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="note">Not supported on either path: server tools such as web search and code execution, URL image and document sources, and Claude thinking blocks. Full contract in <a href="https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md">docs/protocol-contract.md</a>.</p>
+    <p class="note">{{index .T "compat_note"}}</p>
   </div>
 </section>
 
 <section id="commands">
   <div class="wrap">
-    <h2>Plugin commands</h2>
-    <p class="sub">Routing changes apply to new sessions; the current session keeps its connection.</p>
+    <h2>{{index .T "cmds_title"}}</h2>
+    <p class="sub">{{index .T "cmds_sub"}}</p>
     <div class="cmds">
-      <div class="cmd"><code>/neoswitch:login</code><span>Sign in with Antigravity OAuth and enable this project's route</span></div>
-      <div class="cmd"><code>/neoswitch:on</code><span>Enable routing for this project</span></div>
-      <div class="cmd"><code>/neoswitch:status</code><span>Show the route and daemon state</span></div>
-      <div class="cmd"><code>/neoswitch:off</code><span>Disable routing for this project</span></div>
+      <div class="cmd"><code>/neoswitch:login</code><span>{{index .T "cmd_login"}}</span></div>
+      <div class="cmd"><code>/neoswitch:on</code><span>{{index .T "cmd_on"}}</span></div>
+      <div class="cmd"><code>/neoswitch:status</code><span>{{index .T "cmd_status"}}</span></div>
+      <div class="cmd"><code>/neoswitch:off</code><span>{{index .T "cmd_off"}}</span></div>
     </div>
-    <p class="note">Prefer a standalone binary? Builds for macOS, Linux and Windows are on the <a href="https://github.com/yldm-ai/neon-switch/releases">Releases</a> page, and <code>neoswitch serve</code> works with any Anthropic-compatible client.</p>
+    <p class="note">{{index .T "cmds_note"}}</p>
   </div>
 </section>
 
 <footer>
   <div class="wrap">
-    <span>NeoSwitch · MIT License · Not affiliated with Anthropic or Google.</span>
+    <span>{{index .T "footer_note"}}</span>
     <ul>
       <li><a href="https://github.com/yldm-ai/neon-switch">GitHub</a></li>
-      <li><a href="https://github.com/yldm-ai/neon-switch/releases">Releases</a></li>
-      <li><a href="https://github.com/yldm-ai/neon-switch/blob/main/docs/antigravity.md">ACP details</a></li>
+      <li><a href="https://github.com/yldm-ai/neon-switch/releases">{{index .T "footer_releases"}}</a></li>
+      <li><a href="https://github.com/yldm-ai/neon-switch/blob/main/docs/antigravity.md">{{index .T "footer_acp"}}</a></li>
     </ul>
   </div>
 </footer>
@@ -371,9 +396,14 @@
   document.querySelectorAll('.copy').forEach(function (b) {
     b.addEventListener('click', function () {
       navigator.clipboard.writeText(b.dataset.copy).then(function () {
-        b.textContent = 'Copied';
-        setTimeout(function () { b.textContent = 'Copy'; }, 1400);
+        b.textContent = document.body.dataset.copied;
+        setTimeout(function () { b.textContent = document.body.dataset.copy; }, 1400);
       });
+    });
+  });
+  document.addEventListener('click', function (e) {
+    document.querySelectorAll('details.lang[open]').forEach(function (d) {
+      if (!d.contains(e.target)) d.removeAttribute('open');
     });
   });
 </script>
