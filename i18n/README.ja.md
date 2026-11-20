@@ -33,7 +33,7 @@ Google の利用規約に関する警告を表示したあと、Google の [Anti
 > [!WARNING]
 > [Google Antigravity 利用規約](https://antigravity.google/terms)（第 6 条）は、ほかのツールを通じて Antigravity を使うことを禁じており、NeoSwitch はそうしたツールにあたります。Google はそうした利用者の Antigravity と Gemini CLI のアカウントを停止または解約することがあります。`/neoswitch:login` は毎回この警告を表示します。このリスクを受け入れられない場合は、ログインしないでください。
 
-**3. Claude Code を再起動する。** `/exit` と入力し、同じプロジェクトでもう一度 `claude` を起動します。ほかの Claude Code ウィンドウですでに NeoSwitch を使っている場合は、先にそれらをすべて閉じてください。どれか 1 つでも開いている間、NeoSwitch は以前の設定のまま動きます。
+**3. 次のメッセージを送る。** コマンドを実行したウィンドウは次のメッセージから Gemini 4 Neon を使い、このプロジェクトの新しいセッションも同じです。コマンドの返信で再起動を求められた場合（Claude Code をゲートウェイ経由で起動した場合や、ほかの Claude Code ウィンドウが NeoSwitch の以前の設定を使っている場合）は、示されたウィンドウを閉じてから、同じプロジェクトでもう一度 `claude` を起動してください。
 
 ## 切り替え後に表示されるもの
 
@@ -47,7 +47,7 @@ Google の利用規約に関する警告を表示したあと、Google の [Anti
 
 | 表示される内容 | 対処 |
 |---|---|
-| セッション開始時のメッセージに、NeoSwitch がまだ設定されていないと出る | `/neoswitch:login` を実行し、`/exit` と入力してから `claude` を起動し直します。 |
+| セッション開始時のメッセージに、NeoSwitch がまだ設定されていないと出る | `/neoswitch:login` を実行します。次のメッセージから Gemini 4 Neon を使います。 |
 | `agy` がインストールされていないと表示される | Google の [Antigravity コマンドラインツール（`agy`）](https://antigravity.google/download)をインストールしてから、もう一度 `/neoswitch:login` を実行します。 |
 | どのメッセージも接続エラーになる、またはセッション開始時のメッセージにこのセッションは回答できないと出る | 同じプロジェクトで `/neoswitch:off` を実行します。その返答自体が接続エラーになっても、プロジェクトは元に戻っています。`/exit` と入力して `claude` を起動し直すと Claude に戻り、`/neoswitch:status` で何を直せばよいかがわかります。 |
 | ほかの Claude Code ウィンドウが以前の設定を共有していると出る | Claude Code のウィンドウをすべて閉じてから、もう一度開きます。 |
@@ -57,7 +57,7 @@ Google の利用規約に関する警告を表示したあと、Google の [Anti
 
 ## オフ・更新・削除
 
-- `/neoswitch:off` でこのプロジェクトを Claude に戻します。`/neoswitch:on` で、設定し直さずに Gemini 4 Neon にまた切り替えます。どちらのあとも新しいセッションを始めてください。
+- `/neoswitch:off` でこのプロジェクトの新しいセッションを Claude に戻します。すでに Gemini 4 Neon を使っているセッションは `/exit` と入力するまでそのままです。`/neoswitch:on` で、設定し直さずに次のメッセージから Gemini 4 Neon にまた切り替えます。
 
 プラグインを更新するには、ターミナルで次を実行してから Claude Code を再起動します。
 

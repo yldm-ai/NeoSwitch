@@ -121,6 +121,35 @@ func TestToGeminiReplaysThoughtSignatureAndToolResults(t *testing.T) {
 	}
 }
 
+// A conversation that ran on Anthropic before switching to NeoSwitch replays tool calls Claude made. Gemini 3+ rejects a step whose first function call is unsigned, so that call gets the documented placeholder; later parallel calls stay unsigned as Gemini expects.
+func TestToGeminiSignsToolCallsMadeByClaude(t *testing.T) {
+	body := `{"model":"m","max_tokens":10,"messages":[
+		{"role":"user","content":"read both"},
+		{"role":"assistant","content":[
+			{"type":"text","text":"reading"},
+			{"type":"tool_use","id":"toolu_01A","name":"Read","input":{"path":"a"}},
+			{"type":"tool_use","id":"toolu_01B","name":"Read","input":{"path":"b"}}
+		]},
+		{"role":"user","content":[
+			{"type":"tool_result","tool_use_id":"toolu_01A","content":"A"},
+			{"type":"tool_result","tool_use_id":"toolu_01B","content":"B"}
+		]}]}`
+	got, err := ToGemini(mustDecode(t, body))
+	if err != nil {
+		t.Fatal(err)
+	}
+	parts := got.Contents[1].Parts
+	if parts[0].ThoughtSignature != nil {
+		t.Fatal("text parts must not be signed")
+	}
+	if string(parts[1].ThoughtSignature) != "skip_thought_signature_validator" {
+		t.Fatalf("first call signature = %q", parts[1].ThoughtSignature)
+	}
+	if parts[2].ThoughtSignature != nil {
+		t.Fatal("later parallel calls must stay unsigned")
+	}
+}
+
 // Claude Code sends parallel tool results in the order the tools finished, not the order they were called. Gemini returns calls without IDs on the Developer API, so it can only pair responses with same-name calls by position: they must follow the call order.
 func TestToGeminiOrdersParallelToolResultsLikeTheCalls(t *testing.T) {
 	first, second := newToolID([]byte("sig"), ""), newToolID(nil, "")

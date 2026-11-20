@@ -27,7 +27,7 @@ The full endpoint contract is in [protocol-contract.md](protocol-contract.md), a
 
 `/neoswitch:on` and `/neoswitch:login` write three keys to the project's `.claude/settings.local.json`, as listed in the README: `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` for the proxy, and `CLAUDE_CODE_USE_GATEWAY=0`, because in gateway mode, which gateway launchers turn on, Claude Code would take the base URL from its environment and silently ignore the proxy. The token authorizes the loopback proxy and is not an Antigravity credential.
 
-The SessionStart hook starts one local daemon and registers the Claude Code process before its first model request. The daemon exits after all registered Claude Code processes have exited. It reads the backend and the Gemini key once when it starts, so a changed setup reaches new sessions only after every Claude Code window using the daemon has closed.
+The SessionStart hook starts one local daemon and registers the Claude Code process before its first model request. `/neoswitch:on` does the same for the session it runs in, before it writes the project settings: a session not started in gateway mode applies those settings from its next request without restarting. Removing them does not switch a running session back, so after `/neoswitch:off` an open session keeps NeoSwitch until it closes. The daemon exits after all registered Claude Code processes have exited. It reads the backend and the Gemini key once when it starts, so a changed setup reaches new sessions only after every Claude Code window using the daemon has closed.
 
 With the OAuth route, the daemon starts the official `agy acp` subprocess. NeoSwitch sends the translated request through an ACP session and translates the returned answer or tool-call JSON back to the local Anthropic-compatible endpoint. One `agy` process serves all sessions, and requests run concurrently in separate ACP sessions. `agy`'s own file, shell and web tools are refused on every request, so tools run only in Claude Code, under Claude Code's permission rules.
 
@@ -68,7 +68,7 @@ neoswitch version               # print the NeoSwitch version
 
 Create a key in [Google AI Studio](https://aistudio.google.com/apikey); whether it can use Gemini 4 Neon depends on the key. NeoSwitch reads it from `GEMINI_API_KEY` in the environment and never saves it.
 
-With the plugin, export the key in the shell you start Claude Code from, and add the same line to your shell profile (such as `~/.zshrc`) so every new session has it. Then start `claude` in the project, run `/neoswitch:on`, type `/exit` and start `claude` again. If you signed in with `/neoswitch:login` before, that saved choice wins over the key, so also export `NEOSWITCH_BACKEND=gemini`:
+With the plugin, export the key in the shell you start Claude Code from, and add the same line to your shell profile (such as `~/.zshrc`) so every new session has it. Then start `claude` in the project and run `/neoswitch:on`; your next message goes through NeoSwitch. If you signed in with `/neoswitch:login` before, that saved choice wins over the key, so also export `NEOSWITCH_BACKEND=gemini`:
 
 ```bash
 export GEMINI_API_KEY='your-key'

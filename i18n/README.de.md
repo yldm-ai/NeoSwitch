@@ -33,7 +33,7 @@ Der Befehl zeigt Googles Warnung zu den Nutzungsbedingungen, öffnet die Google-
 > [!WARNING]
 > Die [Nutzungsbedingungen von Google Antigravity](https://antigravity.google/terms) (Abschnitt 6) verbieten es, Antigravity über andere Tools zu nutzen, und NeoSwitch ist ein solches Tool. Google kann die Antigravity- und Gemini-CLI-Konten von Personen, die das tun, sperren oder schließen. `/neoswitch:login` wiederholt diese Warnung jedes Mal. Melden Sie sich nicht an, wenn Sie dieses Risiko nicht akzeptieren.
 
-**3. Claude Code neu starten.** Geben Sie `/exit` ein und starten Sie `claude` im selben Projekt erneut. Wenn andere Claude-Code-Fenster NeoSwitch bereits nutzen, schließen Sie zuerst alle: Solange eines davon offen ist, behält NeoSwitch seine bisherige Einrichtung.
+**3. Senden Sie Ihre nächste Nachricht.** Das Fenster, in dem Sie den Befehl ausgeführt haben, nutzt ab seiner nächsten Nachricht Gemini 4 Neon, ebenso neue Sitzungen in diesem Projekt. Wenn die Antwort des Befehls Sie stattdessen zum Neustart auffordert, weil Claude Code über ein Gateway gestartet wurde oder andere Claude-Code-Fenster noch eine frühere NeoSwitch-Einrichtung nutzen, schließen Sie die genannten Fenster und starten Sie `claude` im selben Projekt erneut.
 
 ## Was Sie sehen werden
 
@@ -47,7 +47,7 @@ Der Befehl zeigt Googles Warnung zu den Nutzungsbedingungen, öffnet die Google-
 
 | Was Sie sehen | Was zu tun ist |
 |---|---|
-| Der Sitzungshinweis sagt, NeoSwitch sei noch nicht eingerichtet | Führen Sie `/neoswitch:login` aus, geben Sie dann `/exit` ein und starten Sie `claude` erneut. |
+| Der Sitzungshinweis sagt, NeoSwitch sei noch nicht eingerichtet | Führen Sie `/neoswitch:login` aus. Ihre nächste Nachricht nutzt Gemini 4 Neon. |
 | Eine Meldung sagt, `agy` sei nicht installiert | Installieren Sie Googles [Antigravity-Befehlszeilentool (`agy`)](https://antigravity.google/download) und führen Sie `/neoswitch:login` erneut aus. |
 | Jede Nachricht scheitert mit einem Verbindungsfehler, oder der Sitzungshinweis sagt, diese Sitzung könne nicht antworten | Führen Sie im selben Projekt `/neoswitch:off` aus. Es schaltet das Projekt zurück, auch wenn seine eigene Antwort ebenfalls einen Verbindungsfehler zeigt. Geben Sie dann `/exit` ein und starten Sie `claude` erneut: Sie sind wieder bei Claude, und `/neoswitch:status` sagt Ihnen, was zu beheben ist. |
 | Der Hinweis sagt, andere Claude-Code-Fenster teilten noch die bisherige Einrichtung | Schließen Sie alle Claude-Code-Fenster und öffnen Sie Claude Code erneut. |
@@ -57,7 +57,7 @@ Der Befehl zeigt Googles Warnung zu den Nutzungsbedingungen, öffnet die Google-
 
 ## Ausschalten, aktualisieren oder entfernen
 
-- `/neoswitch:off` schaltet dieses Projekt zurück auf Claude. `/neoswitch:on` schaltet es wieder auf Gemini 4 Neon, ohne dass Sie etwas neu einrichten. Starten Sie danach jeweils eine neue Sitzung.
+- `/neoswitch:off` schaltet dieses Projekt für neue Sitzungen zurück auf Claude; eine Sitzung, die bereits Gemini 4 Neon nutzt, behält es, bis Sie `/exit` eingeben. `/neoswitch:on` schaltet das Projekt ab Ihrer nächsten Nachricht wieder auf Gemini 4 Neon, ohne dass Sie etwas neu einrichten.
 
 Um das Plugin zu aktualisieren, führen Sie dies in einem Terminal aus und starten Sie Claude Code dann neu:
 

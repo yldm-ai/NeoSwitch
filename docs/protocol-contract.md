@@ -44,7 +44,7 @@ genai resolves credentials from the standard environment: `GEMINI_API_KEY` (or `
 
 ## Tool call IDs and thought signatures
 
-Gemini 3+ attaches a `thoughtSignature` to function calls and rejects a later request whose history replays the call without it (finish reason `MISSING_THOUGHT_SIGNATURE`). Claude Code keeps only Anthropic blocks in its history, so NeoSwitch embeds the signature and Gemini's call ID in the `tool_use` ID it mints: `toolu_ns_` followed by base64url JSON. The ID is restricted to `[A-Za-z0-9_-]`, needs no server-side state, and survives proxy restarts and `claude --resume`. Tool IDs not minted by NeoSwitch carry no signature.
+Gemini 3+ attaches a `thoughtSignature` to function calls and rejects a later request whose history replays the call without it (finish reason `MISSING_THOUGHT_SIGNATURE`). Claude Code keeps only Anthropic blocks in its history, so NeoSwitch embeds the signature and Gemini's call ID in the `tool_use` ID it mints: `toolu_ns_` followed by base64url JSON. The ID is restricted to `[A-Za-z0-9_-]`, needs no server-side state, and survives proxy restarts and `claude --resume`. Tool IDs not minted by NeoSwitch carry no signature: they come from Claude, in a session that ran on Anthropic before switching to NeoSwitch or was resumed through it. Gemini validates only the first function call of each model step, so that call gets the placeholder signature `skip_thought_signature_validator` that Gemini documents for history from other models; later parallel calls stay unsigned.
 
 ## Response translation
 

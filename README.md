@@ -33,7 +33,7 @@ It shows Google's terms warning, opens Google sign-in in your browser through Go
 > [!WARNING]
 > The [Google Antigravity Terms of Service](https://antigravity.google/terms) (section 6) forbid using Antigravity through other tools, and NeoSwitch is such a tool. Google may suspend or close the Antigravity and Gemini CLI accounts of people who do. `/neoswitch:login` repeats this warning every time. Do not sign in unless you accept that risk.
 
-**3. Restart Claude Code.** Type `/exit`, then start `claude` again in the same project. If other Claude Code windows already use NeoSwitch, close all of them first: NeoSwitch keeps its earlier setup while any of them is open.
+**3. Send your next message.** The window where you ran the command uses Gemini 4 Neon from its next message, and so do new sessions in this project. If the command's reply asks you to restart instead, because Claude Code was started through a gateway or other Claude Code windows still use an earlier NeoSwitch setup, close the windows it names, then start `claude` again in the same project.
 
 ## What you will see
 
@@ -47,7 +47,7 @@ It shows Google's terms warning, opens Google sign-in in your browser through Go
 
 | What you see | What to do |
 |---|---|
-| The session note says NeoSwitch is not set up yet | Run `/neoswitch:login`, then type `/exit` and start `claude` again. |
+| The session note says NeoSwitch is not set up yet | Run `/neoswitch:login`. Your next message uses Gemini 4 Neon. |
 | A message says `agy` is not installed | Install Google's [Antigravity command-line tool (`agy`)](https://antigravity.google/download), then run `/neoswitch:login` again. |
 | Every message fails with a connection error, or the session note says this session cannot answer | In this same project, run `/neoswitch:off`. It switches the project back even if its own reply shows a connection error too. Then type `/exit` and start `claude` again: you are back on Claude, and `/neoswitch:status` tells you what to fix. |
 | The note says other Claude Code windows still share the earlier setup | Close every Claude Code window, then open Claude Code again. |
@@ -57,7 +57,7 @@ It shows Google's terms warning, opens Google sign-in in your browser through Go
 
 ## Turn it off, update or remove
 
-- `/neoswitch:off` switches this project back to Claude. `/neoswitch:on` switches it to Gemini 4 Neon again without setting anything up again. Start a new session after either one.
+- `/neoswitch:off` switches this project back to Claude for new sessions; a session that already uses Gemini 4 Neon keeps it until you type `/exit`. `/neoswitch:on` switches the project to Gemini 4 Neon again without setting anything up again, starting with your next message.
 
 To update the plugin, run these in a terminal, then restart Claude Code:
 
