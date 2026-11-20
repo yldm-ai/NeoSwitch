@@ -4,21 +4,38 @@
 
 [![CI](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/NeoSwitch.svg)](https://pkg.go.dev/github.com/yldm-ai/NeoSwitch) [![License](https://img.shields.io/github/license/yldm-ai/NeoSwitch)](https://github.com/yldm-ai/NeoSwitch/blob/main/LICENSE)
 
-NeoSwitch は、ローカルの Anthropic 互換プロキシを介してプロジェクトを Gemini 4 Neon にルーティングする Claude Code プラグインです。Claude Code のワークフロー、ストリーミング、ツール呼び出しはそのままに、Antigravity OAuth、Gemini Developer API、Vertex AI のいずれかを選べます。
+**Keep Claude Code. Switch your models.**
 
-上流の認証情報は次の 2 つの経路に対応しています。
+NeoSwitch を使うと、使い慣れたワークフローを変えずに Claude Code で Gemini を利用できます。Claude Code の CLI、コマンド、権限、ツール、スキル、MCP サーバー、フックはそのままで、NeoSwitch はローカルで小さなプロキシを動かし、Claude Code のリクエストを背後のモデル向けに変換します。
 
-- 公式のローカル `agy acp` プロセスを使った Antigravity OAuth。
-- 公式 `google.golang.org/genai` SDK を使った Gemini Developer API または Vertex AI の認証情報。
+現在、NeoSwitch は Claude Code を Gemini 4 Neon にルーティングします。他のプロバイダーは計画中で、まだ対応していません。
 
-Claude Code では Antigravity OAuth のプラグインフローを推奨します。OAuth の認証情報は `agy` の中にとどまり、NeoSwitch がトークンを読み取ったり書き出したりすることはありません。
+## NeoSwitch を使う理由
+
+- **ワークフローはそのまま**：使うのは引き続き Claude Code で、変わるのはモデルだけです。
+- **プロジェクト単位**：あるプロジェクトだけルーティングを有効にし、他のプロジェクトは Anthropic のまま使えます。
+- **ローカルファースト**：プロキシはループバックのみをリッスンし、ランダムなアクセストークンを使い、プロンプト、レスポンス、認証情報をログに残しません。リモートの中継は一切介しません。
+- **互換性を正直に記載**：動くもの、一部だけ動くもの、未対応のものは[後述](#互換性)の一覧にまとめています。
+
+## 認証方法を選ぶ
+
+| 方法 | サインイン方法 | 備考 |
+|---|---|---|
+| Antigravity OAuth | 公式 `agy` CLI 経由の Google アカウント | プラグインのデフォルトのフロー。先に下の警告を読んでください。 |
+| Gemini Developer API | `GEMINI_API_KEY` | Gemini 4 Neon を使えるかはキーによります。`neoswitch doctor` で確認してください。 |
+| Vertex AI | Google Cloud Application Default Credentials | 使えるかはプロジェクトとリージョンによります。`neoswitch doctor` で確認してください。 |
+
+> [!WARNING]
+> [Google Antigravity 利用規約](https://antigravity.google/terms)（第 6 条）は、サードパーティのソフトウェア、ツール、サービスを通じた Antigravity へのアクセスを違反とみなし、Google が関係する Antigravity および Gemini CLI のアカウントを停止または終了できるとしています。Antigravity OAuth 経由で Claude Code をルーティングすることはこれに該当します。サインインするアカウントについてそのリスクを受け入れる場合にのみ使ってください。そうでなければ Gemini API キーか Vertex AI を使ってください。`neoswitch doctor` と `neoswitch antigravity login` も同じ警告を表示します。
+
+OAuth の認証情報は常に `agy` の中にとどまります。NeoSwitch がトークンを読み取ったり、コピーしたり、書き出したりすることはありません。
 
 ## Claude Code で Neon を使う
 
 ### 前提条件
 
 - Claude Code。
-- 公式 Antigravity CLI（`agy` として PATH 上にあること）。
+- Antigravity OAuth を使う場合：公式 Antigravity CLI（`agy` として PATH 上にあること）。
 - Go。プラグインは初回使用時に同梱の NeoSwitch バイナリをビルドします。
 
 ### プラグインのインストール
@@ -37,7 +54,7 @@ claude plugin marketplace update neoswitch
 claude plugin update neoswitch@neoswitch
 ```
 
-更新後は Claude Code を再起動してください。ACP ログインフローには最新バージョンのプラグインが必要です。
+更新後は Claude Code を再起動してください。
 
 ### サインインして Neon を有効にする
 
@@ -54,15 +71,17 @@ Neon を使いたいプロジェクトで次を実行します。
 3. 現在のプロジェクトで NeoSwitch のルーティングを有効にします。
 4. ACP セッションで `gemini-4-neon` を選択します。
 
-コマンドが完了したら、そのプロジェクトの Claude Code を閉じて開き直してください。ルートは次のコマンドで確認できます。
+代わりに Gemini API キーを使う場合は、`/plugin` → `neoswitch` → **Gemini API key** で設定し（Claude Code はセキュアなプラグイン設定に保存します）、`/neoswitch:on` を実行します。
+
+そのプロジェクトの Claude Code を閉じて開き直してください。ルートは次のコマンドで確認できます。
 
 ```text
 /neoswitch:status
 ```
 
-`NeoSwitch ... -> gemini-4-neon` と表示されれば正常です。Claude Code のセッションヘッダーには `claude-opus-5-5` などのリクエストラベルが表示されることがありますが、実際の上流ルートは `/neoswitch:status` で確認してください。
+`NeoSwitch ... -> gemini-4-neon` と表示されるはずです。Claude Code のセッションヘッダーには、`claude-opus-5-5` のようにリクエストしたラベルが表示されることがありますが、上流のルートは `/neoswitch:status` に表示されるものです。
 
-`/neoswitch:antigravity-login` は `/neoswitch:login` のエイリアスです。ログインせずにルーティングだけを切り替えたい場合は `/neoswitch:on` と `/neoswitch:off` を使えます。
+`/neoswitch:antigravity-login` は `/neoswitch:login` のエイリアスです。`/neoswitch:on` と `/neoswitch:off` はサインインせずにルーティングだけを切り替えます。
 
 ## その他の認証方法
 
@@ -70,10 +89,9 @@ Neon を使いたいプロジェクトで次を実行します。
 
 ```bash
 export GEMINI_API_KEY='your-key'
+neoswitch doctor
 go run ./cmd/neoswitch claude
 ```
-
-`/plugin` → `neoswitch` → **Gemini API key** からキーを設定することもできます。キーは Claude Code のセキュアなプラグイン設定に保存されます。
 
 ### Vertex AI
 
@@ -81,10 +99,13 @@ go run ./cmd/neoswitch claude
 export GOOGLE_GENAI_USE_VERTEXAI=true
 export GOOGLE_CLOUD_PROJECT=my-project
 export GOOGLE_CLOUD_LOCATION=global
+neoswitch doctor
 go run ./cmd/neoswitch claude
 ```
 
-プロセスから Google Cloud SDK の Application Default Credentials を利用できる状態にしておく必要があります。
+プロセスから Google Cloud SDK の Application Default Credentials をすでに利用できる状態にしておく必要があります。
+
+`neoswitch doctor` はモデルを照会して 1 行の生成を実行し、認証情報が使えるかどうか、使えない場合はその理由を報告します。理由は、認証情報の拒否、権限不足、リージョン制限、不明なモデル、クォータ、サービス利用不可のいずれかです。
 
 ## プラグインコマンド
 
@@ -97,21 +118,38 @@ go run ./cmd/neoswitch claude
 
 ルーティングを変更したら、新しい Claude Code セッションを開始してください。現在のセッションは既存の接続を維持します。
 
+## 互換性
+
+セッション、権限、ツール実行、MCP サーバー、スキル、フック、`CLAUDE.md`、`/resume` は引き続き Claude Code が担い、NeoSwitch はその背後のモデルだけを置き換えます。これらの機能がどの程度うまく動くかは、モデルが Claude Code のツールプロトコルにどれだけ従えるかによります。日常のコーディングで実際に使って確かめていますが、自動化されたエンドツーエンドのテストではカバーしていません。
+
+| 機能 | Gemini API / Vertex AI | Antigravity OAuth (ACP) |
+|---|---|---|
+| テキストのストリーミング | 対応 | 対応 |
+| ツール呼び出し（並列呼び出しを含む） | Gemini ネイティブの function calling | 一部対応：モデルが Claude のツール呼び出し JSON を書き、ストリーミングではなく一括で届く |
+| 複数ターンのツール使用と `/resume` | 対応。thought signature はツール ID に保持される | 対応 |
+| 画像 | 対応 | `agy` が画像入力を提供する場合に対応 |
+| PDF | 対応 | 非対応。ファイルが省略されたことがモデルに伝えられる |
+| `/effort` | まだ反映されない | `agy` の思考レベルに対応付け |
+| トークン使用量と `count_tokens` | 報告される。Developer API では `count_tokens` は推定値 | 報告される。すべてのプロンプトに追加される約 14k トークンの `agy` の指示を含む |
+| Gemini 4 Neon へのアクセス | キーまたはプロジェクトによる。`neoswitch doctor` で確認 | サインイン済みの `agy` で検証済み |
+
+どちらの経路でも非対応：Web 検索やコード実行などのサーバーツール、URL 指定の画像やドキュメントのソース、Claude の thinking ブロック。`cache_control` と `context_management` は無視されます。NeoSwitch が黙って別のモデルにフォールバックすることはありません。
+
+エンドポイントの完全な契約は [docs/protocol-contract.md](../docs/protocol-contract.md)、ACP の詳細は [docs/antigravity.md](../docs/antigravity.md) にあります。
+
 ## プラグインの仕組み
 
 `/neoswitch:on` がプロジェクトの `.claude/settings.local.json` に書き込むのは `ANTHROPIC_BASE_URL` と `ANTHROPIC_AUTH_TOKEN` だけです。このトークンはループバックプロキシの認可用であり、Antigravity の認証情報ではありません。
 
-SessionStart フックは、最初のモデルリクエストより前にローカルデーモンを 1 つ起動し、Claude Code プロセスを登録します。登録されたすべての Claude Code プロセスが終了すると、デーモンも終了します。プロキシはデフォルトでループバックアドレスのみをリッスンします。
+SessionStart フックはローカルデーモンを 1 つ起動し、最初のモデルリクエストより前に Claude Code プロセスを登録します。登録されたすべての Claude Code プロセスが終了すると、デーモンも終了します。
 
-OAuth ルートでは、デーモンが公式の `agy acp` サブプロセスを起動します。NeoSwitch は変換したリクエストを ACP セッション経由で送信し、返ってきた回答や Claude 互換の tool-call JSON をローカルの Anthropic 互換エンドポイントへ変換して返します。OAuth の認証情報とブラウザのコールバックは引き続き `agy` が管理します。
+OAuth ルートでは、デーモンが公式の `agy acp` サブプロセスを起動します。NeoSwitch は変換したリクエストを ACP セッション経由で送信し、返ってきた回答やツール呼び出し JSON をローカルの Anthropic 互換エンドポイントへ変換して返します。1 つの `agy` プロセスがすべてのセッションを処理し、リクエストは個別の ACP セッションで並行して実行されます。`agy` 自身のファイル、シェル、Web ツールはすべてのリクエストで拒否されるため、ツールは Claude Code の中でのみ、Claude Code の権限ルールに従って実行されます。
 
-1 つの `agy` プロセスがすべてのセッションを処理し、各リクエストは個別の ACP セッションで並行して実行されます。テキストは生成されると同時にストリーミングされ、トークン使用量は Claude Code に報告されます。Claude Code の `/effort` 設定で Neon の思考時間を調整できます。
-
-別の Gemini 認証情報も存在する場合、プラグイン設定の **Use Antigravity OAuth via ACP** を有効にすると ACP ルートを強制できます。Gemini 認証情報が設定されていなければ、通常の `/neoswitch:login` は自動的に ACP を使います。
+別の Gemini 認証情報も存在する場合、オプションのプラグイン設定 **Use Antigravity OAuth via ACP** で ACP ルートを強制できます。Gemini 認証情報が設定されていなければ、通常の `/neoswitch:login` は自動的に ACP を使います。
 
 ## スタンドアロン CLI
 
-バイナリをビルドするか、リポジトリから実行します。
+タグ付けされた各バージョンでは、macOS（Apple Silicon と Intel）、Linux（amd64 と arm64）、Windows（amd64）向けのバイナリが SHA-256 チェックサムとともに [Releases](https://github.com/yldm-ai/NeoSwitch/releases) ページで公開されます。Windows 版はビルドされていますが、まだテストされていません。ソースからビルドすることもできます。
 
 ```bash
 go build -o neoswitch ./cmd/neoswitch
@@ -121,13 +159,14 @@ go install ./cmd/neoswitch
 主なコマンド：
 
 ```bash
+neoswitch doctor              # Claude CLI と、認証情報でモデルを使えるかを確認
 neoswitch antigravity login   # 公式 agy クライアントで ACP OAuth ログイン
 neoswitch antigravity probe   # 保存済みの agy セッションを確認（認証情報は表示しない）
-neoswitch doctor              # 選択中のバックエンドと Claude CLI を確認
 neoswitch models              # 設定されたモデルを表示
 neoswitch on [project]        # プロジェクトのルーティングを有効化
 neoswitch off [project]       # プロジェクトのルーティングを無効化
 neoswitch status [project]    # ルーティングとデーモンの状態を表示
+neoswitch version             # NeoSwitch のバージョンを表示
 ```
 
 他の Anthropic 互換クライアント向けにローカルプロキシを起動するには：
@@ -143,6 +182,7 @@ GEMINI_API_KEY='your-key' neoswitch serve
 
 | 症状 | 対処 |
 |---|---|
+| 認証情報が使えるかわからない | `neoswitch doctor` を実行します。失敗したステップと原因を示します。 |
 | `/neoswitch:login` が見つからない | プラグインを更新し、Claude Code を再起動して `/reload-plugins` を実行します。 |
 | `agy: command not found` | 公式 Antigravity CLI をインストールするか、`ANTIGRAVITY_CLI_PATH` を設定します。 |
 | `no authorization code was entered` | 最新のプラグインに更新してください。現在のフローは ACP `authenticate` を使い、シェルの stdin を読みません。 |
@@ -152,11 +192,14 @@ GEMINI_API_KEY='your-key' neoswitch serve
 
 ## 互換性の範囲
 
-NeoSwitch は公式 Gemini SDK、または改変していないローカルの `agy acp` プロセスを使用します。OAuth トークンの抽出、Antigravity の非公開 HTTP API の呼び出し、リモートプロキシへの認証情報の転送、hosts ファイルの変更、別モデルへの暗黙のフォールバックは行いません。
+NeoSwitch は公式 Gemini SDK、または改変していないローカルの `agy acp` プロセスを使用します。OAuth トークンの抽出、Antigravity の非公開 HTTP API の呼び出し、リモートプロキシへの認証情報の転送、hosts ファイルの変更は行いません。
 
-セッション、権限、MCP、ツールループは引き続き Claude Code が担います。Anthropic は Claude Code を Claude 以外のモデルへルーティングする方法を文書化していないため、Claude Code の更新によって NeoSwitch が依存する挙動が変わる可能性があります。
+Anthropic は Claude Code を Claude 以外のモデルへルーティングする方法を文書化していないため、Claude Code の更新によって NeoSwitch が依存する挙動が変わる可能性があります。
 
-エンドポイントの契約と互換性マトリクスは [docs/protocol-contract.md](../docs/protocol-contract.md)、ACP 認証の詳細は [docs/antigravity.md](../docs/antigravity.md) を参照してください。
+## ロードマップ
+
+- OpenAI を皮切りに、より多くのモデルプロバイダーに対応します。すでに Anthropic 互換エンドポイントを提供しているプロバイダーは、`ANTHROPIC_BASE_URL` を直接設定すれば使え、NeoSwitch は必要ありません。
+- プラグイン用のビルド済みバイナリを提供し、Go を不要にします。
 
 ## 開発
 

@@ -1,5 +1,8 @@
 # Antigravity account sessions
 
+> [!WARNING]
+> The [Google Antigravity Terms of Service](https://antigravity.google/terms) (section 6) treat accessing Antigravity through third-party software, tools or services as a breach and say Google may suspend or terminate the Antigravity and Gemini CLI accounts involved. Routing Claude Code through Antigravity OAuth falls under that rule. Use this route only if you accept that risk; otherwise use a Gemini API key or Vertex AI.
+
 NeoSwitch does not read, export, or replay the OAuth/token profile used by Antigravity. The profile belongs to the official `agy` client and is stored through the platform's secure credential layer.
 
 The safe diagnostic path is:
@@ -21,6 +24,8 @@ To use the authenticated Neon account from the Claude Code plugin, run `/neoswit
 The probe launches the official CLI in headless JSON mode with a fixed, non-sensitive prompt. It captures the result in memory, checks for an exact success response, and prints only whether the session is usable. It never prints `stdout`, `stderr`, an account email, a token, or usage details.
 
 The ACP route uses `agy` as the model-side agent process. NeoSwitch sends the translated Claude request through an ACP session, selects `gemini-4-neon`, and translates the returned text or Claude tool call back to the local Anthropic-compatible proxy. OAuth credentials remain owned by `agy`.
+
+`agy` is a full coding agent with its own file, shell and web tools. NeoSwitch starts it without `--dangerously-skip-permissions` and rejects every tool permission request it sends, so those tools never run; tools run only in Claude Code, under its permission rules.
 
 Images, including screenshots returned by Claude Code tools, are sent as ACP image blocks when `agy` advertises image prompts. PDFs and other attachments cannot travel over ACP; the prompt marks each one as omitted so the model knows it was there.
 
