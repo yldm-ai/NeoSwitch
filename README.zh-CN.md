@@ -74,7 +74,7 @@ Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOS
 /plugin install neoswitch@neoswitch
 ```
 
-在插件配置里填入 Gemini API Key（`/plugin` → neoswitch），Claude Code 会把它存进 macOS 钥匙串。不填的话，NeoSwitch 会使用启动 Claude Code 时环境里的 `GEMINI_API_KEY` 或 Vertex AI 凭证。
+最简单的用法是在 Claude Code 中运行 `/neoswitch:login`。它会通过官方 `agy acp` 完成 OAuth 登录，并自动打开当前项目的 Neon 路由。命令结束后重新开启一个 Claude Code 会话即可。Gemini API Key 仍然可以作为另一种凭证。只有在环境里同时存在其他 Gemini 凭证、你还想强制使用 ACP 时，才需要打开 **Use Antigravity OAuth via ACP**。
 
 | 命令 | 作用 |
 |---|---|
@@ -86,7 +86,9 @@ Proxy 默认监听 `127.0.0.1:8080`。只有在确实需要时，才设置 `NEOS
 
 执行 `/neoswitch:on` 或 `/neoswitch:off` 之后，要在项目里开一个新会话才生效，正在运行的会话保持原来的连接。
 
-在 Claude Code 中运行 `/neoswitch:login`，即可启动官方 `agy` 的无界面 OAuth 流程。需要时它会打开浏览器，登录凭证由 `agy` 保存到系统钥匙串，完成后返回 Claude Code，不打开 `agy` 交互界面。`/neoswitch:antigravity-login` 仍可作为别名使用。这个命令只登录 Antigravity CLI，不会把 NeoSwitch 的 Gemini 后端切换到 Antigravity。
+在 Claude Code 中运行 `/neoswitch:login`，即可启动官方 `agy acp --login` OAuth 流程。需要时它会打开浏览器，登录凭证由 `agy` 保存到系统钥匙串，完成后返回 Claude Code，不打开 `agy` 交互界面。`/neoswitch:antigravity-login` 仍可作为别名使用。
+
+`/neoswitch:login` 会启动 `agy acp`，通过 ACP 的 session 配置选择 `gemini-4-neon`。
 
 工作方式：
 
@@ -123,7 +125,7 @@ go run ./cmd/neoswitch
 NeoSwitch 的稳定核心只使用官方 Gemini API Key 或 Vertex AI（ADC）凭证。以下方式不属于稳定核心：
 
 - 读取或导出 Antigravity OAuth/token profile。
-- 抓取 Antigravity 内部接口。
+- 抓取 Antigravity 内部 HTTP 接口。
 - 修改 hosts 或拦截 TLS 流量。
 - 把用户凭证转发到远程第三方 Proxy。
 - 在模型不可用时静默切换到其他模型。
@@ -146,7 +148,7 @@ neoswitch antigravity probe
 neoswitch antigravity login
 ```
 
-这个命令只通过官方 `agy` CLI 发起一次固定的无敏感测试请求，并且只输出成功或失败状态。它不会读取、打印或保存 token，也不会让 Claude Code 使用 Antigravity 的 Agent 循环。
+这个命令只通过官方 `agy` CLI 发起一次固定的登录检查，并且只输出成功或失败状态。它不会读取、打印或保存 token。
 
 如果 probe 失败，请先在终端运行 `agy` 完成登录，再重新执行 probe。不要把 token 粘贴到 issue、日志或环境变量中。
 
