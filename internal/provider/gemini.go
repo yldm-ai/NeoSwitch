@@ -8,7 +8,9 @@ import (
 	"iter"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
+	"sync/atomic"
 
 	"google.golang.org/genai"
 
@@ -21,6 +23,8 @@ const DefaultModel = "gemini-4-neon"
 type Gemini struct {
 	client *genai.Client
 	Model  string
+	// thinkingLevelRejected records that Model answered a thinking level with HTTP 400, so later requests on this backend stop sending one.
+	thinkingLevelRejected atomic.Bool
 }
 
 // NewGeminiFromEnv builds the backend from the process environment. GEMINI_BASE_URL overrides the API host; earlier NeoSwitch versions expected the version path in it, so a trailing /v1beta or /v1 is stripped because genai appends the version itself.
@@ -71,12 +75,65 @@ func (g *Gemini) BackendName() string {
 	return "Gemini Developer API"
 }
 
+// Generate sends the request with its thinking level. If the model rejects the level, the request is sent once more without it.
 func (g *Gemini) Generate(ctx context.Context, req translate.Request) (*genai.GenerateContentResponse, error) {
-	return g.client.Models.GenerateContent(ctx, g.Model, req.Contents, req.Config)
+	config, leveled := g.generateConfig(req)
+	resp, err := g.client.Models.GenerateContent(ctx, g.Model, req.Contents, config)
+	if leveled && g.rejectedThinkingLevel(err) {
+		return g.client.Models.GenerateContent(ctx, g.Model, req.Contents, req.Config)
+	}
+	return resp, err
 }
 
+// Stream sends the request with its thinking level. If the model rejects the level before the first chunk, the request is sent once more without it; an error after a chunk was yielded is passed through, because the caller has already forwarded output.
 func (g *Gemini) Stream(ctx context.Context, req translate.Request) iter.Seq2[*genai.GenerateContentResponse, error] {
-	return g.client.Models.GenerateContentStream(ctx, g.Model, req.Contents, req.Config)
+	return func(yield func(*genai.GenerateContentResponse, error) bool) {
+		config, leveled := g.generateConfig(req)
+		retry := false
+		for resp, err := range g.client.Models.GenerateContentStream(ctx, g.Model, req.Contents, config) {
+			if leveled && g.rejectedThinkingLevel(err) {
+				retry = true
+				break
+			}
+			leveled = false
+			if !yield(resp, err) {
+				return
+			}
+		}
+		if !retry {
+			return
+		}
+		for resp, err := range g.client.Models.GenerateContentStream(ctx, g.Model, req.Contents, req.Config) {
+			if !yield(resp, err) {
+				return
+			}
+		}
+	}
+}
+
+// generateConfig returns the config to send and whether it carries the request's thinking level. The level is set on a copy so the shared request config is never modified. It is left out when the request names none or when this model has already rejected one. The per-level support of each model was not verified against the live API, which is why a rejection drops the level instead of failing the request.
+func (g *Gemini) generateConfig(req translate.Request) (*genai.GenerateContentConfig, bool) {
+	if req.ThinkingLevel == "" || g.thinkingLevelRejected.Load() {
+		return req.Config, false
+	}
+	config := *req.Config
+	var thinking genai.ThinkingConfig
+	if req.Config.ThinkingConfig != nil {
+		thinking = *req.Config.ThinkingConfig
+	}
+	thinking.ThinkingLevel = req.ThinkingLevel
+	config.ThinkingConfig = &thinking
+	return &config, true
+}
+
+// rejectedThinkingLevel reports whether err is Gemini refusing the thinking configuration (HTTP 400 naming thinking), and if so remembers that the model does not accept a thinking level.
+func (g *Gemini) rejectedThinkingLevel(err error) bool {
+	var apiErr genai.APIError
+	if !errors.As(err, &apiErr) || apiErr.Code != http.StatusBadRequest || !strings.Contains(strings.ToLower(apiErr.Message), "thinking") {
+		return false
+	}
+	g.thinkingLevelRejected.Store(true)
+	return true
 }
 
 // CountTokens counts the prompt as Gemini would see it. Vertex AI accepts the system instruction and tools directly. The Gemini Developer API countTokens call through genai accepts contents only, so there the system instruction and the tool declarations are prepended as text contents: the result is an estimate that can differ from the billed count by the framing tokens Gemini adds around them.
@@ -115,6 +172,37 @@ func (g *Gemini) Check(ctx context.Context) error {
 		return checkError(ctx, "generate with "+g.Model, err)
 	}
 	return nil
+}
+
+// ListModels returns the IDs of the models these credentials can generate content with, sorted, following every page of models.list. The Gemini Developer API reports each model's supported methods, so embedding-only and other non-generating models are left out. Vertex AI reports none, so there Gemini models are kept by name.
+func (g *Gemini) ListModels(ctx context.Context) ([]string, error) {
+	vertex := g.client.ClientConfig().Backend == genai.BackendVertexAI
+	var ids []string
+	page, err := g.client.Models.List(ctx, nil)
+	for {
+		if err != nil {
+			return nil, checkError(ctx, "list models", err)
+		}
+		for _, model := range page.Items {
+			id := model.Name[strings.LastIndex(model.Name, "/")+1:]
+			if id != "" && generatesContent(model, id, vertex) {
+				ids = append(ids, id)
+			}
+		}
+		page, err = page.Next(ctx)
+		if errors.Is(err, genai.ErrPageDone) {
+			break
+		}
+	}
+	slices.Sort(ids)
+	return slices.Compact(ids), nil
+}
+
+func generatesContent(model *genai.Model, id string, vertex bool) bool {
+	if vertex && len(model.SupportedActions) == 0 {
+		return strings.HasPrefix(id, "gemini-")
+	}
+	return slices.Contains(model.SupportedActions, "generateContent")
 }
 
 func checkError(ctx context.Context, step string, err error) error {

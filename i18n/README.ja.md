@@ -38,7 +38,7 @@ OAuth の認証情報は常に `agy` の中にとどまります。NeoSwitch が
 
 - Claude Code。
 - Antigravity OAuth を使う場合：公式 Antigravity CLI（`agy` として PATH 上にあること）。
-- Go。プラグインは初回使用時に同梱の NeoSwitch バイナリをビルドします。
+- Go（任意）。Go がある場合、プラグインは初回使用時に同梱の NeoSwitch バイナリをソースからビルドします。Go がない場合は、リポジトリの `VERSION` ファイルが示すリリースのバイナリを macOS または Linux（amd64 または arm64）向けにダウンロードし、実行前に SHA-256 チェックサムを検証します。リリースの合間には、そのバイナリがプラグインのソースより古いことがあります。
 
 ### プラグインのインストール
 
@@ -131,7 +131,7 @@ go run ./cmd/neoswitch claude
 | 複数ターンのツール使用と `/resume` | 対応。thought signature はツール ID に保持される | 対応 |
 | 画像 | 対応 | `agy` が画像入力を提供する場合に対応 |
 | PDF | 対応 | 非対応。ファイルが省略されたことがモデルに伝えられる |
-| `/effort` | まだ反映されない | `agy` の思考レベルに対応付け |
+| `/effort` | Gemini の思考レベルとして送信。実際の API では未検証で、モデルが拒否した場合は外す | `agy` の思考レベルに対応付け |
 | トークン使用量と `count_tokens` | 報告される。Developer API では `count_tokens` は推定値 | 報告される。すべてのプロンプトに追加される約 14k トークンの `agy` の指示を含む |
 | Gemini 4 Neon へのアクセス | キーまたはプロジェクトによる。`neoswitch doctor` で確認 | サインイン済みの `agy` で検証済み |
 
@@ -141,7 +141,7 @@ go run ./cmd/neoswitch claude
 
 ## プラグインの仕組み
 
-`/neoswitch:on` がプロジェクトの `.claude/settings.local.json` に書き込むのは `ANTHROPIC_BASE_URL` と `ANTHROPIC_AUTH_TOKEN` だけです。このトークンはループバックプロキシの認可用であり、Antigravity の認証情報ではありません。
+`/neoswitch:on` がプロジェクトの `.claude/settings.local.json` に書き込むのは 3 つのキーだけです。プロキシ用の `ANTHROPIC_BASE_URL` と `ANTHROPIC_AUTH_TOKEN`、そして `CLAUDE_CODE_USE_GATEWAY=0` です。ゲートウェイ用ランチャーが有効にするゲートウェイモードでは、Claude Code が環境変数のベース URL を使い、プロキシを黙って無視してしまうためです。このトークンはループバックプロキシの認可用であり、Antigravity の認証情報ではありません。
 
 SessionStart フックはローカルデーモンを 1 つ起動し、最初のモデルリクエストより前に Claude Code プロセスを登録します。登録されたすべての Claude Code プロセスが終了すると、デーモンも終了します。
 
@@ -164,7 +164,7 @@ go install ./cmd/neoswitch
 neoswitch doctor              # Claude CLI と、認証情報でモデルを使えるかを確認
 neoswitch antigravity login   # 公式 agy クライアントで ACP OAuth ログイン
 neoswitch antigravity probe   # 保存済みの agy セッションを確認（認証情報は表示しない）
-neoswitch models              # 設定されたモデルを表示
+neoswitch models              # 認証情報で使えるモデルを一覧表示し、設定中のモデルに印を付ける
 neoswitch on [project]        # プロジェクトのルーティングを有効化
 neoswitch off [project]       # プロジェクトのルーティングを無効化
 neoswitch status [project]    # ルーティングとデーモンの状態を表示
@@ -225,7 +225,7 @@ Antigravity のサインイン情報は NeoSwitch ではなく `agy` が保存�
 | `no authorization code was entered` | 最新のプラグインに更新してください。現在のフローは ACP `authenticate` を使い、シェルの stdin を読みません。 |
 | 新しいセッションで `ECONNREFUSED` | `/neoswitch:status` を実行します。ルートが有効ならデーモンのメッセージを確認してセッションを再起動します。Anthropic を使うセッションから `/neoswitch:off` を実行し、認証情報を修正してから再度有効にしてください。 |
 | バックエンドが設定されていないと表示される | `/neoswitch:login` を実行するか、Claude Code の起動前に `GEMINI_API_KEY` または Vertex AI の設定を export します。 |
-| プラグインのビルドに失敗する | Go をインストールして Claude Code を再起動します。 |
+| プラグインのビルドまたはダウンロードに失敗する | Go をインストールして Claude Code を再起動します。Go があればプラグインはソースからビルドし、何もダウンロードしません。Go がない場合は GitHub Releases にアクセスできるか確認します。チェックサムの不一致は、ダウンロードが拒否され何も実行されなかったことを意味します。 |
 
 ## 互換性の範囲
 
@@ -236,7 +236,6 @@ Anthropic は Claude Code を Claude 以外のモデルへルーティングす�
 ## ロードマップ
 
 - OpenAI を皮切りに、より多くのモデルプロバイダーに対応します。すでに Anthropic 互換エンドポイントを提供しているプロバイダーは、`ANTHROPIC_BASE_URL` を直接設定すれば使え、NeoSwitch は必要ありません。
-- プラグイン用のビルド済みバイナリを提供し、Go を不要にします。
 
 ## 開発
 
@@ -245,6 +244,8 @@ go test ./...
 go test -race ./...
 go vet ./...
 ```
+
+リリースするには `VERSION` を更新し、対応するタグ（`v` に続けてその内容、例: `v0.1.0`）を push します。一致しないタグはリリースワークフローが拒否します。
 
 コントリビューションの手順は [CONTRIBUTING.md](../CONTRIBUTING.md)、脆弱性の非公開報告は [SECURITY.md](../SECURITY.md)、行動規範は [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) を参照してください。
 

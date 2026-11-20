@@ -98,6 +98,40 @@ func (a *AntigravityACP) Login(ctx context.Context) error {
 	return err
 }
 
+// ListModels returns the models agy offers this account, in agy's order. agy advertises them as the values of a new session's model option, so this opens one session without prompting it. Like Login it uses a dedicated agy process, which it stops before returning.
+func (a *AntigravityACP) ListModels(ctx context.Context) ([]string, error) {
+	c, err := startACP(a.path, a.agent, a.cwd)
+	if err != nil {
+		return nil, err
+	}
+	defer c.close()
+	if _, err := c.conn.Initialize(ctx, acp.InitializeRequest{
+		ProtocolVersion:    acp.ProtocolVersionNumber,
+		ClientCapabilities: acp.ClientCapabilities{},
+		ClientInfo:         &acp.Implementation{Name: "neoswitch", Version: "1"},
+	}); err != nil {
+		return nil, fmt.Errorf("initialize Antigravity ACP: %w", err)
+	}
+	session, err := c.conn.NewSession(ctx, acp.NewSessionRequest{Cwd: a.cwd, McpServers: []acp.McpServer{}})
+	if err != nil {
+		return nil, fmt.Errorf("create Antigravity ACP session: %w", err)
+	}
+	if session.SessionId != "" {
+		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), acpCloseTimeout)
+		_, _ = c.conn.CloseSession(closeCtx, acp.CloseSessionRequest{SessionId: session.SessionId})
+		cancel()
+	}
+	values := configValues(session.ConfigOptions, acpModel)
+	if len(values) == 0 {
+		return nil, errors.New("Antigravity ACP advertised no models for a new session")
+	}
+	models := make([]string, len(values))
+	for i, value := range values {
+		models[i] = string(value)
+	}
+	return models, nil
+}
+
 func (a *AntigravityACP) Close() error {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -225,7 +259,7 @@ func (a *AntigravityACP) run(ctx context.Context, req translate.Request, onText 
 		_, _ = c.conn.CloseSession(closeCtx, acp.CloseSessionRequest{SessionId: sid})
 	}()
 	if _, err := c.conn.SetSessionConfigOption(ctx, acp.SetSessionConfigOptionRequest{ValueId: &acp.SetSessionConfigOptionValueId{
-		SessionId: sid, ConfigId: "model", Value: acp.SessionConfigValueId(a.model),
+		SessionId: sid, ConfigId: acpModel, Value: acp.SessionConfigValueId(a.model),
 	}}); err != nil {
 		return acp.PromptResponse{}, a.requestError(ctx, c, "select Antigravity model "+a.model, err)
 	}
@@ -334,32 +368,41 @@ const (
 	acpStuckAfter = time.Minute
 	// acpThoughtLevel is agy's session config option for reasoning depth (low, medium, high, xhigh).
 	acpThoughtLevel acp.SessionConfigId = "thought_level"
+	// acpModel is agy's session config option for the model that answers the session.
+	acpModel acp.SessionConfigId = "model"
 )
 
 // offersConfigValue reports whether a session's select option id offers value.
 func offersConfigValue(options []acp.SessionConfigOption, id acp.SessionConfigId, value acp.SessionConfigValueId) bool {
+	for _, choice := range configValues(options, id) {
+		if choice == value {
+			return true
+		}
+	}
+	return false
+}
+
+// configValues returns the values a session's select option id offers, grouped or not, in the order the agent lists them.
+func configValues(options []acp.SessionConfigOption, id acp.SessionConfigId) []acp.SessionConfigValueId {
+	var values []acp.SessionConfigValueId
 	for _, option := range options {
 		if option.Select == nil || option.Select.Id != id {
 			continue
 		}
 		if ungrouped := option.Select.Options.Ungrouped; ungrouped != nil {
 			for _, choice := range *ungrouped {
-				if choice.Value == value {
-					return true
-				}
+				values = append(values, choice.Value)
 			}
 		}
 		if grouped := option.Select.Options.Grouped; grouped != nil {
 			for _, group := range *grouped {
 				for _, choice := range group.Options {
-					if choice.Value == value {
-						return true
-					}
+					values = append(values, choice.Value)
 				}
 			}
 		}
 	}
-	return false
+	return values
 }
 
 // acpLogger receives the SDK's connection diagnostics, which end up in the daemon log. Some of them carry the raw JSON-RPC line, which can hold prompt or answer text; that attribute is dropped because NeoSwitch logs no conversation content.
