@@ -4,21 +4,38 @@
 
 [![CI](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/NeoSwitch.svg)](https://pkg.go.dev/github.com/yldm-ai/NeoSwitch) [![License](https://img.shields.io/github/license/yldm-ai/NeoSwitch)](https://github.com/yldm-ai/NeoSwitch/blob/main/LICENSE)
 
-NeoSwitch es un plugin de Claude Code que enruta proyectos a Gemini 4 Neon a través de un proxy local compatible con Anthropic. Puedes elegir Antigravity OAuth, la Gemini Developer API o Vertex AI y conservar el flujo de trabajo, el streaming y el uso de herramientas de Claude Code.
+**Keep Claude Code. Switch your models.**
 
-Admite dos vías de credenciales hacia el servicio de origen:
+NeoSwitch te permite usar Gemini con Claude Code sin cambiar el flujo de trabajo que ya conoces. Claude Code conserva su CLI, comandos, permisos, herramientas, skills, servidores MCP y hooks; NeoSwitch ejecuta un pequeño proxy local que traduce sus solicitudes para el modelo que hay detrás.
 
-- Antigravity OAuth mediante el proceso local oficial `agy acp`.
-- Credenciales de Gemini Developer API o Vertex AI mediante el SDK oficial `google.golang.org/genai`.
+Hoy NeoSwitch enruta Claude Code a Gemini 4 Neon. Hay otros proveedores previstos, pero todavía no están soportados.
 
-Para Claude Code se recomienda el flujo del plugin con Antigravity OAuth. Las credenciales OAuth permanecen dentro de `agy`; NeoSwitch no lee ni exporta el token.
+## Por qué NeoSwitch
+
+- **Conserva tu flujo de trabajo**: sigues ejecutando Claude Code. Solo cambia el modelo.
+- **Por proyecto**: activa el enrutamiento en un proyecto y deja los demás en Anthropic.
+- **Local primero**: el proxy escucha solo en loopback, usa un token de acceso aleatorio y no registra prompts, respuestas ni credenciales. No interviene ningún relay remoto.
+- **Compatibilidad sin rodeos**: lo que funciona, lo que funciona en parte y lo que falta se detalla [más abajo](#compatibilidad).
+
+## Elegir una vía de credenciales
+
+| Vía | Cómo inicia sesión | Notas |
+|---|---|---|
+| Antigravity OAuth | Cuenta de Google mediante la CLI oficial `agy` | Flujo predeterminado del plugin. Lee primero la advertencia de abajo. |
+| Gemini Developer API | `GEMINI_API_KEY` | El acceso a Gemini 4 Neon depende de tu clave. Compruébalo con `neoswitch doctor`. |
+| Vertex AI | Application Default Credentials de Google Cloud | El acceso depende de tu proyecto y región. Compruébalo con `neoswitch doctor`. |
+
+> [!WARNING]
+> Los [Términos de Servicio de Google Antigravity](https://antigravity.google/terms) (sección 6) consideran una infracción acceder a Antigravity mediante software, herramientas o servicios de terceros, y establecen que Google puede suspender o cancelar las cuentas de Antigravity y Gemini CLI afectadas. Enrutar Claude Code a través de Antigravity OAuth entra en esa regla. Úsalo solo si aceptas ese riesgo para la cuenta con la que inicias sesión; si no, usa una clave de API de Gemini o Vertex AI. `neoswitch doctor` y `neoswitch antigravity login` muestran la misma advertencia.
+
+Las credenciales OAuth siempre permanecen dentro de `agy`. NeoSwitch no lee, copia ni exporta el token.
 
 ## Usar Claude Code con Neon
 
 ### Requisitos previos
 
 - Claude Code.
-- La CLI oficial de Antigravity, disponible como `agy` en tu PATH.
+- Para Antigravity OAuth: la CLI oficial de Antigravity, disponible como `agy` en tu PATH.
 - Go. El plugin compila el binario de NeoSwitch incluido la primera vez que se usa.
 
 ### Instalar el plugin
@@ -37,7 +54,7 @@ claude plugin marketplace update neoswitch
 claude plugin update neoswitch@neoswitch
 ```
 
-Reinicia Claude Code después de actualizar. El flujo de inicio de sesión ACP requiere la versión actual del plugin.
+Reinicia Claude Code después de actualizar.
 
 ### Iniciar sesión y activar Neon
 
@@ -54,15 +71,17 @@ El comando realiza los siguientes pasos:
 3. Activa el enrutamiento de NeoSwitch para el proyecto actual.
 4. Selecciona `gemini-4-neon` para la sesión ACP.
 
-Cuando termine el comando, cierra y vuelve a abrir Claude Code en ese proyecto. Comprueba la ruta con:
+Para usar una clave de API de Gemini en su lugar, configúrala en `/plugin` → `neoswitch` → **Gemini API key** (Claude Code la guarda en su configuración segura de plugins) y ejecuta `/neoswitch:on`.
+
+Cierra y vuelve a abrir Claude Code en ese proyecto. Comprueba la ruta con:
 
 ```text
 /neoswitch:status
 ```
 
-El estado debería mostrar `NeoSwitch ... -> gemini-4-neon`. Claude Code puede seguir mostrando la etiqueta solicitada, como `claude-opus-5-5`, en la cabecera de la sesión. La ruta real hacia el origen se muestra con `/neoswitch:status`.
+El estado debería mostrar `NeoSwitch ... -> gemini-4-neon`. Claude Code puede seguir mostrando la etiqueta solicitada, como `claude-opus-5-5`, en el encabezado de la sesión; la ruta real hacia el servicio de origen es la que muestra `/neoswitch:status`.
 
-`/neoswitch:antigravity-login` es un alias de `/neoswitch:login`. `/neoswitch:on` y `/neoswitch:off` siguen disponibles si quieres cambiar el enrutamiento sin iniciar sesión.
+`/neoswitch:antigravity-login` es un alias de `/neoswitch:login`. `/neoswitch:on` y `/neoswitch:off` cambian el enrutamiento sin iniciar sesión.
 
 ## Otras vías de credenciales
 
@@ -70,10 +89,9 @@ El estado debería mostrar `NeoSwitch ... -> gemini-4-neon`. Claude Code puede s
 
 ```bash
 export GEMINI_API_KEY='your-key'
+neoswitch doctor
 go run ./cmd/neoswitch claude
 ```
-
-El plugin también puede recibir la clave desde `/plugin` → `neoswitch` → **Gemini API key**. Claude Code guarda la clave en su configuración segura de plugins.
 
 ### Vertex AI
 
@@ -81,37 +99,57 @@ El plugin también puede recibir la clave desde `/plugin` → `neoswitch` → **
 export GOOGLE_GENAI_USE_VERTEXAI=true
 export GOOGLE_CLOUD_PROJECT=my-project
 export GOOGLE_CLOUD_LOCATION=global
+neoswitch doctor
 go run ./cmd/neoswitch claude
 ```
 
-Las Application Default Credentials del Google Cloud SDK deben estar disponibles para el proceso.
+Las Application Default Credentials del Google Cloud SDK ya deben estar disponibles para el proceso.
+
+`neoswitch doctor` busca el modelo y ejecuta una generación de una línea; después informa si las credenciales funcionan o por qué no: credenciales rechazadas, falta de permisos, restricción de región, modelo desconocido, cuota o servicio no disponible.
 
 ## Comandos del plugin
 
 | Comando | Efecto |
 |---|---|
-| `/neoswitch:login` | Autentica con Antigravity OAuth, activa la ruta de Neon para este proyecto y usa ACP |
+| `/neoswitch:login` | Se autentica con Antigravity OAuth, activa la ruta Neon de este proyecto y usa ACP |
 | `/neoswitch:on` | Activa el enrutamiento para las nuevas sesiones de Claude Code en este proyecto |
 | `/neoswitch:status` | Muestra la ruta del proyecto y el estado del daemon |
 | `/neoswitch:off` | Desactiva el enrutamiento para las nuevas sesiones en este proyecto |
 
-Después de cambiar el enrutamiento, inicia una nueva sesión de Claude Code. La sesión actual conserva su conexión.
+Después de cambiar el enrutamiento, inicia una nueva sesión de Claude Code. La sesión actual mantiene su conexión existente.
+
+## Compatibilidad
+
+Claude Code sigue ejecutando la sesión, los permisos, la ejecución de herramientas, los servidores MCP, las skills, los hooks, `CLAUDE.md` y `/resume`; NeoSwitch solo sustituye el modelo que hay detrás. Lo bien que funcionen esas funciones depende de lo bien que el modelo siga el protocolo de herramientas de Claude Code, que se ha probado en el uso diario de programación pero no está cubierto por una suite automatizada de extremo a extremo.
+
+| Capacidad | Gemini API / Vertex AI | Antigravity OAuth (ACP) |
+|---|---|---|
+| Streaming de texto | Soportado | Soportado |
+| Llamadas a herramientas, incluidas las paralelas | Function calling nativo de Gemini | Parcial: el modelo escribe JSON de tool-call de Claude, que llega completo en lugar de en streaming |
+| Uso de herramientas en varios turnos y `/resume` | Soportado; las thought signatures viajan en los ID de las herramientas | Soportado |
+| Imágenes | Soportado | Soportado cuando `agy` ofrece entrada de imágenes |
+| PDF | Soportado | No soportado; se indica al modelo que se omitió un archivo |
+| `/effort` | Aún no se aplica | Se asigna al nivel de razonamiento de `agy` |
+| Uso de tokens y `count_tokens` | Se informa; en la Developer API `count_tokens` es una estimación | Se informa, incluidos unos 14k tokens de instrucciones de `agy` añadidos a cada prompt |
+| Acceso a Gemini 4 Neon | Depende de tu clave o proyecto; compruébalo con `neoswitch doctor` | Verificado con un `agy` con sesión iniciada |
+
+No soportado en ninguna de las dos vías: herramientas de servidor como la búsqueda web y la ejecución de código, fuentes de imagen y documento por URL, y los bloques de thinking de Claude. `cache_control` y `context_management` se ignoran. NeoSwitch nunca recurre en silencio a otro modelo.
+
+El contrato completo del endpoint está en [docs/protocol-contract.md](../docs/protocol-contract.md), y los detalles de ACP en [docs/antigravity.md](../docs/antigravity.md).
 
 ## Cómo funciona el plugin
 
-`/neoswitch:on` solo escribe `ANTHROPIC_BASE_URL` y `ANTHROPIC_AUTH_TOKEN` en el archivo `.claude/settings.local.json` del proyecto. El token autoriza el proxy de loopback y no es una credencial de Antigravity.
+`/neoswitch:on` escribe solo `ANTHROPIC_BASE_URL` y `ANTHROPIC_AUTH_TOKEN` en el archivo `.claude/settings.local.json` del proyecto. El token autoriza el proxy de loopback y no es una credencial de Antigravity.
 
-El hook SessionStart inicia un daemon local y registra el proceso de Claude Code antes de su primera petición al modelo. El daemon se cierra cuando todos los procesos de Claude Code registrados han terminado. Por defecto, el proxy escucha solo en loopback.
+El hook SessionStart inicia un daemon local y registra el proceso de Claude Code antes de su primera solicitud al modelo. El daemon termina cuando todos los procesos de Claude Code registrados han terminado.
 
-Con la ruta OAuth, el daemon inicia el subproceso oficial `agy acp`. NeoSwitch envía la petición traducida a través de una sesión ACP y convierte la respuesta, o el JSON de tool-call compatible con Claude, de vuelta al endpoint local compatible con Anthropic. Las credenciales OAuth y las devoluciones de llamada del navegador siguen gestionadas por `agy`.
+Con la ruta OAuth, el daemon inicia el subproceso oficial `agy acp`. NeoSwitch envía la solicitud traducida a través de una sesión ACP y vuelve a traducir la respuesta o el JSON de tool-call devuelto al endpoint local compatible con Anthropic. Un solo proceso `agy` atiende todas las sesiones, y las solicitudes se ejecutan en paralelo en sesiones ACP separadas. Las herramientas propias de `agy` para archivos, shell y web se rechazan en cada solicitud, así que las herramientas solo se ejecutan en Claude Code, bajo sus reglas de permisos.
 
-Un único proceso `agy` atiende todas las sesiones y las peticiones se ejecutan en paralelo en sesiones ACP independientes. El texto se transmite a medida que se genera, el uso de tokens se informa a Claude Code y el ajuste `/effort` de Claude Code determina cuánto piensa Neon.
-
-El ajuste opcional del plugin **Use Antigravity OAuth via ACP** fuerza la ruta ACP cuando también hay otra credencial de Gemini. Un `/neoswitch:login` normal usa ACP automáticamente si no hay ninguna credencial de Gemini configurada.
+El ajuste opcional del plugin **Use Antigravity OAuth via ACP** fuerza la ruta ACP cuando también hay otra credencial de Gemini. Un `/neoswitch:login` normal usa ACP automáticamente cuando no hay ninguna credencial de Gemini configurada.
 
 ## CLI independiente
 
-Compila el binario o ejecútalo desde el repositorio:
+Cada versión etiquetada publica binarios para macOS (Apple Silicon e Intel), Linux (amd64 y arm64) y Windows (amd64), con sumas de comprobación SHA-256, en la página de [Releases](https://github.com/yldm-ai/NeoSwitch/releases). La compilación para Windows se genera, pero todavía no se ha probado. También puedes compilar desde el código fuente:
 
 ```bash
 go build -o neoswitch ./cmd/neoswitch
@@ -121,13 +159,14 @@ go install ./cmd/neoswitch
 Comandos habituales:
 
 ```bash
-neoswitch antigravity login   # inicio de sesión ACP OAuth con el cliente oficial agy
-neoswitch antigravity probe   # verifica la sesión guardada de agy sin mostrar credenciales
-neoswitch doctor              # comprueba el backend seleccionado y la CLI de Claude
+neoswitch doctor              # comprueba la CLI de Claude y si las credenciales pueden usar el modelo
+neoswitch antigravity login   # inicio de sesión ACP OAuth mediante el cliente oficial agy
+neoswitch antigravity probe   # verifica la sesión de agy guardada sin mostrar credenciales
 neoswitch models              # muestra el modelo configurado
 neoswitch on [project]        # activa el enrutamiento de un proyecto
 neoswitch off [project]       # desactiva el enrutamiento de un proyecto
 neoswitch status [project]    # muestra el enrutamiento y el estado del daemon
+neoswitch version             # muestra la versión de NeoSwitch
 ```
 
 Para ejecutar el proxy local para otro cliente compatible con Anthropic:
@@ -137,26 +176,30 @@ export NEOSWITCH_AUTH_TOKEN="$(openssl rand -hex 24)"
 GEMINI_API_KEY='your-key' neoswitch serve
 ```
 
-Configura tanto `ANTHROPIC_BASE_URL` como `ANTHROPIC_AUTH_TOKEN` en el cliente. `neoswitch claude` configura esas variables automáticamente con un puerto y un token efímeros.
+Define tanto `ANTHROPIC_BASE_URL` como `ANTHROPIC_AUTH_TOKEN` en el cliente. `neoswitch claude` configura esas variables automáticamente con un puerto y un token efímeros.
 
 ## Solución de problemas
 
 | Síntoma | Solución |
 |---|---|
+| No sabes si las credenciales funcionan | Ejecuta `neoswitch doctor`; indica el paso que falla y la causa. |
 | `/neoswitch:login` no se reconoce | Actualiza el plugin, reinicia Claude Code y ejecuta `/reload-plugins`. |
 | `agy: command not found` | Instala la CLI oficial de Antigravity o define `ANTIGRAVITY_CLI_PATH`. |
 | `no authorization code was entered` | Actualiza a la última versión del plugin. El flujo actual usa ACP `authenticate` y no lee la stdin de la shell. |
-| `ECONNREFUSED` en una sesión nueva | Ejecuta `/neoswitch:status`. Si la ruta está activa, revisa el mensaje del daemon y reinicia la sesión. Ejecuta `/neoswitch:off` desde una sesión que use Anthropic y vuelve a activarlo después de corregir la credencial. |
-| La sesión se inicia sin credenciales de Gemini | Ejecuta `/neoswitch:login` o configura una clave de API de Gemini o Vertex AI ADC. |
+| `ECONNREFUSED` en una nueva sesión | Ejecuta `/neoswitch:status`. Si la ruta está activada, revisa el mensaje del daemon y reinicia la sesión. Ejecuta `/neoswitch:off` desde una sesión que use Anthropic y vuelve a activarlo después de corregir la credencial. |
+| La sesión se inicia sin credenciales de Gemini | Ejecuta `/neoswitch:login`, o configura una clave de API de Gemini o Vertex AI ADC. |
 | Falla la compilación del plugin | Instala Go y reinicia Claude Code. |
 
 ## Límites de compatibilidad
 
-NeoSwitch usa el SDK oficial de Gemini o el proceso local `agy acp` sin modificar. No extrae tokens OAuth, no llama a APIs HTTP privadas de Antigravity, no reenvía credenciales a un proxy remoto, no modifica el archivo hosts y no cambia silenciosamente a otro modelo.
+NeoSwitch usa el SDK oficial de Gemini o el proceso local `agy acp` sin modificar. No extrae tokens OAuth, no llama a API HTTP privadas de Antigravity, no reenvía credenciales a un proxy remoto ni modifica el archivo hosts.
 
-Claude Code sigue siendo responsable de la sesión, los permisos, MCP y el bucle de herramientas. Anthropic no documenta el enrutamiento de Claude Code hacia modelos que no son Claude, por lo que las actualizaciones de Claude Code pueden cambiar comportamientos de los que depende NeoSwitch.
+Anthropic no documenta el enrutamiento de Claude Code hacia modelos que no son Claude, por lo que las actualizaciones de Claude Code pueden cambiar comportamientos de los que depende NeoSwitch.
 
-Consulta [docs/protocol-contract.md](../docs/protocol-contract.md) para el contrato del endpoint y la matriz de compatibilidad, y [docs/antigravity.md](../docs/antigravity.md) para los detalles de la autenticación ACP.
+## Hoja de ruta
+
+- Más proveedores de modelos, empezando por OpenAI. Los proveedores que ya ofrecen un endpoint compatible con Anthropic se pueden usar definiendo `ANTHROPIC_BASE_URL` directamente y no necesitan NeoSwitch.
+- Binarios precompilados para el plugin, para que ya no necesite Go.
 
 ## Desarrollo
 
