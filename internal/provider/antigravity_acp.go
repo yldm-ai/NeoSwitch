@@ -481,10 +481,23 @@ type acpConn struct {
 
 var _ acp.Client = (*acpConn)(nil)
 
+// acpEnv is the environment agy runs with: NeoSwitch's own, minus Claude Code's variables. agy signs in through its own keyring profile and never needs them, and they can hold an Anthropic API key or the token of the Claude Code session that ran /neoswitch:login.
+func acpEnv(environ []string) []string {
+	env := make([]string, 0, len(environ))
+	for _, kv := range environ {
+		if strings.HasPrefix(kv, "ANTHROPIC_") || strings.HasPrefix(kv, "CLAUDE_") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return env
+}
+
 func startACP(path, agent, cwd string) (*acpConn, error) {
 	// No --dangerously-skip-permissions: agy's own tools must ask through RequestPermission, which always refuses. Tools run only in Claude Code, under its permission rules.
 	cmd := exec.Command(path, "acp", "--agent", agent)
 	cmd.Dir = cwd
+	cmd.Env = acpEnv(os.Environ())
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, fmt.Errorf("start Antigravity ACP: %w", err)

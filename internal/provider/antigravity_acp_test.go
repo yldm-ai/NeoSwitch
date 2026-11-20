@@ -451,6 +451,13 @@ func TestFindAntigravityCLIFallsBackToInstallerLocation(t *testing.T) {
 	}
 }
 
+func TestACPEnvDropsClaudeCodeVariables(t *testing.T) {
+	got := acpEnv([]string{"ANTHROPIC_API_KEY=sk-ant", "ANTHROPIC_AUTH_TOKEN=tok", "CLAUDE_PROJECT_DIR=/p", "HOME=/h", "HTTPS_PROXY=http://p:1"})
+	if want := []string{"HOME=/h", "HTTPS_PROXY=http://p:1"}; !slices.Equal(got, want) {
+		t.Fatalf("acpEnv = %v, want %v", got, want)
+	}
+}
+
 func generateWithDeadline(t *testing.T, a *AntigravityACP) error {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)

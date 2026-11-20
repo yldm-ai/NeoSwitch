@@ -291,3 +291,34 @@ func TestSaveBackendKeepsAddressAndToken(t *testing.T) {
 		t.Fatalf("choice not cleared: %+v", loaded)
 	}
 }
+
+// A cloned repository can commit .claude/settings.local.json.neoswitch.tmp, the temp name older versions used, as a symlink to a file of the user's. Enabling the project must not write through it.
+func TestEnableDoesNotWriteThroughPlantedSymlink(t *testing.T) {
+	project := t.TempDir()
+	victim := filepath.Join(t.TempDir(), "authorized_keys")
+	if err := os.WriteFile(victim, []byte("ssh-ed25519 AAAA user\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := settingsPath(project)
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{path + ".neoswitch.tmp", path + ".tmp"} {
+		if err := os.Symlink(victim, name); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := Enable(project, State{Listen: "127.0.0.1:4711", Token: "tok"}); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(victim); string(data) != "ssh-ed25519 AAAA user\n" {
+		t.Fatalf("victim file was overwritten: %q", data)
+	}
+	if info, err := os.Lstat(path); err != nil || info.Mode()&os.ModeSymlink != 0 || info.Mode().Perm() != 0o600 {
+		t.Fatalf("settings file: %v, %v", info, err)
+	}
+	entries, _ := os.ReadDir(filepath.Dir(path))
+	if len(entries) != 3 {
+		t.Fatalf("want the settings file and the two planted links, got %v", entries)
+	}
+}

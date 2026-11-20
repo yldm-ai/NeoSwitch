@@ -154,7 +154,24 @@ func serve() error {
 	if listen == "" {
 		listen = "127.0.0.1:8080"
 	}
-	return serveWithListener(backend, model, listen, os.Getenv("NEOSWITCH_AUTH_TOKEN"))
+	token := os.Getenv("NEOSWITCH_AUTH_TOKEN")
+	if token == "" && !loopbackAddress(listen) {
+		return fmt.Errorf("NEOSWITCH_LISTEN=%s accepts connections from other computers, which could then use your Google account or API key: set NEOSWITCH_AUTH_TOKEN, or listen on 127.0.0.1", listen)
+	}
+	return serveWithListener(backend, model, listen, token)
+}
+
+// loopbackAddress reports whether a listen address only accepts connections from this computer. An empty host listens on every interface.
+func loopbackAddress(listen string) bool {
+	host, _, err := net.SplitHostPort(listen)
+	if err != nil || host == "" {
+		return false
+	}
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 func claude(args []string) error {
@@ -327,5 +344,5 @@ Environment:
   CLAUDE_CLI_PATH      Claude executable (default: claude)
   ANTIGRAVITY_CLI_PATH  Antigravity executable (default: agy on PATH, then ~/.local/bin/agy)
   NEOSWITCH_LISTEN     serve listen address (default: 127.0.0.1:8080)
-  NEOSWITCH_AUTH_TOKEN optional token for standalone serve`)
+  NEOSWITCH_AUTH_TOKEN token for standalone serve, required off loopback`)
 }
