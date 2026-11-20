@@ -44,6 +44,8 @@ func main() {
 		err = on(os.Args[2:])
 	case "off":
 		err = off(os.Args[2:])
+	case "key":
+		err = keyCommand(os.Args[2:])
 	case "status":
 		err = status(os.Args[2:])
 	case "backend":
@@ -309,6 +311,7 @@ Usage:
   neoswitch antigravity probe                 verify the official agy session without reading its token
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [all] [project]               route them back to Anthropic (all: every project NeoSwitch turned on)
+  neoswitch key [project]                     paste a Gemini API key in a local browser page, then turn the project on
   neoswitch status [-v] [project]             show whether a project uses NeoSwitch and what to do next (-v adds details)
   neoswitch backend [auto|antigravity|gemini|openai]  show or choose the upstream (openai is opt-in and experimental)
   neoswitch doctor                            check that the credentials can use the model

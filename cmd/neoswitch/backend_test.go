@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/yldm-ai/neo-switch/internal/daemon"
 	"github.com/yldm-ai/neo-switch/internal/provider"
@@ -174,7 +177,7 @@ func TestOnRefusesWithoutBackend(t *testing.T) {
 			t.Fatalf("%s was written: %v", path, err)
 		}
 	}
-	if message := errNoBackend.Error(); !strings.Contains(message, "/neoswitch:login") || strings.Contains(message, "export") {
+	if message := errNoBackend.Error(); !strings.Contains(message, "/neoswitch:login") || !strings.Contains(message, "/neoswitch:key") || strings.Contains(message, "export") {
 		t.Fatalf("errNoBackend must name the slash command and no shell step: %q", message)
 	}
 }
@@ -519,5 +522,157 @@ func TestOffOneProject(t *testing.T) {
 	}
 	if err := off([]string{"some", project}); err == nil {
 		t.Fatal("an unknown argument must be rejected")
+	}
+}
+
+func TestSavedGeminiKey(t *testing.T) {
+	state := isolateBackendEnv(t, true)
+	if err := daemon.SaveGeminiAPIKey(state, "saved-key-0123456789012345678901234"); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustResolve(t); got != backendGemini {
+		t.Fatalf("a saved key selects gemini without a saved choice, got %q", got)
+	}
+	if _, _, _, err := configuredBackend(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := os.Getenv("GEMINI_API_KEY"); got != "saved-key-0123456789012345678901234" {
+		t.Fatalf("the saved key must reach the Gemini client, got %q", got)
+	}
+	t.Setenv("GEMINI_API_KEY", "from-environment")
+	if _, _, _, err := configuredBackend(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := os.Getenv("GEMINI_API_KEY"); got != "from-environment" {
+		t.Fatalf("the environment must win over the saved key, got %q", got)
+	}
+}
+
+func TestLastSetupCommandDecidesBackend(t *testing.T) {
+	state := isolateBackendEnv(t, true)
+	t.Setenv("GEMINI_API_KEY", "for-another-tool")
+	// /neoswitch:login saves antigravity.
+	if _, err := daemon.SaveBackend(state, backendAntigravity); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustResolve(t); got != backendAntigravity {
+		t.Fatalf("after login got %q", got)
+	}
+	// /neoswitch:key saves gemini.
+	if data, status := saveGeminiKeyAndEnable("AIza0123456789012345678901234567890abcd", t.TempDir()); status != http.StatusOK || data.EnableError != "" {
+		t.Fatalf("key setup = %d %+v", status, data)
+	}
+	if got := mustResolve(t); got != backendGemini {
+		t.Fatalf("after /neoswitch:key got %q", got)
+	}
+	t.Setenv(backendEnv, backendOpenAI)
+	if got := mustResolve(t); got != backendOpenAI {
+		t.Fatalf("%s must still override, got %q", backendEnv, got)
+	}
+}
+
+func TestKeyPage(t *testing.T) {
+	const key = "AIzaSyTest0123456789abcdefghijklmnopqrs"
+	state := isolateBackendEnv(t, true)
+	project := t.TempDir()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	served := make(chan error, 1)
+	urls := make(chan string, 1)
+	go func() {
+		served <- runKeyPage(listener, "secret-token", project, time.Minute, func(url string) { urls <- url })
+	}()
+	url := <-urls
+	origin := "http://" + listener.Addr().String()
+	post := func(target, origin, value string) (int, string) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodPost, target, strings.NewReader("key="+value))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		body, _ := io.ReadAll(resp.Body)
+		return resp.StatusCode, string(body)
+	}
+
+	resp, err := http.Get(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK || !strings.Contains(string(body), `type="password"`) || !strings.Contains(string(body), geminiKeyURL) || resp.Header.Get("Referrer-Policy") != "no-referrer" {
+		t.Fatalf("form = %d %v\n%s", resp.StatusCode, resp.Header, body)
+	}
+	for _, tc := range []struct {
+		name, target, origin, value string
+		status                      int
+	}{
+		{"wrong path", origin + "/guess", origin, key, http.StatusNotFound},
+		{"no origin", url, "", key, http.StatusForbidden},
+		{"other origin", url, "http://evil.example", key, http.StatusForbidden},
+		{"not a key", url, origin, "hello", http.StatusBadRequest},
+	} {
+		if status, body := post(tc.target, tc.origin, tc.value); status != tc.status || strings.Contains(body, key) {
+			t.Fatalf("%s: status %d, want %d\n%s", tc.name, status, tc.status, body)
+		}
+	}
+	if saved, _ := daemon.LoadGeminiAPIKey(state); saved != "" {
+		t.Fatal("a rejected request saved a key")
+	}
+	if status, page := post(url, origin, key); status != http.StatusOK || !strings.Contains(page, "/exit") || strings.Contains(page, key) {
+		t.Fatalf("save = %d\n%s", status, page)
+	}
+	select {
+	case err := <-served:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("the page kept running after the key was saved")
+	}
+	if saved, _ := daemon.LoadGeminiAPIKey(state); saved != key {
+		t.Fatalf("saved key = %q", saved)
+	}
+	if loaded, _, _ := daemon.LoadState(state); loaded.Backend != backendGemini {
+		t.Fatalf("backend = %q", loaded.Backend)
+	}
+	if env := readEnv(t, project); env["ANTHROPIC_BASE_URL"] == nil {
+		t.Fatalf("project not turned on: %v", env)
+	}
+	if projects, _ := daemon.Projects(state); len(projects) != 1 || projects[0] != project {
+		t.Fatalf("registry = %v", projects)
+	}
+}
+
+func TestKeyPageGivesUp(t *testing.T) {
+	isolateBackendEnv(t, true)
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := runKeyPage(listener, "t", t.TempDir(), 50*time.Millisecond, func(string) {}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPlausibleGeminiKey(t *testing.T) {
+	for key, want := range map[string]bool{
+		"AIzaSyTest0123456789abcdefghijklmnopqrs": true,
+		"short": false,
+		"AIzaSy Test0123456789abcdefghijklmnopqrs":   false,
+		"export GEMINI_API_KEY=AIzaSyTest0123456789": false,
+		strings.Repeat("a", 201):                     false,
+	} {
+		if got := plausibleGeminiKey(key); got != want {
+			t.Errorf("%q: got %v", key, got)
+		}
 	}
 }

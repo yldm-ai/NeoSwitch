@@ -10,6 +10,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // State is the proxy address and token shared by every enabled project. It is created once and reused so that settings written into projects stay valid across daemon restarts.
@@ -99,6 +100,25 @@ func writeState(dir string, s State) error {
 		return err
 	}
 	return os.Rename(tmp, statePath(dir))
+}
+
+func geminiKeyPath(dir string) string { return filepath.Join(dir, "gemini-api-key") }
+
+// SaveGeminiAPIKey stores the Gemini API key entered with /neoswitch:key. The file is private to the user and replaced atomically, so it is never readable by others or left half written.
+func SaveGeminiAPIKey(dir, key string) error {
+	return writePrivate(geminiKeyPath(dir), []byte(key+"\n"))
+}
+
+// LoadGeminiAPIKey returns the key saved by SaveGeminiAPIKey, or "" when none is saved.
+func LoadGeminiAPIKey(dir string) (string, error) {
+	data, err := os.ReadFile(geminiKeyPath(dir))
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(data)), nil
 }
 
 // writePrivate replaces path with data through a new temp file in the same directory, created with mode 0600, so the content is never readable by other users or left half written.

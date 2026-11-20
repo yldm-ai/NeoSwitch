@@ -185,6 +185,29 @@ func TestCorruptStateIsSetAside(t *testing.T) {
 	}
 }
 
+func TestGeminiAPIKeyIsPrivate(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "state")
+	if key, err := LoadGeminiAPIKey(dir); err != nil || key != "" {
+		t.Fatalf("no key saved yet: %q %v", key, err)
+	}
+	for _, key := range []string{"first-key", "second-key"} {
+		if err := SaveGeminiAPIKey(dir, key); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := LoadGeminiAPIKey(dir); err != nil || got != key {
+			t.Fatalf("loaded %q %v, want %q", got, err, key)
+		}
+	}
+	info, err := os.Stat(filepath.Join(dir, "gemini-api-key"))
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("key file mode = %v %v", info.Mode(), err)
+	}
+	entries, _ := os.ReadDir(dir)
+	if len(entries) != 1 {
+		t.Fatalf("temp files left: %v", entries)
+	}
+}
+
 func TestProjectRegistry(t *testing.T) {
 	dir := t.TempDir()
 	for _, project := range []string{"/a", "/b", "/a", "/c"} {

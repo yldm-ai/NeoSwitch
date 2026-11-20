@@ -19,6 +19,8 @@ Query strings such as `?beta=true` are ignored. Every POST endpoint requires the
 
 genai resolves credentials from the standard environment: `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) for the Gemini Developer API, or `GOOGLE_GENAI_USE_VERTEXAI=true` with `GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_LOCATION` and Application Default Credentials for Vertex AI. The Developer API is called on `v1beta` unless `GOOGLE_GENAI_API_VERSION` is set. `GEMINI_BASE_URL` overrides the API host; a trailing `/v1beta` or `/v1` is accepted and stripped.
 
+When neither `GEMINI_API_KEY` nor `GOOGLE_API_KEY` is set and Vertex AI is not selected, NeoSwitch uses the key saved by `neoswitch key` (`/neoswitch:key`) in `gemini-api-key` in its state directory (mode 0600), passing it to genai as `GEMINI_API_KEY`. A key in the environment always wins over the saved one.
+
 ## Request translation
 
 - `model` is accepted for Claude Code compatibility; the backend model is selected by `GEMINI_MODEL`.

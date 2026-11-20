@@ -28,9 +28,9 @@ const (
 	pluginAntigravityEnv = "CLAUDE_PLUGIN_OPTION_ANTIGRAVITY_OAUTH"
 )
 
-var errNoBackend = errors.New("NeoSwitch is not set up yet: run /neoswitch:login to sign in with your Google account, or set up a Gemini API key first")
+var errNoBackend = errors.New("NeoSwitch is not set up yet: run /neoswitch:key to use a Gemini API key, or /neoswitch:login to sign in with your Google account")
 
-// resolveBackend decides which upstream to use and why. An explicit choice wins: NEOSWITCH_BACKEND, then the choice saved by /neoswitch:login or `neoswitch backend`. Without one, Gemini credentials in the environment select the Gemini API, and otherwise an installed agy selects Antigravity OAuth. OpenAI is only used when chosen explicitly, even if OPENAI_API_KEY is set.
+// resolveBackend decides which upstream to use and why. An explicit choice wins: NEOSWITCH_BACKEND, then the choice saved by whichever of /neoswitch:login (antigravity), /neoswitch:key (gemini) or `neoswitch backend` ran last. Without one, Gemini credentials in the environment or a key saved by /neoswitch:key select the Gemini API, and otherwise an installed agy selects Antigravity OAuth. OpenAI is only used when chosen explicitly, even if OPENAI_API_KEY is set.
 func resolveBackend() (kind, reason string, err error) {
 	switch value := strings.ToLower(strings.TrimSpace(os.Getenv(backendEnv))); value {
 	case backendAntigravity, backendGemini, backendOpenAI:
@@ -54,10 +54,10 @@ func resolveBackend() (kind, reason string, err error) {
 		return "", "", err
 	}
 	if ok && state.Backend != "" {
-		return state.Backend, "chosen with /neoswitch:login or `neoswitch backend`", nil
+		return state.Backend, "chosen with /neoswitch:login, /neoswitch:key or `neoswitch backend`", nil
 	}
 	if geminiCredentialConfigured() {
-		return backendGemini, "Gemini credentials found in the environment", nil
+		return backendGemini, "Gemini credentials found in the environment or saved with /neoswitch:key", nil
 	}
 	if antigravityCLIAvailable() {
 		return backendAntigravity, "agy is installed and no Gemini credentials are set", nil
@@ -88,15 +88,25 @@ func configuredBackend(ctx context.Context) (server.Backend, string, string, err
 		}
 		return backend, backend.Model, backendLabel(kind, ""), nil
 	}
-	if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GOOGLE_API_KEY") == "" && os.Getenv(pluginKeyEnv) != "" {
-		_ = os.Setenv("GEMINI_API_KEY", os.Getenv(pluginKeyEnv))
+	// A key in the environment wins over one saved with /neoswitch:key, and Vertex AI settings win over both. genai reads the key from the environment, so the saved one is passed on that way, also to the daemon spawned from this process.
+	if os.Getenv("GEMINI_API_KEY") == "" && os.Getenv("GOOGLE_API_KEY") == "" {
+		if os.Getenv(pluginKeyEnv) != "" {
+			_ = os.Setenv("GEMINI_API_KEY", os.Getenv(pluginKeyEnv))
+		} else if !vertexConfigured() {
+			saved, err := savedGeminiKey()
+			if err != nil {
+				return nil, "", "", fmt.Errorf("NeoSwitch cannot read the saved Gemini API key (%w): run /neoswitch:key to save it again", err)
+			}
+			if saved != "" {
+				_ = os.Setenv("GEMINI_API_KEY", saved)
+			}
+		}
 	}
 	if !geminiCredentialConfigured() {
-		err := errors.New("NeoSwitch is set to use a Gemini API key, but no key is set up (GEMINI_API_KEY)")
 		if antigravityCLIAvailable() {
-			return nil, "", "", fmt.Errorf("%w; set one up, or run /neoswitch:login to sign in with your Google account instead", err)
+			return nil, "", "", errors.New("NeoSwitch is set to use a Gemini API key, but none is saved: run /neoswitch:key to add one, or /neoswitch:login to sign in with your Google account instead")
 		}
-		return nil, "", "", err
+		return nil, "", "", errors.New("NeoSwitch is set to use a Gemini API key, but none is saved: run /neoswitch:key to add one")
 	}
 	backend, err := provider.NewGeminiFromEnv(ctx)
 	if err != nil {
@@ -188,10 +198,25 @@ func printDaemonSwitchNote(kind string) {
 }
 
 func geminiCredentialConfigured() bool {
-	if strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")) != "" || strings.TrimSpace(os.Getenv(pluginKeyEnv)) != "" {
+	if strings.TrimSpace(os.Getenv("GEMINI_API_KEY")) != "" || strings.TrimSpace(os.Getenv("GOOGLE_API_KEY")) != "" || strings.TrimSpace(os.Getenv(pluginKeyEnv)) != "" || vertexConfigured() {
 		return true
 	}
+	// An unreadable key file counts as no key here; configuredBackend reports the read error.
+	key, _ := savedGeminiKey()
+	return key != ""
+}
+
+func vertexConfigured() bool {
 	return truthy(os.Getenv("GOOGLE_GENAI_USE_ENTERPRISE")) || truthy(os.Getenv("GOOGLE_GENAI_USE_VERTEXAI"))
+}
+
+// savedGeminiKey returns the key saved by /neoswitch:key, or "" when there is none.
+func savedGeminiKey() (string, error) {
+	dir, err := daemon.Dir()
+	if err != nil {
+		return "", err
+	}
+	return daemon.LoadGeminiAPIKey(dir)
 }
 
 func antigravityCLIAvailable() bool {
