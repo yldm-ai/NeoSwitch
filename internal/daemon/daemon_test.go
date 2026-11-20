@@ -48,6 +48,10 @@ func TestEnableAndDisablePreserveOtherSettings(t *testing.T) {
 	if env["FOO"] != "bar" || env[envBaseURL] != "http://127.0.0.1:4711" || env[envAuthToken] != "tok" || settings["permissions"] == nil {
 		t.Fatalf("settings after enable = %s", data)
 	}
+	// Without this, a session started by a gateway launcher keeps the launcher's ANTHROPIC_BASE_URL and bypasses the proxy.
+	if env[EnvUseGateway] != "0" {
+		t.Fatalf("enable must turn Claude Code gateway mode off: %s", data)
+	}
 
 	if err := Disable(project, s); err != nil {
 		t.Fatal(err)
