@@ -164,7 +164,7 @@ go install ./cmd/neoswitch
 neoswitch doctor              # Claude CLI と、認証情報でモデルを使えるかを確認
 neoswitch antigravity login   # 公式 agy クライアントで ACP OAuth ログイン
 neoswitch antigravity probe   # 保存済みの agy セッションを確認（認証情報は表示しない）
-neoswitch models              # 設定されたモデルを表示
+neoswitch models              # 認証情報で使えるモデルを一覧表示し、設定中のモデルに印を付ける
 neoswitch on [project]        # プロジェクトのルーティングを有効化
 neoswitch off [project]       # プロジェクトのルーティングを無効化
 neoswitch status [project]    # ルーティングとデーモンの状態を表示

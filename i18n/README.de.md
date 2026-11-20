@@ -164,7 +164,7 @@ Häufige Befehle:
 neoswitch doctor              # Claude-CLI prüfen und ob die Zugangsdaten das Modell nutzen können
 neoswitch antigravity login   # ACP-OAuth-Anmeldung über den offiziellen agy-Client
 neoswitch antigravity probe   # gespeicherte agy-Sitzung prüfen, ohne Zugangsdaten auszugeben
-neoswitch models              # konfiguriertes Modell ausgeben
+neoswitch models              # mit den Zugangsdaten nutzbare Modelle auflisten, das konfigurierte markiert
 neoswitch on [project]        # Routing für ein Projekt aktivieren
 neoswitch off [project]       # Routing für ein Projekt deaktivieren
 neoswitch status [project]    # Routing und Daemon-Status anzeigen

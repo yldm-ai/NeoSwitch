@@ -164,7 +164,7 @@ Common commands:
 neoswitch doctor              # check the Claude CLI and whether the credentials can use the model
 neoswitch antigravity login   # ACP OAuth login through the official agy client
 neoswitch antigravity probe   # verify the saved agy session without printing credentials
-neoswitch models              # print the configured model
+neoswitch models              # list the models the credentials can use, marking the configured one
 neoswitch on [project]        # enable routing for a project
 neoswitch off [project]       # disable routing for a project
 neoswitch status [project]    # show routing and daemon state

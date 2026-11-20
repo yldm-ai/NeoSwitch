@@ -258,6 +258,74 @@ func TestCheckReportsUnreachableUpstream(t *testing.T) {
 	}
 }
 
+func TestListModelsFollowsPagesAndKeepsGenerativeModels(t *testing.T) {
+	var queries []string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/v1beta/models" {
+			t.Errorf("request = %s %s", r.Method, r.URL.Path)
+		}
+		queries = append(queries, r.URL.Query().Get("pageToken"))
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Query().Get("pageToken") {
+		case "":
+			_, _ = w.Write([]byte(`{"models":[
+				{"name":"models/gemini-z-pro","supportedGenerationMethods":["generateContent","countTokens"]},
+				{"name":"models/text-embedding-9","supportedGenerationMethods":["embedContent"]}
+			],"nextPageToken":"p2"}`))
+		case "p2":
+			_, _ = w.Write([]byte(`{"models":[
+				{"name":"models/gemini-4-neon","supportedGenerationMethods":["generateContent"]},
+				{"name":"models/imagen-9","supportedGenerationMethods":["predict"]},
+				{"name":"models/aqa"}
+			]}`))
+		default:
+			t.Errorf("unexpected page token %q", r.URL.Query().Get("pageToken"))
+		}
+	}))
+	defer upstream.Close()
+	isolate(t, upstream.URL)
+	backend, err := NewGeminiFromEnv(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := backend.ListModels(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"gemini-4-neon", "gemini-z-pro"}; strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("models = %v, want %v", got, want)
+	}
+	if strings.Join(queries, ",") != ",p2" {
+		t.Fatalf("page tokens requested = %q", queries)
+	}
+}
+
+func TestListModelsNamesTheFailure(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Query().Get("pageToken") == "" {
+			_, _ = w.Write([]byte(`{"models":[{"name":"models/gemini-4-neon","supportedGenerationMethods":["generateContent"]}],"nextPageToken":"p2"}`))
+			return
+		}
+		// The failure on a later page must not be swallowed into a partial list.
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"reason":"API_KEY_INVALID"}]}}`))
+	}))
+	defer upstream.Close()
+	isolate(t, upstream.URL)
+	backend, err := NewGeminiFromEnv(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	models, err := backend.ListModels(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "list models") || !strings.Contains(err.Error(), "authentication failed") {
+		t.Fatalf("models = %v, err = %v", models, err)
+	}
+	if strings.Contains(err.Error(), "test-key") {
+		t.Fatalf("error leaks the API key: %v", err)
+	}
+}
+
 const (
 	effortRequest   = `{"max_tokens":5,"output_config":{"effort":"high"},"messages":[{"role":"user","content":"hi"}]}`
 	generateOK      = `{"candidates":[{"content":{"role":"model","parts":[{"text":"OK"}]},"finishReason":"STOP"}]}`

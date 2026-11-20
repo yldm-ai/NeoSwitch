@@ -8,6 +8,7 @@ import (
 	"iter"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync/atomic"
 
@@ -171,6 +172,37 @@ func (g *Gemini) Check(ctx context.Context) error {
 		return checkError(ctx, "generate with "+g.Model, err)
 	}
 	return nil
+}
+
+// ListModels returns the IDs of the models these credentials can generate content with, sorted, following every page of models.list. The Gemini Developer API reports each model's supported methods, so embedding-only and other non-generating models are left out. Vertex AI reports none, so there Gemini models are kept by name.
+func (g *Gemini) ListModels(ctx context.Context) ([]string, error) {
+	vertex := g.client.ClientConfig().Backend == genai.BackendVertexAI
+	var ids []string
+	page, err := g.client.Models.List(ctx, nil)
+	for {
+		if err != nil {
+			return nil, checkError(ctx, "list models", err)
+		}
+		for _, model := range page.Items {
+			id := model.Name[strings.LastIndex(model.Name, "/")+1:]
+			if id != "" && generatesContent(model, id, vertex) {
+				ids = append(ids, id)
+			}
+		}
+		page, err = page.Next(ctx)
+		if errors.Is(err, genai.ErrPageDone) {
+			break
+		}
+	}
+	slices.Sort(ids)
+	return slices.Compact(ids), nil
+}
+
+func generatesContent(model *genai.Model, id string, vertex bool) bool {
+	if vertex && len(model.SupportedActions) == 0 {
+		return strings.HasPrefix(id, "gemini-")
+	}
+	return slices.Contains(model.SupportedActions, "generateContent")
 }
 
 func checkError(ctx context.Context, step string, err error) error {

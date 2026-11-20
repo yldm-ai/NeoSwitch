@@ -164,7 +164,7 @@ go install ./cmd/neoswitch
 neoswitch doctor              # 检查 Claude CLI，以及凭证能否使用该模型
 neoswitch antigravity login   # 通过官方 agy 客户端完成 ACP OAuth 登录
 neoswitch antigravity probe   # 检查已保存的 agy 会话，不打印凭证
-neoswitch models              # 打印当前配置的模型
+neoswitch models              # 列出凭证可用的模型，并标记当前配置的模型
 neoswitch on [project]        # 为项目启用路由
 neoswitch off [project]       # 为项目关闭路由
 neoswitch status [project]    # 查看路由和 daemon 状态
