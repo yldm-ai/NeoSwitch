@@ -17,7 +17,7 @@ import (
 	acp "github.com/coder/acp-go-sdk"
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/NeoSwitch/internal/translate"
+	"github.com/yldm-ai/neon-switch/internal/translate"
 )
 
 // AntigravityACP uses the official agy ACP server as the upstream model session. It never reads Antigravity credentials: agy resolves its own OAuth profile from the platform keyring.

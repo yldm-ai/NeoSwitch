@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/yldm-ai/NeoSwitch/internal/daemon"
+	"github.com/yldm-ai/neon-switch/internal/daemon"
 )
 
 // isolateBackendEnv clears every input resolveBackend reads, points the state at a temp dir, and makes agy available or not.

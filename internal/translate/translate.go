@@ -9,7 +9,7 @@ import (
 
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/NeoSwitch/internal/anthropic"
+	"github.com/yldm-ai/neon-switch/internal/anthropic"
 )
 
 // Request is a translated Anthropic Messages request, ready for genai's Models.GenerateContent / GenerateContentStream / CountTokens.

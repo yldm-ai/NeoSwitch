@@ -2,7 +2,9 @@
 
 [English](../README.md) | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md) | [日本語](README.ja.md) | [한국어](README.ko.md) | [Español](README.es.md) | [Français](README.fr.md) | **Deutsch** | [Português (Brasil)](README.pt-BR.md) | [Русский](README.ru.md)
 
-[![CI](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/NeoSwitch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/NeoSwitch.svg)](https://pkg.go.dev/github.com/yldm-ai/NeoSwitch) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/NeoSwitch/blob/main/LICENSE)
+[![CI](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml/badge.svg)](https://github.com/yldm-ai/neon-switch/actions/workflows/test.yml) [![Go Reference](https://pkg.go.dev/badge/github.com/yldm-ai/neon-switch.svg)](https://pkg.go.dev/github.com/yldm-ai/neon-switch) [![Go version](https://img.shields.io/github/go-mod/go-version/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/blob/main/go.mod) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/yldm-ai/neon-switch/blob/main/LICENSE) [![Last commit](https://img.shields.io/github/last-commit/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/commits/main) [![GitHub stars](https://img.shields.io/github/stars/yldm-ai/neon-switch)](https://github.com/yldm-ai/neon-switch/stargazers)
+
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/yldm-ai/neon-switch/blob/main/.claude-plugin/plugin.json) [![Model: Gemini 4 Neon](https://img.shields.io/badge/model-Gemini%204%20Neon-4285F4)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md) [![Platform: macOS and Linux](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey)](https://github.com/yldm-ai/neon-switch/releases) [![Proxy: local-only](https://img.shields.io/badge/proxy-local--only-2ea44f)](https://github.com/yldm-ai/neon-switch/blob/main/docs/protocol-contract.md)
 
 **Keep Claude Code. Switch your models.**
 
@@ -43,7 +45,7 @@ OAuth-Zugangsdaten bleiben immer in `agy`. NeoSwitch liest, kopiert oder exporti
 Führen Sie diese Befehle in Claude Code aus:
 
 ```text
-/plugin marketplace add yldm-ai/NeoSwitch
+/plugin marketplace add yldm-ai/neon-switch
 /plugin install neoswitch@neoswitch
 ```
 
@@ -149,7 +151,7 @@ Bei der OAuth-Route startet der Daemon den offiziellen Unterprozess `agy acp`. N
 
 ## Eigenständige CLI
 
-Jede getaggte Version veröffentlicht auf der Seite [Releases](https://github.com/yldm-ai/NeoSwitch/releases) Binaries für macOS (Apple Silicon und Intel), Linux (amd64 und arm64) und Windows (amd64) mit SHA-256-Prüfsummen. Der Windows-Build wird kompiliert, ist aber noch nicht getestet. Sie können auch aus dem Quellcode bauen:
+Jede getaggte Version veröffentlicht auf der Seite [Releases](https://github.com/yldm-ai/neon-switch/releases) Binaries für macOS (Apple Silicon und Intel), Linux (amd64 und arm64) und Windows (amd64) mit SHA-256-Prüfsummen. Der Windows-Build wird kompiliert, ist aber noch nicht getestet. Sie können auch aus dem Quellcode bauen:
 
 ```bash
 go build -o neoswitch ./cmd/neoswitch

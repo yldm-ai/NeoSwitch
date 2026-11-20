@@ -14,7 +14,7 @@ import (
 	acp "github.com/coder/acp-go-sdk"
 	"google.golang.org/genai"
 
-	"github.com/yldm-ai/NeoSwitch/internal/translate"
+	"github.com/yldm-ai/neon-switch/internal/translate"
 )
 
 // ---- prompt ----
