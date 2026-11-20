@@ -84,9 +84,9 @@ Close and reopen Claude Code in that project. Check the route with:
 /neoswitch:status
 ```
 
-The status should show `NeoSwitch ... -> gemini-4-neon`. Claude Code can still display its requested label, such as `claude-opus-5-5`, in the session header; the upstream route is the one `/neoswitch:status` shows.
+When it works, the new session opens with a note such as `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.`, and `/neoswitch:status` answers `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` Claude Code can still display its requested label, such as `claude-opus-5-5`, in the session header; NeoSwitch's note and `/neoswitch:status` show the model that actually answers.
 
-`/neoswitch:on` and `/neoswitch:off` change routing without signing in.
+`/neoswitch:on` and `/neoswitch:off` switch the project without signing in again. `/neoswitch:on` stops with a message, and changes nothing, until a Gemini API key or the Antigravity sign-in is set up.
 
 ## Other credential paths
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | Authenticate with Antigravity OAuth, enable this project's Neon route, and use ACP |
 | `/neoswitch:on` | Enable routing for new Claude Code sessions in this project |
-| `/neoswitch:status` | Show the project route and daemon state |
+| `/neoswitch:status` | Say whether this project and session use Gemini 4 Neon, and what to do next |
 | `/neoswitch:off` | Disable routing for new sessions in this project |
 
 After changing routing, start a new Claude Code session. The current session keeps its existing connection.
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # verify the saved agy session without printing cr
 neoswitch models              # list the models the credentials can use, marking the configured one
 neoswitch on [project]        # enable routing for a project
 neoswitch off [project]       # disable routing for a project
-neoswitch status [project]    # show routing and daemon state
+neoswitch status [-v] [project] # show whether a project uses NeoSwitch and what to do next (-v adds details)
 neoswitch version             # print the NeoSwitch version
 ```
 

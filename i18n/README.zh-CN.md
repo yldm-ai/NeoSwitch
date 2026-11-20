@@ -84,9 +84,9 @@ claude plugin update neoswitch@neoswitch
 /neoswitch:status
 ```
 
-状态应显示 `NeoSwitch ... -> gemini-4-neon`。Claude Code 的会话顶部仍可能显示它请求的标签，例如 `claude-opus-5-5`；实际的上游路由以 `/neoswitch:status` 显示的为准。
+正常时，新会话开头会显示类似 `NeoSwitch: this session uses Gemini 4 Neon through a Gemini API key.` 的提示，`/neoswitch:status` 会回答 `This session uses Gemini 4 Neon through ..., and NeoSwitch is running.` Claude Code 的会话顶部仍可能显示它请求的标签，例如 `claude-opus-5-5`；实际回答的模型以 NeoSwitch 的提示和 `/neoswitch:status` 显示的为准。
 
-`/neoswitch:on` 和 `/neoswitch:off` 只切换路由，不会登录。
+`/neoswitch:on` 和 `/neoswitch:off` 只切换项目，不需要重新登录。还没有设置 Gemini API key 或 Antigravity 登录时，`/neoswitch:on` 会显示提示并停下，不做任何改动。
 
 ## 其他凭证方式
 
@@ -130,7 +130,7 @@ go run ./cmd/neoswitch claude
 |---|---|
 | `/neoswitch:login` | 通过 Antigravity OAuth 认证，启用当前项目的 Neon 路由并使用 ACP |
 | `/neoswitch:on` | 为当前项目的新 Claude Code 会话启用路由 |
-| `/neoswitch:status` | 查看项目路由和 daemon 状态 |
+| `/neoswitch:status` | 说明这个项目和当前会话是否在用 Gemini 4 Neon，以及下一步该做什么 |
 | `/neoswitch:off` | 为当前项目的新会话关闭路由 |
 
 修改路由后要新开 Claude Code 会话。当前会话会保持原来的连接。
@@ -182,7 +182,7 @@ neoswitch antigravity probe   # 检查已保存的 agy 会话，不打印凭证
 neoswitch models              # 列出凭证可用的模型，并标记当前配置的模型
 neoswitch on [project]        # 为项目启用路由
 neoswitch off [project]       # 为项目关闭路由
-neoswitch status [project]    # 查看路由和 daemon 状态
+neoswitch status [-v] [project] # 查看项目是否在用 NeoSwitch 以及下一步（-v 显示详情）
 neoswitch version             # 打印 NeoSwitch 版本
 ```
 
