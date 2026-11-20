@@ -47,6 +47,8 @@ const (
 //   - stream, tool: answer with streamEnvelope or a tool call, one character per chunk
 //   - refusal: answers nothing with stopReason refusal
 //   - no-models, grouped-models: sessions offer no model option, or offer fakeModels in groups; every other mode offers them ungrouped
+//   - init-hang, init-exit: initialize never answers, or the process dies on it, as an agy stuck on an update or one that exits right away
+//   - auth-required, rpc-error: prompts fail with the ACP auth_required error, or with an internal JSON-RPC error
 func runFakeACP(mode string) {
 	in := bufio.NewScanner(os.Stdin)
 	in.Buffer(make([]byte, 64<<10), 32<<20)
@@ -140,6 +142,12 @@ func runFakeACP(mode string) {
 			}
 			answer(p)
 		case "initialize":
+			switch mode {
+			case "init-hang":
+				continue
+			case "init-exit":
+				os.Exit(1)
+			}
 			reply(map[string]any{
 				"protocolVersion":   1,
 				"agentCapabilities": map[string]any{"promptCapabilities": map[string]bool{"image": mode != "no-image"}},
@@ -214,6 +222,12 @@ func runFakeACP(mode string) {
 			p := prompt{id: msg.ID, sid: params.SessionID, answer: string(summary)}
 			prompts++
 			switch mode {
+			case "auth-required":
+				send(map[string]any{"id": msg.ID, "error": map[string]any{"code": -32000, "message": "Authentication required"}})
+				continue
+			case "rpc-error":
+				send(map[string]any{"id": msg.ID, "error": map[string]any{"code": -32603, "message": "Internal error", "data": map[string]string{"error": "boom"}}})
+				continue
 			case "exit":
 				os.Exit(1)
 			case "hang":
@@ -338,6 +352,72 @@ func TestACPGenerateRecoversAfterAgentExit(t *testing.T) {
 	}
 	if got := generatedText(t, resp); got != "text" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+// shortHandshake makes the ACP handshake give up quickly for the duration of a test.
+func shortHandshake(t *testing.T) {
+	t.Helper()
+	previous := acpInitializeTimeout
+	acpInitializeTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { acpInitializeTimeout = previous })
+}
+
+func TestACPFailuresReachClaudeCodeAsPlainSentences(t *testing.T) {
+	shortHandshake(t)
+	for _, tc := range []struct {
+		mode        string
+		unavailable bool
+	}{
+		{"init-hang", true},
+		{"init-exit", true},
+		{"exit", true},
+		{"auth-required", true},
+		{"rpc-error", false},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			a := newFakeACP(t, tc.mode)
+			// The request itself has plenty of time: only the handshake limit may end a stuck agy.
+			ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+			defer cancel()
+			start := time.Now()
+			_, err := a.Generate(ctx, textRequest("hi"))
+			if elapsed := time.Since(start); elapsed > 10*time.Second {
+				t.Fatalf("took %s", elapsed)
+			}
+			var unavailable *translate.UnavailableError
+			var upstream *translate.UpstreamError
+			switch {
+			case tc.unavailable && errors.As(err, &unavailable):
+				if !strings.Contains(unavailable.Message, "/neoswitch:login") {
+					t.Fatalf("message %q does not name the fix", unavailable.Message)
+				}
+			case !tc.unavailable && errors.As(err, &upstream):
+			default:
+				t.Fatalf("unexpected error %T %v", err, err)
+			}
+			if message := err.Error(); strings.ContainsAny(message, "{}") || strings.Contains(message, "-32") || strings.Contains(message, "Gemini") {
+				t.Fatalf("message %q leaks protocol details", message)
+			}
+		})
+	}
+}
+
+func TestACPLoginGivesUpOnStuckHandshake(t *testing.T) {
+	shortHandshake(t)
+	a := newFakeACP(t, "init-hang")
+	err := a.Login(context.Background())
+	if err == nil || !strings.Contains(err.Error(), "did not respond") || !strings.Contains(err.Error(), "/neoswitch:login") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestACPMissingCLIIsReportedWithoutExecDetails(t *testing.T) {
+	t.Setenv("ANTIGRAVITY_CLI_PATH", "")
+	t.Setenv("PATH", t.TempDir())
+	_, err := NewAntigravityACPFromEnv(context.Background())
+	if !errors.Is(err, ErrAntigravityCLIMissing) || strings.Contains(err.Error(), "PATH") || strings.Contains(err.Error(), "exec") {
+		t.Fatalf("got %v", err)
 	}
 }
 

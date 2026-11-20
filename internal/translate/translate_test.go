@@ -184,6 +184,26 @@ func TestToGeminiRejectsWhatItCannotRepresent(t *testing.T) {
 	}
 }
 
+func TestToGeminiExplainsUnsupportedFeaturesPlainly(t *testing.T) {
+	for name, tc := range map[string]struct{ body, want string }{
+		"web search":    {`{"tools":[{"type":"web_search_20250305","name":"web_search"}],"messages":[{"role":"user","content":"a"}]}`, "Web search (WebSearch) does not work with NeoSwitch"},
+		"other server":  {`{"tools":[{"type":"code_execution_20250522","name":"code_execution"}],"messages":[{"role":"user","content":"a"}]}`, `"code_execution_20250522" tool does not work with NeoSwitch`},
+		"url image":     {`{"messages":[{"role":"user","content":[{"type":"image","source":{"type":"url","url":"https://example.com/a.png"}}]}]}`, "cannot send images given as web links"},
+		"url in result": {`{"messages":[{"role":"assistant","content":[{"type":"tool_use","id":"t","name":"x","input":{}}]},{"role":"user","content":[{"type":"tool_result","tool_use_id":"t","content":[{"type":"document","source":{"type":"url","url":"https://example.com/a.pdf"}}]}]}]}`, "cannot send documents given as web links"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := ToGemini(mustDecode(t, tc.body))
+			var unsupported *UnsupportedError
+			if !errors.As(err, &unsupported) {
+				t.Fatalf("expected an UnsupportedError, got %v", err)
+			}
+			if !strings.Contains(unsupported.Message, tc.want) || strings.Contains(unsupported.Message, "[") {
+				t.Fatalf("message %q must contain %q and no field path", unsupported.Message, tc.want)
+			}
+		})
+	}
+}
+
 // TestToGeminiAcceptsClaudeCodeToolSchemas runs every built-in tool schema from a captured Claude Code request through the translator and checks they reach Gemini as JSON Schema, byte-for-byte equivalent.
 func TestToGeminiAcceptsClaudeCodeToolSchemas(t *testing.T) {
 	data, err := os.ReadFile("testdata/claude-code-tools.json")

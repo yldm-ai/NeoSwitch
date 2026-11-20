@@ -108,7 +108,12 @@ func decode(w http.ResponseWriter, r *http.Request, config Config) (anthropic.Me
 	}
 	translated, err := translate.ToGemini(request)
 	if err != nil {
-		writeAPIError(w, http.StatusBadRequest, "invalid_request_error", err.Error())
+		message := err.Error()
+		var unsupported *translate.UnsupportedError
+		if errors.As(err, &unsupported) {
+			message = unsupported.Message
+		}
+		writeAPIError(w, http.StatusBadRequest, "invalid_request_error", message)
 		return anthropic.MessagesRequest{}, translate.Request{}, false
 	}
 	return request, translated, true
@@ -128,8 +133,12 @@ func authorized(r *http.Request, token string) bool {
 	return false
 }
 
-// upstreamStatus maps an upstream failure onto the status and error type Claude Code reacts to: 429 and 529 trigger its backoff, 400 is not retried, and "prompt is too long" triggers its context-compaction hint.
+// upstreamStatus maps an upstream failure onto the status and error type Claude Code reacts to: 429 and 529 trigger its backoff, 400 and 403 are not retried, and "prompt is too long" triggers its context-compaction hint.
 func upstreamStatus(err error) (int, string, string) {
+	var unavailable *translate.UnavailableError
+	if errors.As(err, &unavailable) {
+		return http.StatusForbidden, "permission_error", unavailable.Message
+	}
 	var apiErr genai.APIError
 	if errors.As(err, &apiErr) {
 		message := "upstream returned HTTP " + fmt.Sprint(apiErr.Code) + ": " + apiErr.Message
@@ -138,6 +147,9 @@ func upstreamStatus(err error) (int, string, string) {
 			lower := strings.ToLower(apiErr.Message)
 			if strings.Contains(lower, "input token count") && strings.Contains(lower, "exceeds") {
 				message = "prompt is too long: " + apiErr.Message
+			}
+			if invalidGeminiKey(apiErr) {
+				message = "Google rejected the Gemini API key. Check that the key is correct and still active, then start a new Claude Code session."
 			}
 			return http.StatusBadRequest, "invalid_request_error", message
 		case apiErr.Code == http.StatusUnauthorized:
@@ -163,9 +175,19 @@ func upstreamStatus(err error) (int, string, string) {
 		return http.StatusBadGateway, "api_error", translationErr.Error()
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
-		return http.StatusGatewayTimeout, "api_error", "Gemini did not respond within " + upstreamTimeout.String()
+		return http.StatusGatewayTimeout, "api_error", fmt.Sprintf("The model did not answer within %d minutes. Try again.", int(upstreamTimeout.Minutes()))
 	}
-	return http.StatusBadGateway, "api_error", "Gemini request failed: " + err.Error()
+	return http.StatusBadGateway, "api_error", "NeoSwitch could not get an answer from the model: " + err.Error()
+}
+
+// invalidGeminiKey reports whether Gemini refused the request because of its API key. Gemini answers an invalid key with HTTP 400 and the API_KEY_INVALID reason.
+func invalidGeminiKey(e genai.APIError) bool {
+	for _, detail := range e.Details {
+		if detail["reason"] == "API_KEY_INVALID" {
+			return true
+		}
+	}
+	return strings.Contains(strings.ToLower(e.Message), "api key not valid")
 }
 
 func writeUpstreamError(w http.ResponseWriter, err error) {
