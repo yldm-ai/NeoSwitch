@@ -5,20 +5,5 @@
   "repository": "https://github.com/yldm-ai/neon-switch",
   "license": "MIT",
   "skills": "./plugin/skills/",
-  "hooks": "./plugin/hooks.json",
-  "userConfig": {
-    "gemini_api_key": {
-      "type": "string",
-      "title": "Gemini API key",
-      "description": "Used by the local NeoSwitch proxy. Leave empty to use GEMINI_API_KEY or Vertex AI credentials from your environment.",
-      "sensitive": true,
-      "required": false
-    },
-    "antigravity_oauth": {
-      "type": "boolean",
-      "title": "Use Antigravity OAuth via ACP",
-      "description": "Use the official agy ACP session and the signed-in Gemini 4 Neon account instead of a Gemini API key.",
-      "required": false
-    }
-  }
+  "hooks": "./plugin/hooks.json"
 }

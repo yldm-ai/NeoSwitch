@@ -143,8 +143,8 @@ func TestDaemonServesUntilLastSessionExits(t *testing.T) {
 	if err := Attach(s, 200, func() error { t.Fatal("second attach must reuse the running daemon"); return nil }); err != nil {
 		t.Fatal(err)
 	}
-	if n, ok := Status(s); !ok || n != 2 {
-		t.Fatalf("status = %d %v", n, ok)
+	if info, ok := Status(s); !ok || info.Sessions != 2 {
+		t.Fatalf("status = %+v %v", info, ok)
 	}
 	resp, err := http.Get(s.BaseURL() + "/v1/messages")
 	if err != nil || resp.StatusCode != http.StatusTeapot {
@@ -154,8 +154,8 @@ func TestDaemonServesUntilLastSessionExits(t *testing.T) {
 
 	procs.set(100, false)
 	time.Sleep(100 * time.Millisecond)
-	if n, ok := Status(s); !ok || n != 1 {
-		t.Fatalf("after one exit: %d %v", n, ok)
+	if info, ok := Status(s); !ok || info.Sessions != 1 {
+		t.Fatalf("after one exit: %+v %v", info, ok)
 	}
 	procs.set(200, false)
 	select {
@@ -204,8 +204,8 @@ func TestControlEndpointsRequireToken(t *testing.T) {
 	if resp.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("attach with wrong token = %d", resp.StatusCode)
 	}
-	if n, _ := Status(s); n != 0 {
-		t.Fatalf("unauthorized attach registered a session: %d", n)
+	if info, _ := Status(s); info.Sessions != 0 {
+		t.Fatalf("unauthorized attach registered a session: %+v", info)
 	}
 }
 
@@ -215,5 +215,31 @@ func TestProcessAlive(t *testing.T) {
 	}
 	if processAlive(1 << 30) {
 		t.Fatal("nonexistent pid reported alive")
+	}
+}
+
+func TestSaveBackendKeepsAddressAndToken(t *testing.T) {
+	dir := t.TempDir()
+	first, err := EnsureState(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	saved, err := SaveBackend(dir, "antigravity")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Enabled projects store the address and token, so recording a choice must not change them.
+	if saved.Listen != first.Listen || saved.Token != first.Token {
+		t.Fatalf("state changed: %+v -> %+v", first, saved)
+	}
+	loaded, ok, err := LoadState(dir)
+	if err != nil || !ok || loaded.Backend != "antigravity" {
+		t.Fatalf("loaded %+v %v %v", loaded, ok, err)
+	}
+	if _, err := SaveBackend(dir, ""); err != nil {
+		t.Fatal(err)
+	}
+	if loaded, _, _ = LoadState(dir); loaded.Backend != "" {
+		t.Fatalf("choice not cleared: %+v", loaded)
 	}
 }

@@ -16,6 +16,8 @@ import (
 type State struct {
 	Listen string `json:"listen"`
 	Token  string `json:"token"`
+	// Backend is the upstream the user chose, "antigravity" or "gemini"; empty means choose from the environment. /neoswitch:login sets it so a Gemini key exported for other tools does not override the account the user signed in with.
+	Backend string `json:"backend,omitempty"`
 }
 
 func (s State) BaseURL() string { return "http://" + s.Listen }
@@ -64,12 +66,31 @@ func EnsureState(dir string) (State, error) {
 	var token [24]byte
 	_, _ = rand.Read(token[:])
 	s := State{Listen: addr, Token: hex.EncodeToString(token[:])}
-	if err := os.MkdirAll(dir, 0o700); err != nil {
-		return State{}, err
-	}
-	data, _ := json.MarshalIndent(s, "", "  ")
-	if err := os.WriteFile(statePath(dir), append(data, '\n'), 0o600); err != nil {
+	if err := writeState(dir, s); err != nil {
 		return State{}, err
 	}
 	return s, nil
+}
+
+// SaveBackend records the user's backend choice ("" for automatic), creating the state when needed.
+func SaveBackend(dir, backend string) (State, error) {
+	s, err := EnsureState(dir)
+	if err != nil {
+		return State{}, err
+	}
+	s.Backend = backend
+	return s, writeState(dir, s)
+}
+
+// writeState replaces the state file through a temp file so a crash never leaves it truncated. It is private to the user because the token authorizes use of their quota.
+func writeState(dir string, s State) error {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	data, _ := json.MarshalIndent(s, "", "  ")
+	tmp := statePath(dir) + ".tmp"
+	if err := os.WriteFile(tmp, append(data, '\n'), 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, statePath(dir))
 }

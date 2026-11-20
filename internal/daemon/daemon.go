@@ -29,6 +29,14 @@ type Options struct {
 	PollInterval time.Duration
 	// Alive reports whether a process exists; tests replace it.
 	Alive func(pid int) bool
+	// Backend describes the upstream this daemon serves, reported by Status.
+	Backend string
+}
+
+// Info is what a running daemon reports about itself.
+type Info struct {
+	Sessions int    `json:"sessions"`
+	Backend  string `json:"backend"`
 }
 
 // Run serves proxy on s.Listen until every attached Claude Code process has exited, or until StartupGrace passes without any attach. Lifetime is tied to the sessions rather than an idle timer, so a session that sits idle for hours keeps working and nothing outlives the last session.
@@ -69,7 +77,7 @@ func Run(ctx context.Context, s State, proxy http.Handler, opts Options) error {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]int{"sessions": sessions.len()})
+		_ = json.NewEncoder(w).Encode(Info{Sessions: sessions.len(), Backend: opts.Backend})
 	})
 	mux.Handle("/", proxy)
 	server := &http.Server{Handler: mux, ReadHeaderTimeout: 10 * time.Second}
@@ -149,25 +157,22 @@ func authorized(r *http.Request, token string) bool {
 	return ok && subtle.ConstantTimeCompare([]byte(strings.TrimSpace(value)), []byte(token)) == 1
 }
 
-// Status asks a running daemon how many sessions it serves; ok is false when no NeoSwitch daemon answers on s.Listen with s.Token.
-func Status(s State) (sessions int, ok bool) {
+// Status asks a running daemon how many sessions it serves and which backend it uses; ok is false when no NeoSwitch daemon answers on s.Listen with s.Token.
+func Status(s State) (info Info, ok bool) {
 	req, _ := http.NewRequest(http.MethodGet, s.BaseURL()+statusPath, nil)
 	req.Header.Set("Authorization", "Bearer "+s.Token)
 	resp, err := (&http.Client{Timeout: time.Second}).Do(req)
 	if err != nil {
-		return 0, false
+		return Info{}, false
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return 0, false
+		return Info{}, false
 	}
-	var body struct {
-		Sessions int `json:"sessions"`
+	if json.NewDecoder(resp.Body).Decode(&info) != nil {
+		return Info{}, false
 	}
-	if json.NewDecoder(resp.Body).Decode(&body) != nil {
-		return 0, false
-	}
-	return body.Sessions, true
+	return info, true
 }
 
 // Attach registers a Claude Code process with the daemon, starting the daemon through spawn first when none is running. It tries twice because a daemon that is shutting down (its last session just exited) can still answer the status probe and then refuse the attach.

@@ -73,7 +73,7 @@ The command performs the following steps:
 3. Enables NeoSwitch routing for the current project.
 4. Selects `gemini-4-neon` for the ACP session.
 
-To use a Gemini API key instead, set it in `/plugin` → `neoswitch` → **Gemini API key** (Claude Code stores it in its secure plugin configuration) and run `/neoswitch:on`.
+To use a Gemini API key instead, export `GEMINI_API_KEY` before starting Claude Code and run `/neoswitch:on`; the plugin has no settings to fill in. If you signed in with `/neoswitch:login` before, also export `NEOSWITCH_BACKEND=gemini`, because the saved login choice wins otherwise.
 
 Close and reopen Claude Code in that project. Check the route with:
 
@@ -147,7 +147,7 @@ The SessionStart hook starts one local daemon and registers the Claude Code proc
 
 With the OAuth route, the daemon starts the official `agy acp` subprocess. NeoSwitch sends the translated request through an ACP session and translates the returned answer or tool-call JSON back to the local Anthropic-compatible endpoint. One `agy` process serves all sessions, and requests run concurrently in separate ACP sessions. `agy`'s own file, shell and web tools are refused on every request, so tools run only in Claude Code, under Claude Code's permission rules.
 
-The optional plugin setting **Use Antigravity OAuth via ACP** forces the ACP route when another Gemini credential is also present. A normal `/neoswitch:login` automatically uses ACP when no Gemini credential is configured.
+`/neoswitch:login` saves Antigravity OAuth as the backend, so a Gemini key exported for other tools does not take over. Without a saved choice, NeoSwitch uses Gemini credentials from the environment when present and Antigravity OAuth otherwise. `NEOSWITCH_BACKEND=antigravity|gemini|auto` overrides both, and `/neoswitch:status` shows the backend in use and why.
 
 ## Standalone CLI
 
@@ -189,7 +189,7 @@ Set both `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` in the client. `neoswit
 | `agy: command not found` | Install the official Antigravity CLI or set `ANTIGRAVITY_CLI_PATH`. |
 | `no authorization code was entered` | Update to the latest plugin. The current flow uses ACP `authenticate` and does not read shell stdin. |
 | `ECONNREFUSED` on a new session | Run `/neoswitch:status`. If the route is enabled, inspect the daemon message and restart the session. Run `/neoswitch:off` from a session using Anthropic, then enable it again after fixing the credential. |
-| The session starts with no Gemini credentials | Run `/neoswitch:login`, or configure a Gemini API key or Vertex AI ADC. |
+| The session reports that no backend is configured | Run `/neoswitch:login`, or export `GEMINI_API_KEY` or Vertex AI settings before starting Claude Code. |
 | The plugin build fails | Install Go and restart Claude Code. |
 
 ## Compatibility boundary
