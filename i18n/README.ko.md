@@ -122,7 +122,7 @@ go run ./cmd/neoswitch claude
 
 ## 호환성
 
-세션, 권한, 도구 실행, MCP 서버, 스킬, 훅, `CLAUDE.md`, `/resume`은 여전히 Claude Code가 실행합니다. NeoSwitch는 그 뒤의 모델만 교체합니다. 이 기능들이 얼마나 잘 동작하는지는 모델이 Claude Code의 도구 프로토콜을 얼마나 잘 따르는지에 달려 있으며, 이는 일상적인 코딩 작업에서 사용해 봤지만 자동화된 엔드투엔드 테스트로 검증되지는 않았습니다.
+세션, 권한, 도구 실행, MCP 서버, 스킬, 훅, `CLAUDE.md`, `/resume`은 여전히 Claude Code가 실행합니다. NeoSwitch는 그 뒤의 모델만 교체합니다. 이 기능들이 얼마나 잘 동작하는지는 모델이 Claude Code의 도구 프로토콜을 얼마나 잘 따르는지에 달려 있으며, 이는 일상적인 코딩 작업에서 사용해 봤습니다. 자동화된 엔드투엔드 테스트가 변경될 때마다 실제 Claude Code CLI를 NeoSwitch를 거쳐 스크립트로 작성한 Gemini 서버에 대해 실행하고, 도구 호출과 결과, 파일 편집, Bash, 병렬 호출, 권한 거부, 훅, 스킬, `/resume`, 서브에이전트, MCP 도구가 Gemini API 경로를 그대로 통과하는지 확인합니다. 실제 모델이 이를 얼마나 잘 사용하는지는 측정하지 않습니다.
 
 | 기능 | Gemini API / Vertex AI | Antigravity OAuth (ACP) |
 |---|---|---|

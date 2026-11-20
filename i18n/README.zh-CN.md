@@ -122,7 +122,7 @@ go run ./cmd/neoswitch claude
 
 ## 兼容性
 
-会话、权限、工具执行、MCP 服务器、skills、hooks、`CLAUDE.md` 和 `/resume` 仍由 Claude Code 负责；NeoSwitch 只替换它们背后的模型。这些功能的效果取决于模型遵循 Claude Code 工具协议的程度。这一点在日常编码中经过实际使用，但没有自动化的端到端测试覆盖。
+会话、权限、工具执行、MCP 服务器、skills、hooks、`CLAUDE.md` 和 `/resume` 仍由 Claude Code 负责；NeoSwitch 只替换它们背后的模型。这些功能的效果取决于模型遵循 Claude Code 工具协议的程度。这一点在日常编码中经过实际使用。每次改动都会运行自动化的端到端测试：通过 NeoSwitch 让真实的 Claude Code CLI 对接一个按脚本应答的 Gemini 服务器，检查工具调用及其结果、文件编辑、Bash、并行调用、权限拒绝、hooks、skills、`/resume`、子代理和 MCP 工具都能完整地经过 Gemini API 路径；它不衡量真实模型用得好不好。
 
 | 能力 | Gemini API / Vertex AI | Antigravity OAuth (ACP) |
 |---|---|---|

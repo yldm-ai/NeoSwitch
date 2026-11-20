@@ -91,15 +91,20 @@ On Vertex AI the system instruction and tools are counted natively. The Gemini D
 
 | Scenario | Status | Acceptance check |
 |---|---|---|
-| Text, non-streaming and streaming | Supported | `server` tests; deltas merged into one block |
+| Text, non-streaming and streaming | Supported | `server` tests; deltas merged into one block; e2e `text` |
 | System prompt and system messages | Supported | `translate` tests |
-| Claude Code built-in tool schemas | Supported | `testdata/claude-code-tools.json`, captured from Claude Code 2.1.329, passes unmodified |
-| Tool call → tool result → answer | Supported | `provider` wire test replays the signature through genai serialization |
-| Parallel tool calls | Supported | Each call gets its own ID |
+| Claude Code built-in tool schemas | Supported | `testdata/claude-code-tools.json`, captured from Claude Code 2.1.329, passes unmodified; every e2e scenario sends the tools Claude Code really declares |
+| Tool call → tool result → answer | Supported | `provider` wire test replays the signature through genai serialization; e2e `read`, `edit and write` and `bash` check the result content, the replayed signature and the file changed on disk |
+| Parallel tool calls | Supported | Each call gets its own ID; results are sent in call order (`translate` test, e2e `parallel tool calls`) |
 | Images and PDFs, including inside tool results | Supported | `translate` tests |
 | Upstream errors | Supported | Status mapping table test |
 | `count_tokens` | Supported, estimated on the Developer API | `provider` and `server` tests |
-| Session resume | Supported | Stateless tool IDs |
+| Session resume | Supported | Stateless tool IDs; e2e `resume` checks that `claude -p --resume` replays the earlier call with its signature and its result |
+| Claude Code permissions | Supported | e2e `permission denial`: a refused Bash call reaches the model as an `error` function response and the command does not run |
+| Hooks | Supported | e2e `hooks`: project `PreToolUse` and `PostToolUse` hooks fire for a model tool call and receive the NeoSwitch tool ID |
+| Skills | Supported | e2e `skill`: a project skill is advertised, invoked through the Skill tool and its instructions reach the model |
+| Subagents | Supported | e2e `subagent`: the Agent tool's subagent sends its own request and its answer returns to the parent |
+| MCP tools | Supported | e2e `mcp`: a deferred MCP tool from `claude mcp serve` is loaded with ToolSearch and called |
 | Antigravity OAuth via ACP | Supported as an opt-in local adapter | Uses the official `agy acp` process through `github.com/coder/acp-go-sdk` and never reads OAuth tokens. Concurrent sessions, streamed text, usage and stop reasons are passed through. `provider` tests drive a scripted ACP server for concurrency, streaming with split escapes, tool calls, images, cancellation, agent exit and a stuck agent. Images are sent when `agy` advertises them; PDFs are marked as omitted |
 
-End-to-end check without a Gemini key: run `neoswitch claude -- -p ...` with `GEMINI_BASE_URL` pointing at a scripted server that returns a function call with a thought signature and returns 400 if the next request does not replay it.
+The e2e scenarios live in `e2e/` behind the `e2e` build tag and run in CI. Each runs the real Claude Code CLI (`claude -p`, with a temporary home and config directory) through an in-process NeoSwitch proxy against a scripted Gemini server, which returns function calls with thought signatures and answers 400 when the next request does not carry what Claude Code should have sent back. They need no Gemini key or Anthropic login and cover the Gemini API path only, not the Antigravity ACP route. Run them with `go test -tags e2e ./e2e/`; `CLAUDE_CLI_PATH` selects the Claude Code executable.
