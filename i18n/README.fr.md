@@ -86,7 +86,7 @@ Fermez puis rouvrez Claude Code dans ce projet. Vérifiez la route avec :
 
 L'état doit afficher `NeoSwitch ... -> gemini-4-neon`. Claude Code peut continuer d'afficher le nom de modèle demandé, par exemple `claude-opus-5-5`, dans l'en-tête de session ; la route réellement utilisée vers le service amont est celle qu'affiche `/neoswitch:status`.
 
-`/neoswitch:antigravity-login` est un alias de `/neoswitch:login`. `/neoswitch:on` et `/neoswitch:off` modifient le routage sans connexion.
+`/neoswitch:on` et `/neoswitch:off` modifient le routage sans connexion.
 
 ## Autres chemins d'identifiants
 

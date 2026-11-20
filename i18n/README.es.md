@@ -86,7 +86,7 @@ Cierra y vuelve a abrir Claude Code en ese proyecto. Comprueba la ruta con:
 
 El estado debería mostrar `NeoSwitch ... -> gemini-4-neon`. Claude Code puede seguir mostrando la etiqueta solicitada, como `claude-opus-5-5`, en el encabezado de la sesión; la ruta real hacia el servicio de origen es la que muestra `/neoswitch:status`.
 
-`/neoswitch:antigravity-login` es un alias de `/neoswitch:login`. `/neoswitch:on` y `/neoswitch:off` cambian el enrutamiento sin iniciar sesión.
+`/neoswitch:on` y `/neoswitch:off` cambian el enrutamiento sin iniciar sesión.
 
 ## Otras vías de credenciales
 

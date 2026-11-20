@@ -86,7 +86,7 @@ claude plugin update neoswitch@neoswitch
 
 Статус должен показывать `NeoSwitch ... -> gemini-4-neon`. В заголовке сессии Claude Code может по-прежнему отображать запрошенную метку, например `claude-opus-5-5`; вышестоящий маршрут — тот, который показывает `/neoswitch:status`.
 
-`/neoswitch:antigravity-login` — псевдоним `/neoswitch:login`. `/neoswitch:on` и `/neoswitch:off` переключают маршрутизацию без входа.
+`/neoswitch:on` и `/neoswitch:off` переключают маршрутизацию без входа.
 
 ## Другие способы получения учётных данных
 
