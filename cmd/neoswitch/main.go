@@ -304,8 +304,7 @@ Usage:
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [project]                     route them back to Anthropic
   neoswitch status [project]                  show routing and daemon state
-  neoswitch backend [auto|antigravity|gemini|openai]
-                                              show or choose the upstream (openai is opt-in and experimental)
+  neoswitch backend [auto|antigravity|gemini|openai]  show or choose the upstream (openai is opt-in and experimental)
   neoswitch doctor                            check that the credentials can use the model
   neoswitch models                            list the models the credentials can use (* = configured)
   neoswitch version                           print the NeoSwitch version
@@ -313,8 +312,7 @@ Usage:
 Environment:
   NEOSWITCH_BACKEND    antigravity, gemini, openai or auto; overrides the saved choice
   GEMINI_API_KEY       Gemini Developer API key
-  GOOGLE_GENAI_USE_VERTEXAI=true with GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION
-                       use Vertex AI with Application Default Credentials instead
+  GOOGLE_GENAI_USE_VERTEXAI=true  use Vertex AI with Application Default Credentials; also needs GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION
   GEMINI_MODEL         backend model (default: gemini-4-neon)
   GEMINI_BASE_URL      Gemini API base URL
   OPENAI_API_KEY       OpenAI API key (experimental openai backend)
