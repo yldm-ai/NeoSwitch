@@ -164,7 +164,7 @@ go install ./cmd/neoswitch
 neoswitch doctor              # Claude CLI와 자격 증명으로 모델을 사용할 수 있는지 확인
 neoswitch antigravity login   # 공식 agy 클라이언트를 통한 ACP OAuth 로그인
 neoswitch antigravity probe   # 자격 증명을 출력하지 않고 저장된 agy 세션 확인
-neoswitch models              # 설정된 모델 출력
+neoswitch models              # 자격 증명으로 사용할 수 있는 모델을 나열하고 설정된 모델을 표시
 neoswitch on [project]        # 프로젝트 라우팅 활성화
 neoswitch off [project]       # 프로젝트 라우팅 비활성화
 neoswitch status [project]    # 라우팅과 데몬 상태 표시

@@ -164,7 +164,7 @@ Commandes courantes :
 neoswitch doctor              # vérifie la CLI Claude et si les identifiants peuvent utiliser le modèle
 neoswitch antigravity login   # connexion ACP OAuth via le client officiel agy
 neoswitch antigravity probe   # vérifie la session agy enregistrée sans afficher les identifiants
-neoswitch models              # affiche le modèle configuré
+neoswitch models              # liste les modèles utilisables avec les identifiants, en marquant celui configuré
 neoswitch on [project]        # active le routage d'un projet
 neoswitch off [project]       # désactive le routage d'un projet
 neoswitch status [project]    # affiche le routage et l'état du daemon

@@ -164,7 +164,7 @@ go install ./cmd/neoswitch
 neoswitch doctor              # проверить Claude CLI и могут ли учётные данные использовать модель
 neoswitch antigravity login   # вход ACP OAuth через официальный клиент agy
 neoswitch antigravity probe   # проверить сохранённую сессию agy, не выводя учётные данные
-neoswitch models              # вывести настроенную модель
+neoswitch models              # перечислить модели, доступные с этими учётными данными, отметив настроенную
 neoswitch on [project]        # включить маршрутизацию для проекта
 neoswitch off [project]       # отключить маршрутизацию для проекта
 neoswitch status [project]    # показать маршрутизацию и состояние демона

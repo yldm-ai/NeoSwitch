@@ -164,7 +164,7 @@ Comandos habituales:
 neoswitch doctor              # comprueba la CLI de Claude y si las credenciales pueden usar el modelo
 neoswitch antigravity login   # inicio de sesión ACP OAuth mediante el cliente oficial agy
 neoswitch antigravity probe   # verifica la sesión de agy guardada sin mostrar credenciales
-neoswitch models              # muestra el modelo configurado
+neoswitch models              # lista los modelos que pueden usar las credenciales y marca el configurado
 neoswitch on [project]        # activa el enrutamiento de un proyecto
 neoswitch off [project]       # desactiva el enrutamiento de un proyecto
 neoswitch status [project]    # muestra el enrutamiento y el estado del daemon
