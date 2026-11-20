@@ -12,6 +12,7 @@ NeoSwitch 的定位很明确：Claude Code 继续负责 Agent 运行时、工具
 
 - `neoswitch serve`：启动本地 Anthropic-compatible Proxy。
 - `neoswitch claude`：通过临时本地 Proxy 启动 Claude Code。
+- `neoswitch antigravity login`：调用官方 `agy` CLI 完成浏览器 OAuth 登录。
 - `neoswitch antigravity probe`：验证现有 `agy` 登录是否可用，不读取 Antigravity token；它不是 Claude Code 后端。
 - 文本、图片、PDF、Claude Code 的工具 schema、多轮工具调用（包括 Gemini 的 thought signature）、流式与非流式响应，以及 `count_tokens`。
 - 通过官方 `google.golang.org/genai` SDK 接入 Gemini Developer API 或 Vertex AI，默认模型 `gemini-4-neon`。
@@ -103,6 +104,7 @@ neoswitch off [项目目录]          # 改回 Anthropic
 neoswitch status [项目目录]       # 查看路由和代理状态
 neoswitch doctor                 # 检查 Gemini 凭证和 Claude CLI
 neoswitch models                 # 查看当前配置的模型
+neoswitch antigravity login      # 通过官方 agy CLI 完成 OAuth 登录
 neoswitch antigravity probe      # 检查 agy 登录，不输出 token
 ```
 
@@ -132,6 +134,12 @@ Antigravity 的登录状态不是 `GEMINI_API_KEY`。官方 `agy` CLI 自己管�
 
 ```bash
 neoswitch antigravity probe
+```
+
+首次登录或切换账号时，运行下面的命令。它会把终端交给官方 `agy` CLI，由 `agy` 自动打开浏览器完成 Google OAuth，并把会话保存到系统钥匙串。远程 SSH 环境下，`agy` 会显示授权 URL 和验证码。
+
+```bash
+neoswitch antigravity login
 ```
 
 这个命令只通过官方 `agy` CLI 发起一次固定的无敏感测试请求，并且只输出成功或失败状态。它不会读取、打印或保存 token，也不会让 Claude Code 使用 Antigravity 的 Agent 循环。

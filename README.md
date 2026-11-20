@@ -12,6 +12,7 @@ It supports:
 
 - `neoswitch serve` — run the local Anthropic-compatible proxy.
 - `neoswitch claude` — start Claude Code through an ephemeral local proxy.
+- `neoswitch antigravity login` — complete the official `agy` browser OAuth sign-in.
 - `neoswitch antigravity probe` — verify an existing `agy` login without reading its token; this is not a Claude Code backend.
 - text, images, PDFs, Claude Code's tool schemas, multi-turn tool calls (including Gemini thought signatures), streaming and non-streaming responses, and `count_tokens`.
 - the Gemini Developer API or Vertex AI through the official `google.golang.org/genai` SDK, using `gemini-4-neon` by default.
