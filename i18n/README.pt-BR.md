@@ -37,7 +37,7 @@ O comando também mostra um link, para quando você não puder usar o navegador 
 > [!WARNING]
 > Os [Termos de Serviço do Google Antigravity](https://antigravity.google/terms) (seção 6) proíbem usar o Antigravity por meio de outras ferramentas, e o NeoSwitch é uma delas. O Google pode suspender ou encerrar as contas do Antigravity de quem fizer isso. `/neoswitch:login` repete este aviso toda vez. Não entre se você não aceita esse risco.
 
-**3. Envie sua próxima mensagem.** A janela em que você executou o comando usa o Gemini 4 Neon a partir da próxima mensagem, assim como as sessões novas deste projeto. Se a resposta do comando pedir que você reinicie, porque o Claude Code foi iniciado por um gateway ou porque outras janelas do Claude Code ainda usam uma configuração anterior do NeoSwitch, feche as janelas indicadas e inicie `claude` de novo no mesmo projeto.
+**3. Envie sua próxima mensagem.** A janela em que você executou o comando usa o Gemini 4 Neon a partir da próxima mensagem, assim como as sessões novas deste projeto. Se a resposta do comando pedir que você reinicie, porque o Claude Code foi iniciado por um gateway ou porque outras janelas do Claude Code ainda usam uma configuração anterior do NeoSwitch, feche as janelas indicadas e inicie `claude` de novo no mesmo projeto. Quando a última sessão que usa o NeoSwitch aqui é fechada, o projeto volta para o Claude e sua próxima sessão começa no Claude; execute `/neoswitch:on` para usar o Gemini 4 Neon de novo.
 
 ## O que você vai ver
 
@@ -55,14 +55,15 @@ O comando também mostra um link, para quando você não puder usar o navegador 
 | O aviso da sessão diz que o NeoSwitch ainda não está configurado | Execute `/neoswitch:login`. Sua próxima mensagem usa o Gemini 4 Neon. |
 | Uma mensagem diz que o `agy` não está instalado | O `/neoswitch:login` não conseguiu instalá-lo sozinho. Execute `curl -fsSL https://antigravity.google/cli/install.sh \| bash` em um terminal ou instale-o pela [página de download do Google](https://antigravity.google/download) e execute `/neoswitch:login` de novo. |
 | Toda mensagem falha com um erro de conexão, ou o aviso da sessão diz que esta sessão não pode responder | Neste mesmo projeto, execute `/neoswitch:off`. Ele volta o projeto mesmo que a própria resposta também mostre um erro de conexão. Depois digite `/exit` e inicie `claude` de novo: você está de volta ao Claude, e `/neoswitch:status` diz o que corrigir. |
-| O aviso diz que outras janelas do Claude Code ainda compartilham a configuração anterior | Feche todas as janelas do Claude Code e abra o Claude Code de novo. |
+| O aviso diz que outras janelas do Claude Code ainda compartilham a configuração anterior | Feche todas as janelas do Claude Code, abra o Claude Code de novo e execute `/neoswitch:on`. |
+| Um aviso diz que os conectores do claude.ai estão desativados porque outra fonte de autenticação está definida | É o esperado enquanto esta sessão usa o NeoSwitch: a chave de acesso local dele tem prioridade sobre o seu login do claude.ai. Os conectores voltam na sua próxima sessão quando o projeto volta para o Claude, ao fechar a última sessão que usa o NeoSwitch ou após `/neoswitch:off`. |
 | O aviso diz que outro programa está usando a porta de que o NeoSwitch precisa | Feche esse programa e inicie o Claude Code de novo, ou execute `/neoswitch:off`. |
 | O aviso diz que o NeoSwitch não conseguiu baixar seu programa | Verifique sua conexão com a internet e inicie o Claude Code de novo. |
 | `/neoswitch:login` aparece como comando desconhecido | Atualize o plugin (veja abaixo), reinicie o Claude Code e execute `/reload-plugins`. |
 
 ## Desligar, atualizar ou remover
 
-- `/neoswitch:off` volta este projeto para o Claude nas sessões novas; uma sessão que já usa o Gemini 4 Neon continua com ele até você digitar `/exit`. `/neoswitch:on` troca o projeto de novo para o Gemini 4 Neon sem configurar nada outra vez, a partir da próxima mensagem.
+- `/neoswitch:off` volta este projeto para o Claude nas sessões novas; uma sessão que já usa o Gemini 4 Neon continua com ele até você digitar `/exit`. `/neoswitch:on` troca o projeto de novo para o Gemini 4 Neon sem configurar nada outra vez, a partir da próxima mensagem. Fechar a última sessão que usa o NeoSwitch em um projeto faz o mesmo.
 
 Para atualizar manualmente, execute isto em um terminal e depois feche todas as janelas do Claude Code e abra-as de novo:
 
@@ -94,7 +95,7 @@ O login do Google é guardado pelo `agy`, não pelo NeoSwitch, e continua onde e
 
 ## O que o NeoSwitch altera
 
-Em cada projeto que você liga, o NeoSwitch adiciona três entradas ao objeto `env` de `.claude/settings.local.json`, e `/neoswitch:off` as remove de novo:
+Em cada projeto que você liga, o NeoSwitch adiciona três entradas ao objeto `env` de `.claude/settings.local.json`, e `/neoswitch:off`, ou fechar a última sessão que usa o NeoSwitch ali, as remove de novo:
 
 - `ANTHROPIC_BASE_URL` e `ANTHROPIC_AUTH_TOKEN` enviam as novas sessões do Claude Code do projeto para o NeoSwitch neste computador. O token só abre o NeoSwitch neste computador; não é uma credencial do Google nem da Anthropic.
 - `CLAUDE_CODE_USE_GATEWAY=0` faz essas sessões falarem diretamente com o NeoSwitch. Algumas ferramentas que iniciam o Claude Code por outro gateway ligam o modo gateway, e então o Claude Code ignoraria o NeoSwitch.

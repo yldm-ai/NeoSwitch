@@ -239,7 +239,7 @@ func TestStatusAnswersInPlainLines(t *testing.T) {
 				installAgy(t)
 				mustOn(t, project)
 			},
-			want: []string{"this session still uses Claude", "Start a new Claude Code session here to use Gemini 4 Neon."},
+			want: []string{"this session still uses Claude", "Run /neoswitch:on to use Gemini 4 Neon from this session's next message."},
 		},
 		{
 			name: "on, agy removed afterwards",
@@ -259,7 +259,7 @@ func TestStatusAnswersInPlainLines(t *testing.T) {
 				state, _, _ := daemon.LoadState(os.Getenv("NEOSWITCH_STATE_DIR"))
 				t.Setenv("ANTHROPIC_BASE_URL", state.BaseURL())
 			},
-			want: []string{"cannot answer", "Start a new Claude Code session here to restart it"},
+			want: []string{"cannot answer", "Run /neoswitch:on to restart it"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -330,9 +330,14 @@ func TestAttachNotice(t *testing.T) {
 		{"earlier version", "", agy, daemon.Info{Backend: agy, Version: "v0.0.1"}, true, "still use the earlier NeoSwitch version"},
 		{"daemon without version", "", agy, daemon.Info{Backend: agy}, true, "Close all Claude Code windows"},
 		{"gateway notice only", "NeoSwitch: gateway.", agy, daemon.Info{Backend: agy, Version: version}, true, "NeoSwitch: gateway."},
+		{"tracked project", "", agy, daemon.Info{Backend: agy, Version: version}, true, "When the last session here using NeoSwitch closes, this project goes back to Claude."},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := attachNotice(tc.notice, provider.DefaultModel, tc.label, tc.info, tc.running)
+			got := attachNotice(tc.notice, provider.DefaultModel, tc.label, tc.info, tc.running, tc.name == "tracked project")
+			// Only a daemon that tracks the project turns it off; promising it otherwise would be false.
+			if tc.name != "tracked project" && strings.Contains(got, "goes back to Claude") {
+				t.Fatalf("an untracked session was promised the way back: %q", got)
+			}
 			if !strings.Contains(got, tc.want) {
 				t.Fatalf("got %q, want %q", got, tc.want)
 			}

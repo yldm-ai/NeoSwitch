@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -459,5 +461,26 @@ func TestSignInSocketLocation(t *testing.T) {
 	}
 	if _, err := signInSocket(dir); err == nil || !strings.Contains(err.Error(), "chmod 700") {
 		t.Fatalf("an open folder must be refused, got %v", err)
+	}
+}
+
+// A browser sign-in that finishes after the session that asked for it closed signs in, but leaves the project on Claude: routing lasts as long as the session that wanted it.
+func TestBrowserSignInAfterSessionClosedKeepsProjectOff(t *testing.T) {
+	dir := fakeSignInEnv(t)
+	withBrowser(t, "after", 500*time.Millisecond)
+	project := t.TempDir()
+	gone := exec.Command("true")
+	if err := gone.Run(); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CLAUDECODE", "1")
+	t.Setenv("CLAUDE_PID", strconv.Itoa(gone.Process.Pid))
+	if err := antigravityLogin([]string{"--on", project}); err != nil {
+		t.Fatal(err)
+	}
+	eventually(t, "the browser sign-in did not finish", func() bool { return fakeSignedIn(t) == "browser" && pendingSignInLink(dir) == "" })
+	time.Sleep(300 * time.Millisecond)
+	if settingsExist(t, project) {
+		t.Fatal("a closed session's project was turned on")
 	}
 }

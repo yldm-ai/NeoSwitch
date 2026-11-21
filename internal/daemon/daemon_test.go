@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -135,7 +136,7 @@ func TestAttachFailsFastWhenAnotherProgramHoldsThePort(t *testing.T) {
 	defer listener.Close()
 	s := State{Listen: listener.Addr().String(), Token: "t"}
 	start := time.Now()
-	err = Attach(s, 100, func() error { t.Fatal("must not spawn a daemon that cannot listen"); return nil })
+	_, err = Attach(s, 100, "", func() error { t.Fatal("must not spawn a daemon that cannot listen"); return nil })
 	var busy *PortInUseError
 	if !errors.As(err, &busy) || busy.Listen != s.Listen {
 		t.Fatalf("got %v", err)
@@ -185,10 +186,10 @@ func TestDaemonServesUntilLastSessionExits(t *testing.T) {
 
 	procs.set(100, true)
 	procs.set(200, true)
-	if err := Attach(s, 100, spawn); err != nil {
+	if _, err := Attach(s, 100, "", spawn); err != nil {
 		t.Fatal(err)
 	}
-	if err := Attach(s, 200, func() error { t.Fatal("second attach must reuse the running daemon"); return nil }); err != nil {
+	if _, err := Attach(s, 200, "", func() error { t.Fatal("second attach must reuse the running daemon"); return nil }); err != nil {
 		t.Fatal(err)
 	}
 	if info, ok := Status(s); !ok || info.Sessions != 2 || info.Version != "v9" {
@@ -213,6 +214,102 @@ func TestDaemonServesUntilLastSessionExits(t *testing.T) {
 		}
 	case <-time.After(3 * time.Second):
 		t.Fatal("daemon kept running after the last session exited")
+	}
+}
+
+// releases records the projects a daemon released, in order.
+type releases struct {
+	mu   sync.Mutex
+	list []string
+}
+
+func (r *releases) add(project string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.list = append(r.list, project)
+}
+
+func (r *releases) get() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.list)
+}
+
+func startDaemon(t *testing.T, s State, opts Options) (stop func(), done <-chan error) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	finished := make(chan error, 1)
+	go func() { finished <- Run(ctx, s, http.NotFoundHandler(), opts) }()
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		if _, ok := Status(s); ok {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("daemon did not start")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Cleanup(cancel)
+	return cancel, finished
+}
+
+// A project returns to Claude once no attached session uses it: at a detach right away, or at the next check for a session that died.
+func TestDaemonReleasesProjectWhenItsLastSessionEnds(t *testing.T) {
+	s := testState(t)
+	procs := &fakeProcs{alive: map[int]bool{100: true, 200: true, 300: true}}
+	var released releases
+	startDaemon(t, s, Options{StartupGrace: time.Minute, PollInterval: 20 * time.Millisecond, Alive: procs.Alive, Release: released.add})
+	noSpawn := func() error { t.Fatal("must reuse the running daemon"); return nil }
+	for pid, project := range map[int]string{100: "/p", 200: "/p", 300: "/q"} {
+		if tracked, err := Attach(s, pid, project, noSpawn); err != nil || !tracked {
+			t.Fatalf("attach %d: tracked %v, %v", pid, tracked, err)
+		}
+	}
+	Detach(s, 100)
+	if got := released.get(); len(got) != 0 {
+		t.Fatalf("/p released while session 200 still uses it: %v", got)
+	}
+	Detach(s, 200)
+	if got := released.get(); !slices.Equal(got, []string{"/p"}) {
+		t.Fatalf("after the last /p session detached: %v", got)
+	}
+	procs.set(300, false)
+	time.Sleep(100 * time.Millisecond)
+	if got := released.get(); !slices.Equal(got, []string{"/p", "/q"}) {
+		t.Fatalf("after the /q session died: %v", got)
+	}
+}
+
+// A daemon stopped from outside, as at logout, releases the projects of the sessions still attached.
+func TestDaemonReleasesProjectsWhenStopped(t *testing.T) {
+	s := testState(t)
+	var released releases
+	stop, done := startDaemon(t, s, Options{StartupGrace: time.Minute, Alive: func(int) bool { return true }, Release: released.add})
+	if _, err := Attach(s, 100, "/p", nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Attach(s, 200, "", nil); err != nil {
+		t.Fatal(err)
+	}
+	stop()
+	<-done
+	if got := released.get(); !slices.Equal(got, []string{"/p"}) {
+		t.Fatalf("released %v", got)
+	}
+}
+
+// Once the daemon decided to stop it refuses attaches, which then start a new daemon instead of joining one about to exit.
+func TestClosingDaemonRefusesAttach(t *testing.T) {
+	sessions := &sessionSet{pids: map[int]map[string]bool{}, release: func(string) {}}
+	if !sessions.add(100, "/p") {
+		t.Fatal("refused before closing")
+	}
+	if !sessions.prune(func(int) bool { return false }, false) {
+		t.Fatal("the last session exited, yet the daemon keeps running")
+	}
+	if sessions.add(200, "/p") {
+		t.Fatal("a closing daemon took a session")
 	}
 }
 

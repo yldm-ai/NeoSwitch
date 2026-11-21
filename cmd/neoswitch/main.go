@@ -48,6 +48,8 @@ func main() {
 		err = backendCommand(os.Args[2:])
 	case "sign-in-check":
 		err = checkRelayedLink(os.Stdin, os.Stdout)
+	case "detach":
+		err = endSession(os.Args[2:])
 	case "attach":
 		err = attach(os.Args[2:])
 	case "daemon":
