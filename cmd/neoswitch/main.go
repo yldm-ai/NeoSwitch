@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -15,7 +14,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yldm-ai/neo-switch/internal/daemon"
 	"github.com/yldm-ai/neo-switch/internal/provider"
 	"github.com/yldm-ai/neo-switch/internal/server"
 )
@@ -48,6 +46,8 @@ func main() {
 		err = status(os.Args[2:])
 	case "backend":
 		err = backendCommand(os.Args[2:])
+	case "sign-in-check":
+		err = checkRelayedLink(os.Stdin, os.Stdout)
 	case "attach":
 		err = attach(os.Args[2:])
 	case "daemon":
@@ -71,11 +71,14 @@ func main() {
 }
 
 func antigravity(args []string) error {
-	if len(args) != 1 || (args[0] != "probe" && args[0] != "login" && args[0] != "oauth") {
-		return fmt.Errorf("usage: neoswitch antigravity {login|probe}")
+	if len(args) > 0 && (args[0] == "login" || args[0] == "oauth") {
+		return antigravityLogin(args[1:])
 	}
-	if args[0] == "login" || args[0] == "oauth" {
-		return antigravityLogin()
+	if len(args) > 0 && args[0] == signInHelperCommand {
+		return runSignInHelper(args[1:])
+	}
+	if len(args) != 1 || args[0] != "probe" {
+		return fmt.Errorf("usage: neoswitch antigravity {login [--on project] [code] | probe}")
 	}
 	path, err := provider.FindAntigravityCLI()
 	if err != nil {
@@ -111,39 +114,6 @@ func antigravity(args []string) error {
 		return fmt.Errorf("Antigravity session probe was not successful; run %q interactively to inspect authentication", path)
 	}
 	fmt.Println("ok: Antigravity CLI session is usable")
-	return nil
-}
-
-// antigravityLogin delegates authentication to the official CLI's ACP server, which owns the browser OAuth flow and stores the resulting profile in the platform keyring. Signing in is also the user's choice of backend, so it is saved: a Gemini key exported for other tools must not take over afterwards.
-//
-// A missing agy is installed first with Google's official installer, unless ANTIGRAVITY_CLI_PATH names a specific agy: that is the user's own choice, so NeoSwitch reports it instead of installing another copy elsewhere. The Terms warning follows, because it only matters once the sign-in can actually start; it is shown before every sign-in.
-func antigravityLogin() error {
-	if _, err := provider.FindAntigravityCLI(); errors.Is(err, provider.ErrAntigravityCLIMissing) {
-		if strings.TrimSpace(os.Getenv("ANTIGRAVITY_CLI_PATH")) != "" {
-			return fmt.Errorf("%w: point ANTIGRAVITY_CLI_PATH at agy, or unset it so that /neoswitch:login installs agy, then run /neoswitch:login again", err)
-		}
-		if _, err := installAntigravityCLI(context.Background()); err != nil {
-			return err
-		}
-	}
-	backend, err := provider.NewAntigravityACPFromEnv(context.Background())
-	if err != nil {
-		return err
-	}
-	fmt.Fprintln(os.Stderr, antigravityTermsWarning)
-	if err := backend.Login(context.Background()); err != nil {
-		return err
-	}
-	fmt.Println("ok: Antigravity OAuth login completed through agy ACP")
-	dir, err := daemon.Dir()
-	if err != nil {
-		return err
-	}
-	if _, err := daemon.SaveBackend(dir, backendAntigravity); err != nil {
-		return fmt.Errorf("save the Antigravity OAuth choice: %w", err)
-	}
-	fmt.Println("ok: NeoSwitch uses Antigravity OAuth for routed projects")
-	printDaemonSwitchNote(backendAntigravity)
 	return nil
 }
 
@@ -324,7 +294,8 @@ func usage() {
 Usage:
   neoswitch claude [-- claude arguments...]   start Claude Code through a local proxy
   neoswitch serve                             run the Anthropic-compatible proxy
-  neoswitch antigravity login                 sign in with the official agy browser OAuth flow
+  neoswitch antigravity login                 sign in with Google through the official agy: a browser opens, and a printed link works on any device
+  neoswitch antigravity login cancel          drop a sign-in still waiting for its code; the current sign-in stays
   neoswitch antigravity probe                 verify the official agy session without reading its token
   neoswitch on [project]                      route new Claude Code sessions in a project to Gemini
   neoswitch off [project]                     route them back to Anthropic

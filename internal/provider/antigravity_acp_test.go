@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -24,10 +25,40 @@ const fakeACPEnv = "NEOSWITCH_FAKE_ACP"
 
 func TestMain(m *testing.M) {
 	if mode := os.Getenv(fakeACPEnv); mode != "" {
+		if slices.Contains(os.Args, "--login") {
+			runFakeTerminalSignIn(mode)
+		}
 		runFakeACP(mode)
 		os.Exit(0)
 	}
 	os.Exit(m.Run())
+}
+
+// fakeSignInCode is the code the fake terminal sign-in accepts.
+const fakeSignInCode = "4/0Afake-code_1"
+
+// runFakeTerminalSignIn acts as `agy acp --login`: it prints a link the way agy does and reads one code from stdin. The right code exits 0; anything else fails like an invalid_grant from Google. Mode sign-in-silent never shows a link, as an agy stuck on the network; sign-in-exit stops before showing one. The method's env must arrive, or the fake fails.
+func runFakeTerminalSignIn(mode string) {
+	switch mode {
+	case "sign-in-silent":
+		time.Sleep(time.Minute)
+		os.Exit(1)
+	case "sign-in-exit":
+		fmt.Println("couldn't start: keyring locked")
+		os.Exit(1)
+	}
+	if os.Getenv("FAKE_SIGN_IN_ENV") != "set" || os.Getenv("CLAUDE_FAKE_SECRET") != "" {
+		fmt.Println("couldn't log in: wrong environment")
+		os.Exit(1)
+	}
+	fmt.Print("Open this link in a browser to log in with Google:\n\n  https://accounts.google.com/o/oauth2/auth?client_id=fake&state=s\n\nThen paste the authorization code, or the full URL of the page you land on, and press Enter: ")
+	code, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	if strings.TrimSpace(code) != fakeSignInCode {
+		fmt.Println("\ncouldn't log in: token exchange failed: oauth2: \"invalid_grant\" \"Bad Request\"")
+		os.Exit(1)
+	}
+	fmt.Println("\nLogged in.")
+	os.Exit(0)
 }
 
 // streamEnvelope exercises escapes, a \u escape and a UTF-16 surrogate pair; the fake sends it one character per chunk so every escape is split across chunks.
@@ -50,6 +81,8 @@ const (
 //   - no-models, grouped-models: sessions offer no model option, or offer fakeModels in groups; every other mode offers them ungrouped
 //   - init-hang, init-exit: initialize never answers, or the process dies on it, as an agy stuck on an update or one that exits right away
 //   - auth-required, rpc-error: prompts fail with the ACP auth_required error, or with an internal JSON-RPC error
+//   - signed-out: sessions cannot be created, failing with the ACP auth_required error as a signed-out agy does
+//   - browser-wait: authenticate never answers, as a browser sign-in nobody finishes
 func runFakeACP(mode string) {
 	in := bufio.NewScanner(os.Stdin)
 	in.Buffer(make([]byte, 64<<10), 32<<20)
@@ -118,9 +151,14 @@ func runFakeACP(mode string) {
 		}
 		reply := func(result any) { send(map[string]any{"id": msg.ID, "result": result}) }
 		var params struct {
-			SessionID string `json:"sessionId"`
-			MethodID  string `json:"methodId"`
-			Prompt    []struct {
+			SessionID          string `json:"sessionId"`
+			MethodID           string `json:"methodId"`
+			ClientCapabilities struct {
+				Auth struct {
+					Terminal bool `json:"terminal"`
+				} `json:"auth"`
+			} `json:"clientCapabilities"`
+			Prompt []struct {
 				Type     string `json:"type"`
 				MimeType string `json:"mimeType"`
 				Data     string `json:"data"`
@@ -149,18 +187,30 @@ func runFakeACP(mode string) {
 			case "init-exit":
 				os.Exit(1)
 			}
+			methods := []any{map[string]any{"id": "oauth-personal", "name": "Log in with Google"}}
+			// Like agy, the fake offers sign-in by code only to clients that can run it.
+			if params.ClientCapabilities.Auth.Terminal && mode != "no-terminal-sign-in" {
+				methods = append(methods, map[string]any{"id": "terminal-login", "name": "Log in from the terminal", "type": "terminal", "args": []string{"--login"}, "env": map[string]string{"FAKE_SIGN_IN_ENV": "set"}})
+			}
 			reply(map[string]any{
 				"protocolVersion":   1,
 				"agentCapabilities": map[string]any{"promptCapabilities": map[string]bool{"image": mode != "no-image"}},
-				"authMethods":       []any{map[string]string{"id": "oauth-personal", "name": "Log in with Google"}},
+				"authMethods":       methods,
 			})
 		case "authenticate":
 			if params.MethodID != "oauth-personal" {
 				send(map[string]any{"id": msg.ID, "error": map[string]any{"code": -1, "message": "unexpected auth method " + params.MethodID}})
 				continue
 			}
+			if mode == "browser-wait" {
+				continue
+			}
 			reply(map[string]any{})
 		case "session/new":
+			if mode == "signed-out" {
+				send(map[string]any{"id": msg.ID, "error": map[string]any{"code": -32000, "message": "Authentication required"}})
+				continue
+			}
 			sessions++
 			result := map[string]any{"sessionId": "s" + strings.Repeat("x", sessions)}
 			var options []any
@@ -832,5 +882,131 @@ func TestACPRejectsAgentToolPermissions(t *testing.T) {
 				t.Fatalf("outcome = %+v, want selected %q", resp.Outcome, tc.want)
 			}
 		})
+	}
+}
+
+// The fake fails unless the method's env arrives and Claude Code's variables do not.
+func TestTerminalSignInAcceptsTheCode(t *testing.T) {
+	a := newFakeACP(t, "ok")
+	t.Setenv("CLAUDE_FAKE_SECRET", "must-not-reach-agy")
+	s, err := a.StartTerminalSignIn(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s.Link() != "https://accounts.google.com/o/oauth2/auth?client_id=fake&state=s" {
+		t.Fatalf("link %q", s.Link())
+	}
+	if err := s.Submit(context.Background(), fakeSignInCode); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-s.Done():
+	default:
+		t.Fatal("agy still runs after the sign-in")
+	}
+}
+
+func TestTerminalSignInReportsRejectedCode(t *testing.T) {
+	a := newFakeACP(t, "ok")
+	s, err := a.StartTerminalSignIn(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = s.Submit(context.Background(), "4/0Awrong")
+	if err == nil || !strings.Contains(err.Error(), "invalid_grant") || !strings.Contains(err.Error(), "newest link") {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestTerminalSignInNeedsAnAgyThatOffersIt(t *testing.T) {
+	a := newFakeACP(t, "no-terminal-sign-in")
+	if _, err := a.StartTerminalSignIn(context.Background()); !errors.Is(err, errNoTerminalSignIn) {
+		t.Fatalf("got %v", err)
+	}
+}
+
+func TestTerminalSignInFailsWithoutLink(t *testing.T) {
+	old := signInLinkTimeout
+	signInLinkTimeout = 300 * time.Millisecond
+	t.Cleanup(func() { signInLinkTimeout = old })
+	for mode, want := range map[string]string{"sign-in-silent": "did not show a sign-in link", "sign-in-exit": "keyring locked"} {
+		t.Run(mode, func(t *testing.T) {
+			a := newFakeACP(t, mode)
+			if _, err := a.StartTerminalSignIn(context.Background()); err == nil || !strings.Contains(err.Error(), want) {
+				t.Fatalf("got %v", err)
+			}
+		})
+	}
+}
+
+// The link goes only into the message for a signed-out agy: another outage while a sign-in waits, such as one started to switch accounts, is not cured by it.
+func TestSignedOutMessageCarriesPendingSignInLink(t *testing.T) {
+	a := newFakeACP(t, "ok")
+	if got := a.signedOut(errors.New("x")).Error(); got != acpUnavailableMessage {
+		t.Fatalf("without a pending sign-in: %q", got)
+	}
+	a.PendingSignIn = func() string { return "https://accounts.google.com/x" }
+	got := a.signedOut(errors.New("x")).Error()
+	if !strings.HasSuffix(got, "\n\nhttps://accounts.google.com/x") || !strings.Contains(got, "/neoswitch:login") {
+		t.Fatalf("got %q", got)
+	}
+	if got := a.unavailable(errors.New("x")).Error(); got != acpUnavailableMessage {
+		t.Fatalf("an outage got %q", got)
+	}
+}
+
+// A sign-in may switch accounts, so an agy started before it is replaced; a request already on it finishes first.
+func TestSignInRetiresOlderAgy(t *testing.T) {
+	a := newFakeACP(t, "ok")
+	ctx := context.Background()
+	old, err := a.connection(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signedIn := time.Now()
+	a.SignedInAt = func() time.Time { return signedIn }
+	fresh, err := a.connection(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fresh == old {
+		t.Fatal("the agy started before the sign-in was reused")
+	}
+	if old.cmd.ProcessState != nil {
+		t.Fatal("the old agy stopped while a request still used it")
+	}
+	old.release()
+	if old.cmd.ProcessState == nil {
+		t.Fatal("the old agy kept running after its last request")
+	}
+	fresh.release()
+	again, err := a.connection(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer again.release()
+	if again != fresh {
+		t.Fatal("an agy started after the sign-in was replaced")
+	}
+}
+
+func TestSignedIn(t *testing.T) {
+	for mode, want := range map[string]bool{"ok": true, "signed-out": false} {
+		signed, err := newFakeACP(t, mode).SignedIn(context.Background())
+		if err != nil || signed != want {
+			t.Errorf("%s: signed in %v, %v", mode, signed, err)
+		}
+	}
+	if signed, err := newFakeACP(t, "init-exit").SignedIn(context.Background()); signed || err == nil {
+		t.Fatalf("a broken agy: signed in %v, %v", signed, err)
+	}
+}
+
+// A browser sign-in stopped because the code won must say so, not report an internal error.
+func TestLoginStopsWithItsContext(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	if err := newFakeACP(t, "browser-wait").Login(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("got %v", err)
 	}
 }

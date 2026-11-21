@@ -32,6 +32,8 @@ Then turn on automatic updates, so fixes reach you when Google or Claude Code ch
 
 It shows Google's terms warning, opens Google sign-in in your browser through Google's [Antigravity command-line tool (`agy`)](https://antigravity.google/download), and then switches the project on. If `agy` is not on this computer yet, the command first installs it into `~/.local/bin` with Google's official installer (about 230 MB; the installer also adds that folder to your shell's PATH). If you are comfortable with a terminal, a Gemini API key also works: see [docs/cli.md](docs/cli.md#gemini-api-key).
 
+The command also shows a link, for when the browser it opens is not one you can use, such as on a computer you reach over SSH: open the link in a browser on any device, sign in, and run `/neoswitch:login` followed by the code the page shows. Run `/neoswitch:login` again while signed in to switch to another Google account: it keeps the current one until you finish, and `/neoswitch:login cancel` keeps it for good.
+
 > [!WARNING]
 > The [Google Antigravity Terms of Service](https://antigravity.google/terms) (section 6) forbid using Antigravity through other tools, and NeoSwitch is such a tool. Google may suspend or close the Antigravity accounts of people who do. `/neoswitch:login` repeats this warning every time. Do not sign in unless you accept that risk.
 
