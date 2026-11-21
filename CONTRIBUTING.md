@@ -37,3 +37,10 @@ go vet ./...
 ## Releases
 
 Maintainers release by pushing a tag that starts with `v`, such as `v0.2.0`. The [release workflow](.github/workflows/release.yml) runs `go test -race ./...` and `go vet ./...`, builds the `neoswitch` binaries for macOS, Linux and Windows with the tag as the version, and publishes a GitHub Release with the binaries and a `checksums.txt` file of SHA-256 sums.
+
+Most users get NeoSwitch through the plugin marketplace, which delivers `main`. Plugin users without Go download the release named by `main`'s `VERSION`, and the session note tells every plugin user to update when `main`'s `VERSION` is newer than the version they run. So `main`'s `VERSION` must always name a published release, built from the tree that `main` gets:
+
+1. Merge the fixes to `main` first. A change that users should get, above all a fix for a protocol change upstream, needs a release: without one it reaches only users who have Go, and no user is told to update.
+2. On a new branch from the latest `main`, change only `VERSION`, commit, and push the branch.
+3. Push the matching tag on that commit, `v` followed by the contents of `VERSION`, and wait for the release workflow to publish the release.
+4. Open the pull request and merge it. The `released-version` check fails while the tag is missing, while its release is not published, or when the tree being merged differs from the tagged one; re-run it after the release is published.

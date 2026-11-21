@@ -22,6 +22,8 @@ NeoSwitch 让 Claude Code 改用 Google 的 Gemini 4 Neon 模型来回答，Clau
 /plugin install neoswitch@neoswitch
 ```
 
+然后打开自动更新，这样 Google 或 Claude Code 改动了 NeoSwitch 依赖的东西时，修复会自动送到你这里：运行 `/plugin`，打开 **Marketplaces** 标签页，选中 `neoswitch`，打开 auto-update。不是 Anthropic 官方的插件市场，Claude Code 默认不自动更新。
+
 **2. 用你的 Google 账号登录。** 在要切换的项目里打开 Claude Code，运行：
 
 ```text
@@ -42,6 +44,7 @@ NeoSwitch 让 Claude Code 改用 Google 的 Gemini 4 Neon 模型来回答，Clau
 - 每次回答可能要等 5 到 40 秒才出现第一个字，这是正常的。如果你是用 `/neoswitch:login` 登录的，输入 `/effort low` 可以让回答更快开始。
 - 安装或更新后的第一条 NeoSwitch 命令可能要等上一分钟，NeoSwitch 在做准备。
 - 随时可以运行 `/neoswitch:status`，它会告诉你当前会话用的是 Claude 还是 Gemini 4 Neon，以及下一步该做什么。
+- 有新版 NeoSwitch 时，会话开头的提示会告诉你，并给出更新命令。打开了自动更新的话，Claude Code 会自己装好新版，关掉所有 Claude Code 窗口再重新打开后生效。
 
 ## 出了问题怎么办
 
@@ -59,7 +62,7 @@ NeoSwitch 让 Claude Code 改用 Google 的 Gemini 4 Neon 模型来回答，Clau
 
 - `/neoswitch:off` 让这个项目的新会话切回 Claude；已经在用 Gemini 4 Neon 的会话会一直用到你输入 `/exit`。`/neoswitch:on` 把项目再切回 Gemini 4 Neon，不用重新设置，从下一条消息开始生效。
 
-更新插件：在终端里运行下面两条命令，然后重启 Claude Code：
+手动更新：在终端里运行下面两条命令，然后关掉所有 Claude Code 窗口再重新打开：
 
 ```bash
 claude plugin marketplace update neoswitch

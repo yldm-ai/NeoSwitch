@@ -217,6 +217,9 @@ func printStatus(w io.Writer, project string, verbose bool) error {
 			fmt.Fprintln(w, "Run /neoswitch:off to go back to Claude.")
 		}
 	}
+	if notice := updateNotice(dir); notice != "" {
+		fmt.Fprintln(w, notice)
+	}
 	if !verbose {
 		return nil
 	}
@@ -289,6 +292,8 @@ func attach(args []string) error {
 	if *pid <= 1 {
 		return hookMessage("NeoSwitch: the SessionStart hook did not pass the Claude Code process ID")
 	}
+	// Every routed session refreshes the update cache, including one blocked by a setup problem below: a fix may be what it needs.
+	startUpdateCheck(dir)
 	// Projects enabled before `neoswitch on` turned gateway mode off still let a gateway launcher's ANTHROPIC_BASE_URL win. The running session cannot be changed any more, so fix the project for the next one and say so instead of letting status claim a route the session may not use.
 	var notice string
 	if gatewayModeOn() {
@@ -320,7 +325,7 @@ func attach(args []string) error {
 		return hookMessage("NeoSwitch could not start, so this session cannot answer. Start a new Claude Code session to try again, or run /neoswitch:off to go back to Claude. Details are in " + filepath.Join(dir, "daemon.log") + ".")
 	}
 	info, running := daemon.Status(state)
-	return hookMessage(attachNotice(notice, model, label, info, running))
+	return hookMessage(joinNotes(attachNotice(notice, model, label, info, running), updateNotice(dir)))
 }
 
 // sessionBlocked reports a setup problem found at session start, followed by the way back to Claude, because the session cannot answer until it is fixed.
@@ -334,6 +339,17 @@ func withPrefix(message string) string {
 		return message
 	}
 	return "NeoSwitch: " + message
+}
+
+// joinNotes joins the non-empty notes of a hook message.
+func joinNotes(notes ...string) string {
+	var kept []string
+	for _, note := range notes {
+		if note != "" {
+			kept = append(kept, note)
+		}
+	}
+	return strings.Join(kept, " ")
 }
 
 // attachNotice is the message a session sees after it attached. Without a problem to report it confirms the model, because Claude Code's header keeps showing the Claude model the session asks for.
@@ -355,11 +371,7 @@ func attachNotice(notice, model, label string, info daemon.Info, running bool) s
 
 // gatewayModeOn reports whether the session runs in Claude Code's gateway mode. Project settings that turn it off are already applied to the hook's environment.
 func gatewayModeOn() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv(daemon.EnvUseGateway))) {
-	case "", "0", "false", "no", "off":
-		return false
-	}
-	return true
+	return envTrue(daemon.EnvUseGateway)
 }
 
 func hookMessage(message string) error {

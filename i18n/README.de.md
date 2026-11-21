@@ -22,6 +22,8 @@ Sie schalten jeweils ein Projekt um; Ihre anderen Projekte nutzen weiter Claude.
 /plugin install neoswitch@neoswitch
 ```
 
+Schalten Sie danach automatische Updates ein, damit Korrekturen Sie erreichen, wenn Google oder Claude Code etwas ändern, worauf NeoSwitch angewiesen ist: Führen Sie `/plugin` aus, öffnen Sie den Tab **Marketplaces**, wählen Sie `neoswitch` und schalten Sie auto-update ein. Für Marketplaces, die nicht von Anthropic stammen, lässt Claude Code es ausgeschaltet.
+
 **2. Mit Ihrem Google-Konto anmelden.** Öffnen Sie Claude Code in dem Projekt, das Sie umschalten möchten, und führen Sie aus:
 
 ```text
@@ -42,6 +44,7 @@ Der Befehl zeigt Googles Warnung zu den Nutzungsbedingungen, öffnet die Google-
 - Eine Antwort kann 5 bis 40 Sekunden brauchen, bis die ersten Wörter erscheinen. Das ist normal. Wenn Sie sich mit `/neoswitch:login` angemeldet haben, beginnen Antworten mit `/effort low` früher.
 - Der erste NeoSwitch-Befehl nach einer Installation oder einem Update kann bis zu einer Minute dauern, während sich NeoSwitch vorbereitet.
 - `/neoswitch:status` sagt Ihnen jederzeit, ob diese Sitzung Claude oder Gemini 4 Neon nutzt und was als Nächstes zu tun ist.
+- Wenn eine neuere NeoSwitch-Version verfügbar ist, sagt die Sitzungsnotiz das und nennt die Befehle zum Aktualisieren. Mit eingeschaltetem auto-update installiert Claude Code sie selbst; sie gilt, sobald alle Claude-Code-Fenster geschlossen und wieder geöffnet wurden.
 
 ## Wenn etwas nicht klappt
 
@@ -59,7 +62,7 @@ Der Befehl zeigt Googles Warnung zu den Nutzungsbedingungen, öffnet die Google-
 
 - `/neoswitch:off` schaltet dieses Projekt für neue Sitzungen zurück auf Claude; eine Sitzung, die bereits Gemini 4 Neon nutzt, behält es, bis Sie `/exit` eingeben. `/neoswitch:on` schaltet das Projekt ab Ihrer nächsten Nachricht wieder auf Gemini 4 Neon, ohne dass Sie etwas neu einrichten.
 
-Um das Plugin zu aktualisieren, führen Sie dies in einem Terminal aus und starten Sie Claude Code dann neu:
+Um von Hand zu aktualisieren, führen Sie dies in einem Terminal aus und schließen Sie dann alle Claude-Code-Fenster und öffnen Sie sie wieder:
 
 ```bash
 claude plugin marketplace update neoswitch

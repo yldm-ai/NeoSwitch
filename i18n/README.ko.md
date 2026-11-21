@@ -22,6 +22,8 @@ NeoSwitch를 쓰면 Claude Code는 그대로 두고, Claude 대신 Google의 Gem
 /plugin install neoswitch@neoswitch
 ```
 
+이어서 자동 업데이트를 켜 두면 NeoSwitch가 의존하는 부분을 Google이나 Claude Code가 바꿨을 때도 수정이 자동으로 전달됩니다. `/plugin`을 실행하고 **Marketplaces** 탭에서 `neoswitch`를 선택한 뒤 auto-update를 켜세요. Anthropic 외의 마켓플레이스는 Claude Code가 기본적으로 자동 업데이트하지 않습니다.
+
 **2. Google 계정으로 로그인합니다.** 전환할 프로젝트에서 Claude Code를 열고 다음을 실행하세요.
 
 ```text
@@ -42,6 +44,7 @@ Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`
 - 답의 첫 글자가 나오기까지 5~40초가 걸릴 수 있으며 정상입니다. `/neoswitch:login`으로 로그인했다면 `/effort low`로 답이 더 빨리 시작됩니다.
 - 설치나 업데이트 후 첫 NeoSwitch 명령은 준비 때문에 최대 1분쯤 걸릴 수 있습니다.
 - `/neoswitch:status`를 실행하면 이 세션이 Claude와 Gemini 4 Neon 중 무엇을 쓰는지, 다음에 무엇을 하면 되는지 언제든 알려 줍니다.
+- 새 NeoSwitch가 나오면 세션 시작 메시지로 알려 주고 업데이트 명령을 보여 줍니다. 자동 업데이트가 켜져 있으면 Claude Code가 직접 설치하며, Claude Code 창을 모두 닫았다가 다시 열면 적용됩니다.
 
 ## 문제가 생기면
 
@@ -59,7 +62,7 @@ Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`
 
 - `/neoswitch:off`는 이 프로젝트의 새 세션을 Claude로 되돌립니다. 이미 Gemini 4 Neon을 쓰는 세션은 `/exit`를 입력할 때까지 그대로입니다. `/neoswitch:on`은 다시 설정하지 않고 다음 메시지부터 프로젝트를 Gemini 4 Neon으로 다시 전환합니다.
 
-플러그인을 업데이트하려면 터미널에서 다음을 실행한 뒤 Claude Code를 다시 시작하세요.
+직접 업데이트하려면 터미널에서 다음을 실행한 뒤 Claude Code 창을 모두 닫았다가 다시 여세요.
 
 ```bash
 claude plugin marketplace update neoswitch
