@@ -269,7 +269,7 @@ func TestInstallerProcessesKeepTheLock(t *testing.T) {
 func TestLoginDoesNotInstallOverAnExplicitPath(t *testing.T) {
 	home, downloads := fakeInstaller(t, serveScript(fakeInstallScript))
 	t.Setenv("ANTIGRAVITY_CLI_PATH", filepath.Join(t.TempDir(), "agy"))
-	err := antigravityLogin()
+	err := antigravityLogin(nil)
 	if !errors.Is(err, provider.ErrAntigravityCLIMissing) || !strings.Contains(err.Error(), "ANTIGRAVITY_CLI_PATH") || downloads.Load() != 0 {
 		t.Fatalf("got %v after %d downloads", err, downloads.Load())
 	}

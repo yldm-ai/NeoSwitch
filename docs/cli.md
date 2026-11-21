@@ -54,7 +54,8 @@ Commands:
 neoswitch claude [-- args]      # start Claude Code through a local proxy with an ephemeral port and token
 neoswitch serve                 # run the Anthropic-compatible proxy for another client
 neoswitch doctor                # check the Claude CLI and whether the credentials can use the model
-neoswitch antigravity login     # ACP OAuth login through the official agy client (alias: antigravity oauth)
+neoswitch antigravity login     # ACP OAuth login through the official agy client (alias: antigravity oauth): a browser opens, and the printed link takes a pasted code from any device
+neoswitch antigravity login cancel  # drop a sign-in still waiting for its code; the current sign-in stays
 neoswitch antigravity probe     # verify the saved agy session without printing credentials
 neoswitch models                # list the models the credentials can use, marking the configured one
 neoswitch backend [choice]      # show or choose the backend: auto, antigravity, gemini or openai

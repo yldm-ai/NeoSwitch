@@ -32,6 +32,8 @@ Activez ensuite les mises à jour automatiques, pour recevoir les correctifs qua
 
 La commande affiche l'avertissement sur les conditions de Google, ouvre la connexion Google dans votre navigateur via l'[outil en ligne de commande Antigravity de Google (`agy`)](https://antigravity.google/download), puis bascule le projet. Si `agy` n'est pas encore sur cet ordinateur, elle l'installe d'abord dans `~/.local/bin` avec l'installateur officiel de Google (environ 230 Mo ; l'installateur ajoute aussi ce dossier au PATH de votre shell). Si vous êtes à l'aise avec un terminal, une clé API Gemini fonctionne aussi : voir [docs/cli.md](../docs/cli.md#gemini-api-key) (en anglais).
 
+La commande affiche aussi un lien, pour le cas où vous ne pouvez pas utiliser le navigateur qu'elle ouvre, par exemple sur une machine à laquelle vous accédez en SSH : ouvrez le lien dans un navigateur sur n'importe quel appareil, connectez-vous, puis lancez `/neoswitch:login` suivi du code affiché par la page. Relancez `/neoswitch:login` une fois connecté pour passer à un autre compte Google : le compte actuel reste actif jusqu'à la fin, et `/neoswitch:login cancel` le conserve.
+
 > [!WARNING]
 > Les [Conditions d'utilisation de Google Antigravity](https://antigravity.google/terms) (section 6) interdisent d'utiliser Antigravity par l'intermédiaire d'autres outils, et NeoSwitch en est un. Google peut suspendre ou fermer les comptes Antigravity des personnes qui le font. `/neoswitch:login` répète cet avertissement à chaque fois. Ne vous connectez pas si vous n'acceptez pas ce risque.
 

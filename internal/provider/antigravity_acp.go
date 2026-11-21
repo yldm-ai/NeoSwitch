@@ -35,6 +35,11 @@ type AntigravityACP struct {
 
 	// promptOverhead is how many input tokens agy adds around every prompt (its own agent instructions, about 14k for bare-llm), learned from the usage of earlier answers. ACP reports usage only after an answer, so estimates made before one need it.
 	promptOverhead atomic.Int64
+
+	// PendingSignIn returns the link of a sign-in by code that is waiting for its code, or "".
+	PendingSignIn func() string
+	// SignedInAt returns when the last sign-in finished, or the zero time. A sign-in can switch to another Google account, and an agy started before it may keep the account it started with, so a connection older than the sign-in is retired.
+	SignedInAt func() time.Time
 }
 
 // ErrAntigravityCLIMissing means the official Antigravity CLI is not installed where NeoSwitch looks for it. Callers add the step that fixes it in their context.
@@ -122,6 +127,10 @@ func (a *AntigravityACP) Login(ctx context.Context) error {
 		return errors.New("Antigravity ACP did not advertise an authentication method")
 	}
 	if _, err := c.conn.Authenticate(ctx, acp.AuthenticateRequest{MethodId: methodID}); err != nil {
+		// A cancelled sign-in reaches here as an internal JSON-RPC error; the cancellation is the real cause.
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		// The JSON-RPC error itself means nothing to the user; its message, such as "Authentication required", is kept as the reason.
 		reason := err.Error()
 		var rpcErr *acp.RequestError
@@ -133,24 +142,33 @@ func (a *AntigravityACP) Login(ctx context.Context) error {
 	return nil
 }
 
-// ListModels returns the models agy offers this account, in agy's order. agy advertises them as the values of a new session's model option, so this opens one session without prompting it. Like Login it uses a dedicated agy process, which it stops before returning.
-func (a *AntigravityACP) ListModels(ctx context.Context) ([]string, error) {
+// probeSession opens one session in a dedicated agy process and closes it without prompting, then stops that process.
+func (a *AntigravityACP) probeSession(ctx context.Context) (acp.NewSessionResponse, error) {
 	c, err := startACP(a.path, a.agent, a.cwd)
 	if err != nil {
-		return nil, err
+		return acp.NewSessionResponse{}, err
 	}
 	defer c.close()
 	if _, err := c.initialize(ctx, acp.ClientCapabilities{}); err != nil {
-		return nil, fmt.Errorf("initialize Antigravity ACP: %w", err)
+		return acp.NewSessionResponse{}, fmt.Errorf("initialize Antigravity ACP: %w", err)
 	}
 	session, err := c.conn.NewSession(ctx, acp.NewSessionRequest{Cwd: a.cwd, McpServers: []acp.McpServer{}})
 	if err != nil {
-		return nil, fmt.Errorf("create Antigravity ACP session: %w", err)
+		return acp.NewSessionResponse{}, fmt.Errorf("create Antigravity ACP session: %w", err)
 	}
 	if session.SessionId != "" {
 		closeCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), acpCloseTimeout)
 		_, _ = c.conn.CloseSession(closeCtx, acp.CloseSessionRequest{SessionId: session.SessionId})
 		cancel()
+	}
+	return session, nil
+}
+
+// ListModels returns the models agy offers this account, in agy's order. agy advertises them as the values of a new session's model option, so this opens one session without prompting it. Like Login it uses a dedicated agy process, which it stops before returning.
+func (a *AntigravityACP) ListModels(ctx context.Context) ([]string, error) {
+	session, err := a.probeSession(ctx)
+	if err != nil {
+		return nil, err
 	}
 	values := configValues(session.ConfigOptions, acpModel)
 	if len(values) == 0 {
@@ -275,6 +293,7 @@ func (a *AntigravityACP) run(ctx context.Context, req translate.Request, onText 
 	if err != nil {
 		return acp.PromptResponse{}, err
 	}
+	defer c.release()
 	session, err := c.conn.NewSession(ctx, acp.NewSessionRequest{Cwd: a.cwd, McpServers: []acp.McpServer{}})
 	if err != nil {
 		return acp.PromptResponse{}, a.requestError(ctx, c, "create Antigravity ACP session", err)
@@ -338,7 +357,7 @@ func (a *AntigravityACP) requestError(ctx context.Context, c *acpConn, action st
 	select {
 	case <-c.conn.Done():
 		a.discard(c)
-		return acpUnavailable(fmt.Errorf("%s: agy exited unexpectedly: %w", action, err))
+		return a.unavailable(fmt.Errorf("%s: agy exited unexpectedly: %w", action, err))
 	default:
 	}
 	if ctxErr := ctx.Err(); ctxErr != nil {
@@ -349,7 +368,9 @@ func (a *AntigravityACP) requestError(ctx context.Context, c *acpConn, action st
 	}
 	var rpcErr *acp.RequestError
 	if errors.As(err, &rpcErr) && rpcErr.Code == acpAuthRequired {
-		return acpUnavailable(fmt.Errorf("%s: %w", action, err))
+		// A signed-out agy is replaced, so the first request after the user signs in again starts one that reads the new sign-in.
+		a.discard(c)
+		return a.signedOut(fmt.Errorf("%s: %w", action, err))
 	}
 	acpLogger.Warn("Antigravity request failed", "action", action, "error", err)
 	return &translate.UpstreamError{Reason: "Antigravity could not answer this request. Try again; if it keeps failing, run /neoswitch:login to sign in again."}
@@ -358,10 +379,21 @@ func (a *AntigravityACP) requestError(ctx context.Context, c *acpConn, action st
 // acpUnavailableMessage is what Claude Code shows when agy cannot serve any request: it did not start, did not finish the handshake, exited, or asks for a sign-in.
 const acpUnavailableMessage = "Antigravity is not responding, possibly because you are signed out. Run /neoswitch:login to sign in again, or run /neoswitch:off and start a new session to go back to Claude."
 
-// acpUnavailable logs the cause, which can hold raw JSON-RPC text, and returns the plain error the proxy reports.
-func acpUnavailable(cause error) error {
+// unavailable logs the cause, which can hold raw JSON-RPC text, and returns the plain error the proxy reports. While a sign-in by code waits, the message gives its link and the step that finishes it.
+func (a *AntigravityACP) unavailable(cause error) error {
 	acpLogger.Warn("Antigravity unavailable", "error", cause)
 	return &translate.UnavailableError{Message: acpUnavailableMessage}
+}
+
+// signedOut is unavailable for an agy that refused a request for want of a sign-in. When a sign-in waits for its code, the message carries the link: a session routed to a signed-out agy cannot answer, so its model can never show the user that link, while Claude Code shows this message as it is.
+func (a *AntigravityACP) signedOut(cause error) error {
+	if a.PendingSignIn != nil {
+		if link := a.PendingSignIn(); link != "" {
+			acpLogger.Warn("Antigravity signed out", "error", cause)
+			return &translate.UnavailableError{Message: "Antigravity cannot answer until you finish signing in. Open this link in a browser on any device, sign in with Google, then run /neoswitch:login followed by the code the page shows:\n\n" + link}
+		}
+	}
+	return a.unavailable(cause)
 }
 
 // connection returns the running agy, starting and initializing one when there is none or the previous one exited.
@@ -374,12 +406,18 @@ func (a *AntigravityACP) connection(ctx context.Context) (*acpConn, error) {
 			_ = a.conn.close()
 			a.conn = nil
 		default:
-			return a.conn, nil
+			if a.SignedInAt == nil || !a.conn.started.Before(a.SignedInAt()) {
+				a.conn.acquire()
+				return a.conn, nil
+			}
+			// Requests already on it finish with the sign-in they started with.
+			a.conn.retire()
+			a.conn = nil
 		}
 	}
 	c, err := startACP(a.path, a.agent, a.cwd)
 	if err != nil {
-		return nil, acpUnavailable(err)
+		return nil, a.unavailable(err)
 	}
 	init, err := c.initialize(ctx, acp.ClientCapabilities{})
 	if err != nil {
@@ -387,10 +425,11 @@ func (a *AntigravityACP) connection(ctx context.Context) (*acpConn, error) {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return nil, fmt.Errorf("initialize Antigravity ACP: %w", ctxErr)
 		}
-		return nil, acpUnavailable(fmt.Errorf("initialize Antigravity ACP: %w", err))
+		return nil, a.unavailable(fmt.Errorf("initialize Antigravity ACP: %w", err))
 	}
 	c.imagePrompts = init.AgentCapabilities.PromptCapabilities.Image
 	a.conn = c
+	c.acquire()
 	return c, nil
 }
 
@@ -470,8 +509,13 @@ type acpConn struct {
 	conn         *acp.ClientSideConnection
 	imagePrompts bool
 
+	started time.Time
+
 	mu    sync.Mutex
 	sinks map[acp.SessionId]func(acp.SessionUpdate)
+	// active counts the requests using the connection; a retired one closes when the last of them ends.
+	active  int
+	retired bool
 	// lastUpdate is when agy last sent a session update for any session, in Unix nanoseconds; zero means never.
 	lastUpdate atomic.Int64
 
@@ -510,7 +554,7 @@ func startACP(path, agent, cwd string) (*acpConn, error) {
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start Antigravity ACP: %w", err)
 	}
-	c := &acpConn{cmd: cmd, sinks: map[acp.SessionId]func(acp.SessionUpdate){}}
+	c := &acpConn{cmd: cmd, started: time.Now(), sinks: map[acp.SessionId]func(acp.SessionUpdate){}}
 	c.conn = acp.NewClientSideConnection(c, stdin, stdout)
 	c.conn.SetLogger(acpLogger)
 	return c, nil
@@ -547,6 +591,33 @@ func (c *acpConn) subscribe(sid acp.SessionId, sink func(acp.SessionUpdate)) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.sinks[sid] = sink
+}
+
+func (c *acpConn) acquire() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.active++
+}
+
+func (c *acpConn) release() {
+	c.mu.Lock()
+	c.active--
+	idle := c.retired && c.active == 0
+	c.mu.Unlock()
+	if idle {
+		_ = c.close()
+	}
+}
+
+// retire closes the connection once no request uses it.
+func (c *acpConn) retire() {
+	c.mu.Lock()
+	c.retired = true
+	idle := c.active == 0
+	c.mu.Unlock()
+	if idle {
+		_ = c.close()
+	}
 }
 
 func (c *acpConn) unsubscribe(sid acp.SessionId) {

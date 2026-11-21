@@ -32,6 +32,8 @@ Depois ative as atualizações automáticas, para receber as correções quando 
 
 Ele mostra o aviso sobre os termos do Google, abre o login do Google no navegador por meio da [ferramenta de linha de comando Antigravity do Google (`agy`)](https://antigravity.google/download) e depois troca o projeto. Se o `agy` ainda não estiver neste computador, ele o instala antes em `~/.local/bin` com o instalador oficial do Google (cerca de 230 MB; o instalador também adiciona essa pasta ao PATH do seu shell). Se você está à vontade com o terminal, uma chave de API do Gemini também funciona: veja [docs/cli.md](../docs/cli.md#gemini-api-key) (em inglês).
 
+O comando também mostra um link, para quando você não puder usar o navegador que ele abre, como em um computador que você acessa por SSH: abra o link em um navegador em qualquer dispositivo, faça login e execute `/neoswitch:login` seguido do código que a página mostra. Execute `/neoswitch:login` de novo já conectado para trocar de conta Google: a atual continua valendo até você terminar, e `/neoswitch:login cancel` a mantém.
+
 > [!WARNING]
 > Os [Termos de Serviço do Google Antigravity](https://antigravity.google/terms) (seção 6) proíbem usar o Antigravity por meio de outras ferramentas, e o NeoSwitch é uma delas. O Google pode suspender ou encerrar as contas do Antigravity de quem fizer isso. `/neoswitch:login` repete este aviso toda vez. Não entre se você não aceita esse risco.
 

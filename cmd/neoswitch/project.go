@@ -15,8 +15,10 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/yldm-ai/neo-switch/internal/daemon"
+	"github.com/yldm-ai/neo-switch/internal/provider"
 	"github.com/yldm-ai/neo-switch/internal/server"
 )
 
@@ -42,6 +44,22 @@ func on(args []string) error {
 	if err != nil {
 		return err
 	}
+	return enableProject(project, currentSession())
+}
+
+// claudeSession is the Claude Code session a command runs in. A sign-in finished in the browser turns the project on from the sign-in helper, which records the session of the /neoswitch:login that started it.
+type claudeSession struct {
+	pid     int
+	inside  bool
+	gateway bool
+}
+
+func currentSession() claudeSession {
+	pid, inside := callingSession()
+	return claudeSession{pid: pid, inside: inside, gateway: gatewayModeOn()}
+}
+
+func enableProject(project string, session claudeSession) error {
 	// Turning a project on with no way to reach a model would only make every message of its next session fail. The check is local: it starts no agy and makes no network call, so an installed but signed-out agy still passes.
 	if _, _, err := resolveBackend(); err != nil {
 		return err
@@ -54,9 +72,9 @@ func on(args []string) error {
 	if err != nil {
 		return err
 	}
-	pid, inside := callingSession()
+	pid, inside := session.pid, session.inside
 	var notice string
-	if inside && !gatewayModeOn() && pid > 1 {
+	if inside && !session.gateway && pid > 1 {
 		if notice, err = serveSession(dir, state, pid); err != nil {
 			return fmt.Errorf("NeoSwitch was not turned on, so this session keeps using Claude: %w", err)
 		}
@@ -68,7 +86,7 @@ func on(args []string) error {
 	switch {
 	case !inside:
 		fmt.Println("New Claude Code sessions in this project use Gemini. Sessions already open here that were not started through a gateway switch with their next message; run /neoswitch:on in them so NeoSwitch answers them.")
-	case gatewayModeOn():
+	case session.gateway:
 		fmt.Println("This session was started through a gateway (" + daemon.EnvUseGateway + ") and keeps its connection. Start a new Claude Code session in this project to use Gemini.")
 	case pid <= 1:
 		fmt.Println("This Claude Code version does not tell NeoSwitch which session is running it, so this session cannot use Gemini. Start a new Claude Code session in this project.")
@@ -131,6 +149,10 @@ func off(args []string) error {
 	dir, err := daemon.Dir()
 	if err != nil {
 		return err
+	}
+	// A sign-in still waiting would turn the project back on when it finishes in the browser. It is told first, so it cannot turn the project on after it was turned off.
+	if socket, err := signInSocket(dir); err == nil {
+		forgetPendingSignIn(socket, project)
 	}
 	state, ok, err := daemon.LoadState(dir)
 	if err != nil {
@@ -393,17 +415,24 @@ func spawnDaemon(dir string) error {
 	cmd.Dir = dir
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
-	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "ANTHROPIC_") || strings.HasPrefix(kv, "CLAUDE_") {
-			continue
-		}
-		cmd.Env = append(cmd.Env, kv)
-	}
+	cmd.Env = withoutClaudeCode(os.Environ())
 	detach(cmd)
 	if err := cmd.Start(); err != nil {
 		return err
 	}
 	return cmd.Process.Release()
+}
+
+// withoutClaudeCode drops Claude Code's API settings and session variables from environ, for the background processes NeoSwitch starts from a session.
+func withoutClaudeCode(environ []string) []string {
+	var env []string
+	for _, kv := range environ {
+		if strings.HasPrefix(kv, "ANTHROPIC_") || strings.HasPrefix(kv, "CLAUDE_") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	return env
 }
 
 func runDaemon() error {
@@ -424,6 +453,10 @@ func runDaemon() error {
 	}
 	if closer, ok := backend.(interface{ Close() error }); ok {
 		defer func() { _ = closer.Close() }()
+	}
+	if acp, ok := backend.(*provider.AntigravityACP); ok {
+		acp.PendingSignIn = func() string { return pendingSignInLink(dir) }
+		acp.SignedInAt = func() time.Time { return lastSignIn(dir) }
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

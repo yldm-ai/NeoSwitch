@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -10,6 +11,20 @@ import (
 
 // Tests run from inside Claude Code (its Bash tool) inherit the session's CLAUDECODE and CLAUDE_PID. Left set, they would make enableProject treat every test as a live session and start a daemon from the test binary for it. NEOSWITCH_PLUGIN would likewise make attach start the test binary as its background update check.
 func TestMain(m *testing.M) {
+	// The test binary also plays agy and the sign-in helper for the sign-in by code tests.
+	if os.Getenv(fakeAgyEnv) != "" && len(os.Args) > 1 {
+		switch {
+		case os.Args[1] == "acp":
+			runFakeAgy()
+			os.Exit(0)
+		case os.Args[1] == "antigravity":
+			if err := antigravity(os.Args[2:]); err != nil {
+				fmt.Fprintln(os.Stderr, "neoswitch:", err)
+				os.Exit(1)
+			}
+			os.Exit(0)
+		}
+	}
 	for _, key := range []string{"CLAUDECODE", "CLAUDE_PID", "CLAUDE_CODE_USE_GATEWAY", pluginEnv} {
 		_ = os.Unsetenv(key)
 	}
