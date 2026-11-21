@@ -672,9 +672,9 @@ func runSignInHelper(args []string) error {
 		fmt.Fprintln(os.Stderr, "NeoSwitch sign-in: signed in through the browser")
 		mu.Lock()
 		defer mu.Unlock()
-		// The session may have closed since; attaching a closed one would stop the daemon for everyone.
+		// Routing lasts as long as the session that asked for it. One that closed meanwhile asked for nothing any more: the sign-in stands, and the project stays on Claude.
 		if session.inside && !processAlive(session.pid) {
-			session.inside = false
+			turnOn = false
 		}
 		return signedIn(dir, turnOn, *project, session)
 	case signedInByCode:

@@ -24,7 +24,7 @@ func settingsPath(project string) string {
 
 // Enable points Claude Code sessions in project at the shared proxy by adding its env entries to settings.local.json. Every other key in the file is preserved.
 func Enable(project string, s State) error {
-	return editSettings(project, func(env map[string]any) {
+	return editSettings(project, true, func(env map[string]any) {
 		env[envBaseURL] = s.BaseURL()
 		env[envAuthToken] = s.Token
 		env[EnvUseGateway] = gatewayOff
@@ -33,7 +33,7 @@ func Enable(project string, s State) error {
 
 // Disable removes the env entries Enable wrote. Entries the user changed to point elsewhere are left alone.
 func Disable(project string, s State) error {
-	return editSettings(project, func(env map[string]any) {
+	return editSettings(project, false, func(env map[string]any) {
 		if env[envBaseURL] == s.BaseURL() {
 			delete(env, envBaseURL)
 			if env[envAuthToken] == s.Token {
@@ -46,7 +46,6 @@ func Disable(project string, s State) error {
 	})
 }
 
-// Enabled reports whether project's settings point at the shared proxy.
 func Enabled(project string, s State) (bool, error) {
 	settings, err := readSettings(project)
 	if err != nil {
@@ -85,28 +84,50 @@ func invalidSettings(path string, data []byte, err error) error {
 	return fmt.Errorf("NeoSwitch cannot read %s: it must hold a single JSON object ({ ... }). Fix the file and try again", path)
 }
 
-func editSettings(project string, edit func(env map[string]any)) error {
-	settings, err := readSettings(project)
-	if err != nil {
-		return err
-	}
-	env, ok := settings["env"].(map[string]any)
-	if !ok {
-		if _, present := settings["env"]; present {
-			return fmt.Errorf("NeoSwitch cannot change %s: its \"env\" entry is not a JSON object ({ ... }). Fix the file and try again", settingsPath(project))
-		}
-		env = map[string]any{}
-	}
-	edit(env)
-	if len(env) == 0 {
-		delete(settings, "env")
-	} else {
-		settings["env"] = env
-	}
+// editSettings applies edit to the project's env and writes the file only when that changed something. Without create, a missing file is left missing: the daemon disables projects on its own, after the session ends, when a worktree may already be gone. Claude Code writes the same file, for example to save a permission rule, so a file that changed while being edited is read again once rather than overwritten.
+func editSettings(project string, create bool, edit func(env map[string]any)) error {
 	path := settingsPath(project)
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return err
+	for attempt := 0; ; attempt++ {
+		before, err := os.Stat(path)
+		if errors.Is(err, os.ErrNotExist) && !create {
+			return nil
+		}
+		settings, err := readSettings(project)
+		if err != nil {
+			return err
+		}
+		original, _ := json.Marshal(settings)
+		env, ok := settings["env"].(map[string]any)
+		if !ok {
+			if _, present := settings["env"]; present {
+				return fmt.Errorf("NeoSwitch cannot change %s: its \"env\" entry is not a JSON object ({ ... }). Fix the file and try again", path)
+			}
+			env = map[string]any{}
+		}
+		edit(env)
+		if len(env) == 0 {
+			delete(settings, "env")
+		} else {
+			settings["env"] = env
+		}
+		if edited, _ := json.Marshal(settings); bytes.Equal(edited, original) && before != nil {
+			return nil
+		}
+		if after, err := os.Stat(path); attempt == 0 && !sameFileState(before, after, err) {
+			continue
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return err
+		}
+		data, _ := json.MarshalIndent(settings, "", "  ")
+		return WriteFileAtomic(path, append(data, '\n'), 0o600)
 	}
-	data, _ := json.MarshalIndent(settings, "", "  ")
-	return WriteFileAtomic(path, append(data, '\n'), 0o600)
+}
+
+// sameFileState reports whether the file looks as it did when it was read: both missing, or the same size and modification time.
+func sameFileState(before os.FileInfo, after os.FileInfo, afterErr error) bool {
+	if before == nil {
+		return errors.Is(afterErr, os.ErrNotExist)
+	}
+	return afterErr == nil && after.Size() == before.Size() && after.ModTime().Equal(before.ModTime())
 }

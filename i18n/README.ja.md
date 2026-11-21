@@ -37,7 +37,7 @@ Google の利用規約に関する警告を表示したあと、Google の [Anti
 > [!WARNING]
 > [Google Antigravity 利用規約](https://antigravity.google/terms)（第 6 条）は、ほかのツールを通じて Antigravity を使うことを禁じており、NeoSwitch はそうしたツールにあたります。Google はそうした利用者の Antigravity のアカウントを停止または解約することがあります。`/neoswitch:login` は毎回この警告を表示します。このリスクを受け入れられない場合は、ログインしないでください。
 
-**3. 次のメッセージを送る。** コマンドを実行したウィンドウは次のメッセージから Gemini 4 Neon を使い、このプロジェクトの新しいセッションも同じです。コマンドの返信で再起動を求められた場合（Claude Code をゲートウェイ経由で起動した場合や、ほかの Claude Code ウィンドウが NeoSwitch の以前の設定を使っている場合）は、示されたウィンドウを閉じてから、同じプロジェクトでもう一度 `claude` を起動してください。
+**3. 次のメッセージを送る。** コマンドを実行したウィンドウは次のメッセージから Gemini 4 Neon を使い、このプロジェクトの新しいセッションも同じです。コマンドの返信で再起動を求められた場合（Claude Code をゲートウェイ経由で起動した場合や、ほかの Claude Code ウィンドウが NeoSwitch の以前の設定を使っている場合）は、示されたウィンドウを閉じてから、同じプロジェクトでもう一度 `claude` を起動してください。このプロジェクトで NeoSwitch を使う最後のセッションを閉じると、プロジェクトは Claude に戻り、次のセッションは Claude で始まります。Gemini 4 Neon をまた使うには `/neoswitch:on` を実行してください。
 
 ## 切り替え後に表示されるもの
 
@@ -55,14 +55,15 @@ Google の利用規約に関する警告を表示したあと、Google の [Anti
 | セッション開始時のメッセージに、NeoSwitch がまだ設定されていないと出る | `/neoswitch:login` を実行します。次のメッセージから Gemini 4 Neon を使います。 |
 | `agy` がインストールされていないと表示される | `/neoswitch:login` が自動ではインストールできませんでした。ターミナルで `curl -fsSL https://antigravity.google/cli/install.sh \| bash` を実行するか、[Google のダウンロードページ](https://antigravity.google/download)からインストールしてから、もう一度 `/neoswitch:login` を実行します。 |
 | どのメッセージも接続エラーになる、またはセッション開始時のメッセージにこのセッションは回答できないと出る | 同じプロジェクトで `/neoswitch:off` を実行します。その返答自体が接続エラーになっても、プロジェクトは元に戻っています。`/exit` と入力して `claude` を起動し直すと Claude に戻り、`/neoswitch:status` で何を直せばよいかがわかります。 |
-| ほかの Claude Code ウィンドウが以前の設定を共有していると出る | Claude Code のウィンドウをすべて閉じてから、もう一度開きます。 |
+| ほかの Claude Code ウィンドウが以前の設定を共有していると出る | Claude Code のウィンドウをすべて閉じてもう一度開き、`/neoswitch:on` を実行します。 |
+| 別の認証ソースが設定されているため claude.ai connectors が無効と警告が出る | このセッションが NeoSwitch を使っている間は想定どおりです。ローカルのアクセスキーが claude.ai のサインインより優先されます。プロジェクトが Claude に戻ると（NeoSwitch を使う最後のセッションを閉じるか `/neoswitch:off` を実行すると）、次のセッションで connectors が戻ります。 |
 | NeoSwitch が必要とするポートを別のプログラムが使っていると出る | そのプログラムを閉じて Claude Code を起動し直すか、`/neoswitch:off` を実行します。 |
 | NeoSwitch がプログラムをダウンロードできなかったと出る | インターネット接続を確認し、Claude Code を起動し直します。 |
 | `/neoswitch:login` が不明なコマンドになる | プラグインを更新し（下記参照）、Claude Code を再起動してから `/reload-plugins` を実行します。 |
 
 ## オフ・更新・削除
 
-- `/neoswitch:off` でこのプロジェクトの新しいセッションを Claude に戻します。すでに Gemini 4 Neon を使っているセッションは `/exit` と入力するまでそのままです。`/neoswitch:on` で、設定し直さずに次のメッセージから Gemini 4 Neon にまた切り替えます。
+- `/neoswitch:off` でこのプロジェクトの新しいセッションを Claude に戻します。すでに Gemini 4 Neon を使っているセッションは `/exit` と入力するまでそのままです。`/neoswitch:on` で、設定し直さずに次のメッセージから Gemini 4 Neon にまた切り替えます。プロジェクトで NeoSwitch を使う最後のセッションを閉じても同じです。
 
 手動で更新するには、ターミナルで次を実行してから、Claude Code のウィンドウをすべて閉じて開き直します。
 
@@ -94,7 +95,7 @@ Google のログイン情報は NeoSwitch ではなく `agy` が保存してお�
 
 ## NeoSwitch が変更するもの
 
-オンにした各プロジェクトで、NeoSwitch は `.claude/settings.local.json` の `env` オブジェクトに 3 つの項目を追加し、`/neoswitch:off` で取り除きます。
+オンにした各プロジェクトで、NeoSwitch は `.claude/settings.local.json` の `env` オブジェクトに 3 つの項目を追加し、`/neoswitch:off` を実行するか、そこで NeoSwitch を使う最後のセッションを閉じると取り除きます。
 
 - `ANTHROPIC_BASE_URL` と `ANTHROPIC_AUTH_TOKEN`: そのプロジェクトの新しい Claude Code セッションを、このコンピューター上の NeoSwitch につなぎます。このトークンはこのコンピューターの NeoSwitch にしか使えず、Google や Anthropic の認証情報ではありません。
 - `CLAUDE_CODE_USE_GATEWAY=0`: それらのセッションを NeoSwitch に直接つなぎます。別のゲートウェイ経由で Claude Code を起動するツールの中にはゲートウェイモードをオンにするものがあり、そのままだと Claude Code は NeoSwitch を無視してしまいます。

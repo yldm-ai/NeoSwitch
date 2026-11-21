@@ -21,6 +21,17 @@
           }
         ]
       }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/plugin/session-end.sh\" \"$PPID\"",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }

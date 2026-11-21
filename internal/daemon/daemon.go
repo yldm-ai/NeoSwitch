@@ -18,6 +18,7 @@ import (
 
 const (
 	attachPath = "/neoswitch/attach"
+	detachPath = "/neoswitch/detach"
 	statusPath = "/neoswitch/status"
 )
 
@@ -33,6 +34,8 @@ type Options struct {
 	Backend string
 	// Version is the NeoSwitch version of the daemon binary, reported by Status so a session started after an update can tell it is served by the earlier version.
 	Version string
+	// Release is called with a project once no attached session uses it any more, so the next session there starts on Claude. It runs while attaches wait, so a session turning the project on again lands after it. A session attached without a project releases none.
+	Release func(project string)
 }
 
 // Info is what a running daemon reports about itself. Version is empty for daemons from versions that did not report it.
@@ -57,9 +60,34 @@ func Run(ctx context.Context, s State, proxy http.Handler, opts Options) error {
 	if err != nil {
 		return fmt.Errorf("listen on %s: %w", s.Listen, err)
 	}
-	sessions := &sessionSet{pids: map[int]bool{}}
+	if opts.Release == nil {
+		opts.Release = func(string) {}
+	}
+	sessions := &sessionSet{pids: map[int]map[string]bool{}, release: opts.Release}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST "+attachPath, func(w http.ResponseWriter, r *http.Request) {
+		if !authorized(r, s.Token) {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		var body struct {
+			PID     int    `json:"pid"`
+			Project string `json:"project"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 4<<10)).Decode(&body); err != nil || body.PID <= 1 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		// A daemon that decided to stop refuses, so Attach starts a new one instead of attaching to one about to exit.
+		if !sessions.add(body.PID, body.Project) {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		// Daemons that predate project tracking answer 204, which tells a session its project stays routed.
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(attachReply{Tracked: body.Project != ""})
+	})
+	mux.HandleFunc("POST "+detachPath, func(w http.ResponseWriter, r *http.Request) {
 		if !authorized(r, s.Token) {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
@@ -71,7 +99,7 @@ func Run(ctx context.Context, s State, proxy http.Handler, opts Options) error {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		sessions.add(body.PID)
+		sessions.remove(body.PID)
 		w.WriteHeader(http.StatusNoContent)
 	})
 	mux.HandleFunc("GET "+statusPath, func(w http.ResponseWriter, r *http.Request) {
@@ -97,10 +125,11 @@ func Run(ctx context.Context, s State, proxy http.Handler, opts Options) error {
 		case err := <-served:
 			return err
 		case <-ctx.Done():
+			// Stopped from outside, as at logout or shutdown: the sessions go too, so their projects return to Claude.
+			sessions.stop()
 			return shutdown(server)
 		case <-ticker.C:
-			attached, alive := sessions.prune(opts.Alive)
-			if (!attached && time.Now().After(deadline)) || (attached && alive == 0) {
+			if sessions.prune(opts.Alive, time.Now().After(deadline)) {
 				return shutdown(server)
 			}
 		}
@@ -113,17 +142,36 @@ func shutdown(server *http.Server) error {
 	return server.Shutdown(ctx)
 }
 
-type sessionSet struct {
-	mu       sync.Mutex
-	pids     map[int]bool
-	attached bool
+type attachReply struct {
+	// Tracked: the daemon turns the session's project off once no attached session uses it.
+	Tracked bool `json:"tracked"`
 }
 
-func (s *sessionSet) add(pid int) {
+// sessionSet holds the attached Claude Code processes and the projects each one turned on.
+type sessionSet struct {
+	mu       sync.Mutex
+	pids     map[int]map[string]bool
+	attached bool
+	// closing: the daemon decided to stop and takes no more sessions.
+	closing bool
+	release func(project string)
+}
+
+// add reports false when the daemon is closing.
+func (s *sessionSet) add(pid int, project string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.pids[pid] = true
+	if s.closing {
+		return false
+	}
+	if s.pids[pid] == nil {
+		s.pids[pid] = map[string]bool{}
+	}
+	if project != "" {
+		s.pids[pid][project] = true
+	}
 	s.attached = true
+	return true
 }
 
 func (s *sessionSet) len() int {
@@ -132,16 +180,56 @@ func (s *sessionSet) len() int {
 	return len(s.pids)
 }
 
-// prune drops exited processes and reports whether any session ever attached and how many are still running.
-func (s *sessionSet) prune(alive func(int) bool) (bool, int) {
+// remove forgets a session that ended, releasing the projects no other session uses.
+func (s *sessionSet) remove(pid int) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.drop(pid)
+}
+
+// prune drops exited processes, releasing their projects, and reports whether the daemon should stop: every attached session has exited, or none attached before graceOver. Deciding to stop also refuses later attaches.
+func (s *sessionSet) prune(alive func(int) bool, graceOver bool) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	for pid := range s.pids {
 		if !alive(pid) {
-			delete(s.pids, pid)
+			s.drop(pid)
 		}
 	}
-	return s.attached, len(s.pids)
+	if (!s.attached && graceOver) || (s.attached && len(s.pids) == 0) {
+		s.closing = true
+	}
+	return s.closing
+}
+
+// stop releases every project and refuses later attaches.
+func (s *sessionSet) stop() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.closing = true
+	for pid := range s.pids {
+		s.drop(pid)
+	}
+}
+
+// drop removes pid and releases each of its projects that no remaining session uses. The caller holds mu.
+func (s *sessionSet) drop(pid int) {
+	projects := s.pids[pid]
+	delete(s.pids, pid)
+	for project := range projects {
+		if !s.inUse(project) {
+			s.release(project)
+		}
+	}
+}
+
+func (s *sessionSet) inUse(project string) bool {
+	for _, projects := range s.pids {
+		if projects[project] {
+			return true
+		}
+	}
+	return false
 }
 
 func processAlive(pid int) bool {
@@ -188,20 +276,31 @@ func (e *PortInUseError) Error() string { return "another program is using " + e
 // portBusyWait is how long a held port may stay silent before it is blamed on another program. A NeoSwitch daemon that is starting or shutting down holds the port briefly without answering the status probe.
 var portBusyWait = 2 * time.Second
 
-// Attach registers a Claude Code process with the daemon, starting the daemon through spawn first when none is running. It tries twice because a daemon that is shutting down (its last session just exited) can still answer the status probe and then refuse the attach. A port held by another program fails at once with *PortInUseError instead of waiting for a daemon that can never listen.
-func Attach(s State, pid int, spawn func() error) error {
-	var err error
-	for attempt := 0; attempt < 2; attempt++ {
-		if err = attachOnce(s, pid, spawn); err == nil {
-			return nil
+// Attach registers a Claude Code process with the daemon, starting the daemon through spawn first when none is running, and reports whether the daemon tracks project: it then turns the project off once no attached session uses it. project is "" for a session that turns no project on. It tries three times because a daemon that is shutting down (its last session just exited) can still answer the status probe and then refuse the attach. A port held by another program fails at once with *PortInUseError instead of waiting for a daemon that can never listen.
+func Attach(s State, pid int, project string, spawn func() error) (tracked bool, err error) {
+	for attempt := 0; attempt < 3; attempt++ {
+		if tracked, err = attachOnce(s, pid, project, spawn); err == nil {
+			return tracked, nil
 		}
 		var busy *PortInUseError
 		if errors.As(err, &busy) {
-			return err
+			return false, err
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
-	return err
+	return false, err
+}
+
+// Detach tells the daemon a session ended, so the projects only it used return to Claude at once rather than at the daemon's next check, which a session reopened right away would beat. A daemon that does not answer, or predates detaching, is left to that check.
+func Detach(s State, pid int) {
+	body, _ := json.Marshal(map[string]int{"pid": pid})
+	req, _ := http.NewRequest(http.MethodPost, s.BaseURL()+detachPath, bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+s.Token)
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
+	if err == nil {
+		_ = resp.Body.Close()
+	}
 }
 
 // portFree reports whether nothing listens on addr.
@@ -228,14 +327,14 @@ func answersWithin(s State, d time.Duration) bool {
 	}
 }
 
-func attachOnce(s State, pid int, spawn func() error) error {
+func attachOnce(s State, pid int, project string, spawn func() error) (bool, error) {
 	if _, ok := Status(s); !ok && !portFree(s.Listen) {
 		if !answersWithin(s, portBusyWait) {
-			return &PortInUseError{Listen: s.Listen}
+			return false, &PortInUseError{Listen: s.Listen}
 		}
 	} else if !ok {
 		if err := spawn(); err != nil {
-			return fmt.Errorf("start NeoSwitch daemon: %w", err)
+			return false, fmt.Errorf("start NeoSwitch daemon: %w", err)
 		}
 		deadline := time.Now().Add(15 * time.Second)
 		for {
@@ -243,22 +342,29 @@ func attachOnce(s State, pid int, spawn func() error) error {
 				break
 			}
 			if time.Now().After(deadline) {
-				return fmt.Errorf("NeoSwitch daemon did not come up on %s", s.Listen)
+				return false, fmt.Errorf("NeoSwitch daemon did not come up on %s", s.Listen)
 			}
 			time.Sleep(100 * time.Millisecond)
 		}
 	}
-	body, _ := json.Marshal(map[string]int{"pid": pid})
+	body, _ := json.Marshal(map[string]any{"pid": pid, "project": project})
 	req, _ := http.NewRequest(http.MethodPost, s.BaseURL()+attachPath, bytes.NewReader(body))
 	req.Header.Set("Authorization", "Bearer "+s.Token)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := (&http.Client{Timeout: 5 * time.Second}).Do(req)
 	if err != nil {
-		return fmt.Errorf("attach session: %w", err)
+		return false, fmt.Errorf("attach session: %w", err)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusNoContent {
-		return fmt.Errorf("attach session: daemon answered HTTP %d", resp.StatusCode)
+	switch resp.StatusCode {
+	case http.StatusNoContent:
+		return false, nil
+	case http.StatusOK:
+		var reply attachReply
+		if err := json.NewDecoder(resp.Body).Decode(&reply); err != nil {
+			return false, fmt.Errorf("attach session: %w", err)
+		}
+		return reply.Tracked, nil
 	}
-	return nil
+	return false, fmt.Errorf("attach session: daemon answered HTTP %d", resp.StatusCode)
 }
