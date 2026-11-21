@@ -357,7 +357,7 @@ func TestSessionStartProblemsNameTheFix(t *testing.T) {
 	t.Setenv(backendEnv, backendAntigravity)
 	_, _, _, err := configuredBackend(context.Background())
 	message := sessionBlocked(err.Error())
-	for _, want := range []string{"Antigravity CLI from Google", "/neoswitch:off"} {
+	for _, want := range []string{"/neoswitch:login", "/neoswitch:off"} {
 		if !strings.Contains(message, want) {
 			t.Fatalf("%q lacks %q", message, want)
 		}

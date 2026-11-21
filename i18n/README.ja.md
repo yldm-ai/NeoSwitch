@@ -28,7 +28,7 @@ NeoSwitch を使うと、Claude Code はそのままに、Claude の代わりに
 /neoswitch:login
 ```
 
-Google の利用規約に関する警告を表示したあと、Google の [Antigravity コマンドラインツール（`agy`）](https://antigravity.google/download)を通じてブラウザで Google のログインを開き、最後にこのプロジェクトを切り替えます。`agy` はこのコンピューターにあらかじめインストールしておく必要があります。ターミナルに慣れている方は Gemini API キーも使えます。[docs/cli.md](../docs/cli.md#gemini-api-key)（英語）を参照してください。
+Google の利用規約に関する警告を表示したあと、Google の [Antigravity コマンドラインツール（`agy`）](https://antigravity.google/download)を通じてブラウザで Google のログインを開き、最後にこのプロジェクトを切り替えます。このコンピューターに `agy` がまだなければ、先に Google 公式のインストーラーで `~/.local/bin` にインストールします（約 230 MB。インストーラーはこのフォルダーをシェルの PATH にも追加します）。ターミナルに慣れている方は Gemini API キーも使えます。[docs/cli.md](../docs/cli.md#gemini-api-key)（英語）を参照してください。
 
 > [!WARNING]
 > [Google Antigravity 利用規約](https://antigravity.google/terms)（第 6 条）は、ほかのツールを通じて Antigravity を使うことを禁じており、NeoSwitch はそうしたツールにあたります。Google はそうした利用者の Antigravity のアカウントを停止または解約することがあります。`/neoswitch:login` は毎回この警告を表示します。このリスクを受け入れられない場合は、ログインしないでください。
@@ -48,7 +48,7 @@ Google の利用規約に関する警告を表示したあと、Google の [Anti
 | 表示される内容 | 対処 |
 |---|---|
 | セッション開始時のメッセージに、NeoSwitch がまだ設定されていないと出る | `/neoswitch:login` を実行します。次のメッセージから Gemini 4 Neon を使います。 |
-| `agy` がインストールされていないと表示される | Google の [Antigravity コマンドラインツール（`agy`）](https://antigravity.google/download)をインストールしてから、もう一度 `/neoswitch:login` を実行します。 |
+| `agy` がインストールされていないと表示される | `/neoswitch:login` が自動ではインストールできませんでした。ターミナルで `curl -fsSL https://antigravity.google/cli/install.sh \| bash` を実行するか、[Google のダウンロードページ](https://antigravity.google/download)からインストールしてから、もう一度 `/neoswitch:login` を実行します。 |
 | どのメッセージも接続エラーになる、またはセッション開始時のメッセージにこのセッションは回答できないと出る | 同じプロジェクトで `/neoswitch:off` を実行します。その返答自体が接続エラーになっても、プロジェクトは元に戻っています。`/exit` と入力して `claude` を起動し直すと Claude に戻り、`/neoswitch:status` で何を直せばよいかがわかります。 |
 | ほかの Claude Code ウィンドウが以前の設定を共有していると出る | Claude Code のウィンドウをすべて閉じてから、もう一度開きます。 |
 | NeoSwitch が必要とするポートを別のプログラムが使っていると出る | そのプログラムを閉じて Claude Code を起動し直すか、`/neoswitch:off` を実行します。 |
@@ -85,7 +85,7 @@ claude plugin marketplace remove neoswitch
 | プラグインがダウンロードまたはビルドした NeoSwitch のプログラム | `$XDG_CACHE_HOME/neoswitch/`。`XDG_CACHE_HOME` が未設定なら `~/.cache/neoswitch/` |
 | 設定とログ: `proxy.json`（アドレス、アクセスキー、選んだ方法）、`daemon.log` | `NEOSWITCH_STATE_DIR` が設定されていればそこ。なければ macOS は `~/Library/Application Support/neoswitch/`、Linux は `$XDG_CONFIG_HOME/neoswitch/` または `~/.config/neoswitch/` |
 
-Google のログイン情報は NeoSwitch ではなく `agy` が保存しており、そのまま残ります。
+Google のログイン情報は NeoSwitch ではなく `agy` が保存しており、そのまま残ります。`/neoswitch:login` がインストールした場合も含め、`agy` 本体も残ります。
 
 ## NeoSwitch が変更するもの
 

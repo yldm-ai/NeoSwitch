@@ -28,7 +28,7 @@ NeoSwitch를 쓰면 Claude Code는 그대로 두고, Claude 대신 Google의 Gem
 /neoswitch:login
 ```
 
-Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`agy`)](https://antigravity.google/download)를 통해 브라우저에서 Google 로그인을 열고, 마지막으로 이 프로젝트를 전환합니다. 이 컴퓨터에 `agy`가 설치되어 있어야 합니다. 터미널에 익숙하다면 Gemini API 키도 쓸 수 있습니다. [docs/cli.md](../docs/cli.md#gemini-api-key)(영어)를 보세요.
+Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`agy`)](https://antigravity.google/download)를 통해 브라우저에서 Google 로그인을 열고, 마지막으로 이 프로젝트를 전환합니다. 이 컴퓨터에 아직 `agy`가 없으면 먼저 Google 공식 설치 스크립트로 `~/.local/bin`에 설치합니다(약 230MB. 설치 스크립트는 이 폴더를 셸의 PATH에도 추가합니다). 터미널에 익숙하다면 Gemini API 키도 쓸 수 있습니다. [docs/cli.md](../docs/cli.md#gemini-api-key)(영어)를 보세요.
 
 > [!WARNING]
 > [Google Antigravity 서비스 약관](https://antigravity.google/terms)(제6조)은 다른 도구를 통해 Antigravity를 쓰는 것을 금지하며, NeoSwitch는 그런 도구에 해당합니다. Google은 그렇게 쓰는 사람의 Antigravity 계정을 정지하거나 해지할 수 있습니다. `/neoswitch:login`은 매번 이 경고를 다시 보여 줍니다. 이 위험을 받아들일 수 없다면 로그인하지 마세요.
@@ -48,7 +48,7 @@ Google 약관 경고를 보여 준 뒤 Google의 [Antigravity 명령줄 도구(`
 | 보이는 내용 | 해결 방법 |
 |---|---|
 | 세션 시작 안내에 NeoSwitch가 아직 설정되지 않았다고 나옴 | `/neoswitch:login`을 실행하세요. 다음 메시지부터 Gemini 4 Neon을 씁니다. |
-| `agy`가 설치되어 있지 않다는 메시지가 나옴 | Google의 [Antigravity 명령줄 도구(`agy`)](https://antigravity.google/download)를 설치한 뒤 `/neoswitch:login`을 다시 실행하세요. |
+| `agy`가 설치되어 있지 않다는 메시지가 나옴 | `/neoswitch:login`이 자동으로 설치하지 못한 경우입니다. 터미널에서 `curl -fsSL https://antigravity.google/cli/install.sh \| bash`를 실행하거나 [Google 다운로드 페이지](https://antigravity.google/download)에서 설치한 뒤 `/neoswitch:login`을 다시 실행하세요. |
 | 모든 메시지가 연결 오류로 실패하거나, 세션 시작 안내에 이 세션은 답할 수 없다고 나옴 | 같은 프로젝트에서 `/neoswitch:off`를 실행하세요. 그 응답에도 연결 오류가 보이더라도 프로젝트는 이미 되돌려졌습니다. `/exit`를 입력하고 `claude`를 다시 시작하면 Claude로 돌아오며, `/neoswitch:status`가 무엇을 고쳐야 하는지 알려 줍니다. |
 | 다른 Claude Code 창이 이전 설정을 함께 쓰고 있다고 나옴 | Claude Code 창을 모두 닫은 뒤 다시 여세요. |
 | NeoSwitch에 필요한 포트를 다른 프로그램이 쓰고 있다고 나옴 | 그 프로그램을 닫고 Claude Code를 다시 시작하거나 `/neoswitch:off`를 실행하세요. |
@@ -85,7 +85,7 @@ claude plugin marketplace remove neoswitch
 | 플러그인이 내려받거나 빌드한 NeoSwitch 프로그램 | `$XDG_CACHE_HOME/neoswitch/`, `XDG_CACHE_HOME`이 없으면 `~/.cache/neoswitch/` |
 | 설정과 로그: `proxy.json`(주소, 접근 키, 고른 방법), `daemon.log` | `NEOSWITCH_STATE_DIR`가 설정되어 있으면 그곳, 아니면 macOS는 `~/Library/Application Support/neoswitch/`, Linux는 `$XDG_CONFIG_HOME/neoswitch/` 또는 `~/.config/neoswitch/` |
 
-Google 로그인 정보는 NeoSwitch가 아니라 `agy`가 보관하며 그대로 남습니다.
+Google 로그인 정보는 NeoSwitch가 아니라 `agy`가 보관하며 그대로 남습니다. `/neoswitch:login`이 설치한 경우를 포함해 `agy` 자체도 남습니다.
 
 ## NeoSwitch가 바꾸는 것
 

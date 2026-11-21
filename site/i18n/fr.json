@@ -30,7 +30,7 @@
   "why_local_desc": "Uniquement sur l'interface de bouclage. Les jetons OAuth restent dans <code>agy</code> ; NeoSwitch ne les lit jamais.",
   "why_honest_title": "Compatibilité sans détour",
   "why_honest_desc": "Ce qui fonctionne, ce qui fonctionne partiellement et ce qui manque est détaillé plus bas. Aucune bascule silencieuse vers un autre modèle.",
-  "start_sub": "Nécessite Claude Code. Go est facultatif : avec Go, le plugin compile son binaire à partir des sources lors de la première utilisation ; sans Go, il télécharge le binaire de la release correspondante et vérifie sa somme de contrôle. Pour Antigravity OAuth, il vous faut aussi la CLI officielle <code>agy</code> dans votre PATH.",
+  "start_sub": "Nécessite Claude Code. Go est facultatif : avec Go, le plugin compile son binaire à partir des sources lors de la première utilisation ; sans Go, il télécharge le binaire de la release correspondante et vérifie sa somme de contrôle. Pour Antigravity OAuth, <code>/neoswitch:login</code> installe la CLI officielle <code>agy</code> de Google si elle manque.",
   "step1_title": "Installer le plugin",
   "step1_desc": "Dans Claude Code :",
   "step2_title": "Se connecter et activer le routage",

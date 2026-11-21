@@ -30,7 +30,7 @@
   "why_local_desc": "Solo loopback. Los tokens OAuth permanecen dentro de <code>agy</code>; NeoSwitch nunca los lee.",
   "why_honest_title": "Compatibilidad sin rodeos",
   "why_honest_desc": "Lo que funciona, lo que funciona en parte y lo que falta se detalla más abajo. Nunca se recurre en silencio a otro modelo.",
-  "start_sub": "Requiere Claude Code. Go es opcional: con Go, el plugin compila su binario a partir del código fuente la primera vez que se usa; sin Go, descarga el binario de la release correspondiente y verifica su checksum. Para Antigravity OAuth también necesitas la CLI oficial <code>agy</code> en tu PATH.",
+  "start_sub": "Requiere Claude Code. Go es opcional: con Go, el plugin compila su binario a partir del código fuente la primera vez que se usa; sin Go, descarga el binario de la release correspondiente y verifica su checksum. Para Antigravity OAuth, <code>/neoswitch:login</code> instala la CLI oficial <code>agy</code> de Google si falta.",
   "step1_title": "Instala el plugin",
   "step1_desc": "Dentro de Claude Code:",
   "step2_title": "Inicia sesión y activa el enrutamiento",

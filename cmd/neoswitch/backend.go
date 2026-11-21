@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/yldm-ai/neo-switch/internal/daemon"
@@ -74,7 +73,7 @@ func configuredBackend(ctx context.Context) (server.Backend, string, string, err
 	if kind == backendAntigravity {
 		backend, err := provider.NewAntigravityACPFromEnv(ctx)
 		if errors.Is(err, provider.ErrAntigravityCLIMissing) {
-			return nil, "", "", fmt.Errorf("%w: install the Antigravity CLI from Google, then start a new Claude Code session", err)
+			return nil, "", "", fmt.Errorf("%w: run /neoswitch:login, which installs it, then start a new Claude Code session", err)
 		}
 		if err != nil {
 			return nil, "", "", err
@@ -195,7 +194,7 @@ func geminiCredentialConfigured() bool {
 }
 
 func antigravityCLIAvailable() bool {
-	_, err := exec.LookPath(antigravityCLIPath())
+	_, err := provider.FindAntigravityCLI()
 	return err == nil
 }
 

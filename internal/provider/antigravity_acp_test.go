@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -415,9 +416,38 @@ func TestACPLoginGivesUpOnStuckHandshake(t *testing.T) {
 func TestACPMissingCLIIsReportedWithoutExecDetails(t *testing.T) {
 	t.Setenv("ANTIGRAVITY_CLI_PATH", "")
 	t.Setenv("PATH", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
 	_, err := NewAntigravityACPFromEnv(context.Background())
 	if !errors.Is(err, ErrAntigravityCLIMissing) || strings.Contains(err.Error(), "PATH") || strings.Contains(err.Error(), "exec") {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// Google's installer puts agy in ~/.local/bin and adds it to shell profiles only, so a Claude Code started before the install must still find it.
+func TestFindAntigravityCLIFallsBackToInstallerLocation(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("ANTIGRAVITY_CLI_PATH", "")
+	installed := filepath.Join(home, ".local", "bin", "agy")
+	if err := os.MkdirAll(filepath.Dir(installed), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(installed, []byte("#!/bin/sh\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := FindAntigravityCLI(); err != nil || got != installed {
+		t.Fatalf("FindAntigravityCLI() = %q, %v; want %q", got, err, installed)
+	}
+	a, err := NewAntigravityACPFromEnv(context.Background())
+	if err != nil || a.path != installed {
+		t.Fatalf("NewAntigravityACPFromEnv() = %+v, %v; want path %q", a, err, installed)
+	}
+
+	// An explicit ANTIGRAVITY_CLI_PATH is the user's choice and never falls back.
+	t.Setenv("ANTIGRAVITY_CLI_PATH", filepath.Join(t.TempDir(), "agy"))
+	if _, err := FindAntigravityCLI(); !errors.Is(err, ErrAntigravityCLIMissing) {
+		t.Fatalf("explicit missing path: got %v", err)
 	}
 }
 
