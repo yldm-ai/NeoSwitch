@@ -52,6 +52,8 @@ func main() {
 		err = attach(os.Args[2:])
 	case "daemon":
 		err = runDaemon()
+	case "update-check":
+		err = updateCheckCommand()
 	case "version", "--version":
 		fmt.Println("neoswitch", version)
 		return

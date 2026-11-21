@@ -8,9 +8,9 @@ import (
 	"testing"
 )
 
-// Tests run from inside Claude Code (its Bash tool) inherit the session's CLAUDECODE and CLAUDE_PID. Left set, they would make enableProject treat every test as a live session and start a daemon from the test binary for it.
+// Tests run from inside Claude Code (its Bash tool) inherit the session's CLAUDECODE and CLAUDE_PID. Left set, they would make enableProject treat every test as a live session and start a daemon from the test binary for it. NEOSWITCH_PLUGIN would likewise make attach start the test binary as its background update check.
 func TestMain(m *testing.M) {
-	for _, key := range []string{"CLAUDECODE", "CLAUDE_PID", "CLAUDE_CODE_USE_GATEWAY"} {
+	for _, key := range []string{"CLAUDECODE", "CLAUDE_PID", "CLAUDE_CODE_USE_GATEWAY", pluginEnv} {
 		_ = os.Unsetenv(key)
 	}
 	os.Exit(m.Run())

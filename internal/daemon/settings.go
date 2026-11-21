@@ -108,5 +108,5 @@ func editSettings(project string, edit func(env map[string]any)) error {
 		return err
 	}
 	data, _ := json.MarshalIndent(settings, "", "  ")
-	return writeFileAtomic(path, append(data, '\n'), 0o600)
+	return WriteFileAtomic(path, append(data, '\n'), 0o600)
 }

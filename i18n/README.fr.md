@@ -22,6 +22,8 @@ Vous basculez un projet à la fois ; vos autres projets continuent d'utiliser Cl
 /plugin install neoswitch@neoswitch
 ```
 
+Activez ensuite les mises à jour automatiques, pour recevoir les correctifs quand Google ou Claude Code modifient quelque chose dont NeoSwitch dépend : exécutez `/plugin`, ouvrez l'onglet **Marketplaces**, choisissez `neoswitch` et activez auto-update. Claude Code les laisse désactivées pour les marketplaces qui ne viennent pas d'Anthropic.
+
 **2. Connectez-vous avec votre compte Google.** Ouvrez Claude Code dans le projet à basculer et exécutez :
 
 ```text
@@ -42,6 +44,7 @@ La commande affiche l'avertissement sur les conditions de Google, ouvre la conne
 - Une réponse peut mettre 5 à 40 secondes avant d'afficher ses premiers mots. C'est normal. Si vous vous êtes connecté avec `/neoswitch:login`, `/effort low` fait démarrer les réponses plus tôt.
 - La première commande NeoSwitch après une installation ou une mise à jour peut prendre jusqu'à une minute, le temps que NeoSwitch se prépare.
 - `/neoswitch:status` vous indique à tout moment si cette session utilise Claude ou Gemini 4 Neon, et quoi faire ensuite.
+- Quand une version plus récente de NeoSwitch est disponible, la note de session l'indique et donne les commandes de mise à jour. Avec auto-update activé, Claude Code l'installe tout seul ; elle s'applique une fois toutes les fenêtres Claude Code fermées puis rouvertes.
 
 ## En cas de problème
 
@@ -59,7 +62,7 @@ La commande affiche l'avertissement sur les conditions de Google, ouvre la conne
 
 - `/neoswitch:off` rebascule ce projet sur Claude pour les nouvelles sessions ; une session qui utilise déjà Gemini 4 Neon le garde jusqu'à ce que vous tapiez `/exit`. `/neoswitch:on` rebascule le projet sur Gemini 4 Neon sans rien reconfigurer, dès votre prochain message.
 
-Pour mettre le plugin à jour, exécutez ceci dans un terminal, puis redémarrez Claude Code :
+Pour mettre à jour à la main, exécutez ceci dans un terminal, puis fermez toutes les fenêtres Claude Code et rouvrez-les :
 
 ```bash
 claude plugin marketplace update neoswitch

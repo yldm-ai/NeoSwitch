@@ -22,6 +22,8 @@ You switch one project at a time; your other projects keep using Claude. The plu
 /plugin install neoswitch@neoswitch
 ```
 
+Then turn on automatic updates, so fixes reach you when Google or Claude Code change something NeoSwitch depends on: run `/plugin`, open the **Marketplaces** tab, choose `neoswitch` and turn on auto-update. Claude Code leaves it off for marketplaces that do not come from Anthropic.
+
 **2. Sign in with your Google account.** Open Claude Code in the project you want to switch and run:
 
 ```text
@@ -42,6 +44,7 @@ It shows Google's terms warning, opens Google sign-in in your browser through Go
 - A reply can take 5 to 40 seconds before its first words appear. That is normal. If you signed in with `/neoswitch:login`, `/effort low` makes replies start sooner.
 - The first NeoSwitch command after an install or update can take up to a minute while NeoSwitch gets ready.
 - `/neoswitch:status` tells you at any time whether this session uses Claude or Gemini 4 Neon, and what to do next.
+- When a newer NeoSwitch is available, the session note says so and gives the update commands. With auto-update on, Claude Code installs it by itself, and it applies once every Claude Code window has been closed and opened again.
 
 ## If something goes wrong
 
@@ -59,7 +62,7 @@ It shows Google's terms warning, opens Google sign-in in your browser through Go
 
 - `/neoswitch:off` switches this project back to Claude for new sessions; a session that already uses Gemini 4 Neon keeps it until you type `/exit`. `/neoswitch:on` switches the project to Gemini 4 Neon again without setting anything up again, starting with your next message.
 
-To update the plugin, run these in a terminal, then restart Claude Code:
+To update by hand, run these in a terminal, then close all Claude Code windows and open them again:
 
 ```bash
 claude plugin marketplace update neoswitch

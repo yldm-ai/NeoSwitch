@@ -33,7 +33,9 @@ With the OAuth route, the daemon starts the official `agy acp` subprocess. NeoSw
 
 `/neoswitch:login` saves Antigravity OAuth as the backend, so a Gemini key exported for other tools does not take over. Without a saved choice, NeoSwitch uses Gemini credentials from the environment when present, and Antigravity OAuth when `agy` is installed. `NEOSWITCH_BACKEND=antigravity|gemini|openai|auto` overrides all of these, and `neoswitch status -v` shows the backend in use and why.
 
-The plugin runs the binary through `plugin/neoswitch.sh`. With Go installed, it builds the binary from the plugin's own source on first use. Without Go, it downloads the release binary named by the repository's `VERSION` file for macOS or Linux (amd64 or arm64) and verifies its SHA-256 checksum before running it. Between releases that binary can be older than the plugin source.
+The plugin runs the binary through `plugin/neoswitch.sh`. With Go installed, it builds the binary from the plugin's own source on first use. Without Go, it downloads the release binary named by the repository's `VERSION` file for macOS or Linux (amd64 or arm64) and verifies its SHA-256 checksum before running it; when the download fails, for example offline right after an update, it runs the version it downloaded earlier. Between releases that binary can be older than the plugin source.
+
+Claude Code does not auto-update third-party marketplaces unless the user turns it on, so the plugin checks for updates itself. At most every 6 hours, the SessionStart hook reads `main`'s `VERSION` from GitHub in a background process, without delaying the session. When it is newer than the running version, the session note and `/neoswitch:status` say so and give the update commands. `NEOSWITCH_NO_UPDATE_CHECK=1` or Claude Code's `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1` turns the check off. The standalone CLI does not check.
 
 The plugin is not supported on Windows: the daemon's check for open Claude Code sessions does not work there, so it would stop shortly after starting.
 
@@ -131,6 +133,7 @@ Run `neoswitch off` in each project you enabled before removing NeoSwitch. To re
 | Variable | Effect |
 |---|---|
 | `NEOSWITCH_BACKEND` | `antigravity`, `gemini`, `openai` or `auto`; overrides the saved choice |
+| `NEOSWITCH_NO_UPDATE_CHECK=1` | Plugin only: do not check GitHub for a newer NeoSwitch |
 | `NEOSWITCH_STATE_DIR` | State directory (default: `~/Library/Application Support/neoswitch/` on macOS, `$XDG_CONFIG_HOME/neoswitch/` or `~/.config/neoswitch/` on Linux) |
 | `GEMINI_API_KEY` | Gemini Developer API key |
 | `GOOGLE_GENAI_USE_VERTEXAI=true` with `GOOGLE_CLOUD_PROJECT` and `GOOGLE_CLOUD_LOCATION` | Use Vertex AI with Application Default Credentials instead |
@@ -162,6 +165,6 @@ go test -race ./...
 go vet ./...
 ```
 
-To release, bump `VERSION` and push the matching tag (`v` followed by its contents, such as `v0.1.0`); the release workflow refuses a tag that does not match.
+To release, follow [Releases in CONTRIBUTING.md](../CONTRIBUTING.md#releases): bump `VERSION` on its own branch, push the matching tag (`v` followed by its contents, such as `v0.1.0`), and merge to `main` only after the release is published. The release workflow refuses a tag that does not match `VERSION`.
 
 See [CONTRIBUTING.md](../CONTRIBUTING.md) for the contribution workflow.

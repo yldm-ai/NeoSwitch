@@ -22,6 +22,8 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 /plugin install neoswitch@neoswitch
 ```
 
+接著開啟自動更新，這樣 Google 或 Claude Code 改動了 NeoSwitch 依賴的東西時，修正會自動送到你這裡：執行 `/plugin`，開啟 **Marketplaces** 分頁，選取 `neoswitch`，開啟 auto-update。不是 Anthropic 官方的外掛市集，Claude Code 預設不會自動更新。
+
 **2. 用你的 Google 帳號登入。** 在要切換的專案裡開啟 Claude Code，執行：
 
 ```text
@@ -42,6 +44,7 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 - 每次回答可能要等 5 到 40 秒才出現第一個字，這是正常的。如果你是用 `/neoswitch:login` 登入的，輸入 `/effort low` 可以讓回答更快開始。
 - 安裝或更新後的第一條 NeoSwitch 指令可能要等上一分鐘，NeoSwitch 正在做準備。
 - 隨時可以執行 `/neoswitch:status`，它會告訴你目前工作階段用的是 Claude 還是 Gemini 4 Neon，以及下一步該做什麼。
+- 有新版 NeoSwitch 時，工作階段開頭的提示會告訴你，並列出更新指令。開啟了自動更新的話，Claude Code 會自己裝好新版，關閉所有 Claude Code 視窗再重新開啟後生效。
 
 ## 出了問題怎麼辦
 
@@ -59,7 +62,7 @@ NeoSwitch 讓 Claude Code 改用 Google 的 Gemini 4 Neon 模型來回答，Clau
 
 - `/neoswitch:off` 讓這個專案的新工作階段切回 Claude；已經在用 Gemini 4 Neon 的工作階段會一直用到你輸入 `/exit`。`/neoswitch:on` 把專案再切回 Gemini 4 Neon，不必重新設定，從下一則訊息開始生效。
 
-更新外掛：在終端機裡執行下面兩條指令，然後重新啟動 Claude Code：
+手動更新外掛：在終端機裡執行下面兩條指令，然後關閉所有 Claude Code 視窗再重新開啟：
 
 ```bash
 claude plugin marketplace update neoswitch
