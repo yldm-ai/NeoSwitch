@@ -108,10 +108,5 @@ func editSettings(project string, edit func(env map[string]any)) error {
 		return err
 	}
 	data, _ := json.MarshalIndent(settings, "", "  ")
-	// Write through a temp file so a crash never leaves Claude Code with a truncated settings file.
-	tmp := path + ".neoswitch.tmp"
-	if err := os.WriteFile(tmp, append(data, '\n'), 0o600); err != nil {
-		return err
-	}
-	return os.Rename(tmp, path)
+	return writeFileAtomic(path, append(data, '\n'), 0o600)
 }

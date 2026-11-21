@@ -88,9 +88,32 @@ func writeState(dir string, s State) error {
 		return err
 	}
 	data, _ := json.MarshalIndent(s, "", "  ")
-	tmp := statePath(dir) + ".tmp"
-	if err := os.WriteFile(tmp, append(data, '\n'), 0o600); err != nil {
+	return writeFileAtomic(statePath(dir), append(data, '\n'), 0o600)
+}
+
+// writeFileAtomic replaces path through a new temp file in the same directory, so a crash never leaves a truncated file. The temp file is created exclusively under a random name: a fixed name could already exist as a symlink, planted by a cloned repository in its .claude directory, and writing through it would overwrite whatever file it points to.
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	tmp, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, statePath(dir))
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		tmp.Close()
+		os.Remove(tmp.Name())
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmp.Name())
+		return err
+	}
+	if err := os.Rename(tmp.Name(), path); err != nil {
+		os.Remove(tmp.Name())
+		return err
+	}
+	return nil
 }

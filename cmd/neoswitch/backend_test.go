@@ -368,3 +368,25 @@ func TestSessionStartProblemsNameTheFix(t *testing.T) {
 		}
 	}
 }
+
+func TestLoopbackAddress(t *testing.T) {
+	for listen, want := range map[string]bool{
+		"127.0.0.1:8080": true, "localhost:8080": true, "[::1]:8080": true, "127.0.0.2:1": true,
+		":8080": false, "0.0.0.0:8080": false, "[::]:8080": false, "192.168.1.5:8080": false, "example.com:80": false, "garbage": false,
+	} {
+		if got := loopbackAddress(listen); got != want {
+			t.Errorf("loopbackAddress(%q) = %v, want %v", listen, got, want)
+		}
+	}
+}
+
+// Standalone serve must not hand the user's Google account or API key to the network without a token.
+func TestServeRefusesOpenListenWithoutToken(t *testing.T) {
+	isolateBackendEnv(t, true)
+	t.Setenv(backendEnv, backendAntigravity)
+	t.Setenv("NEOSWITCH_LISTEN", "0.0.0.0:0")
+	t.Setenv("NEOSWITCH_AUTH_TOKEN", "")
+	if err := serve(); err == nil || !strings.Contains(err.Error(), "NEOSWITCH_AUTH_TOKEN") {
+		t.Fatalf("got %v", err)
+	}
+}
